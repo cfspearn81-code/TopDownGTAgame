@@ -1,0 +1,8 @@
+/build/
+/dist/
+*.dat
+*.tmp
+*.obj
+*.o
+*.ppm
+__pycache__/

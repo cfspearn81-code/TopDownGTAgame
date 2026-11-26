@@ -1,0 +1,14 @@
+Rebuild the portable Windows game from a 64-bit Linux x86-64 host:
+  bash scripts/build.sh
+
+Requires GCC, Python 3 and GNU binutils with i386pep support. The linked
+Windows executable is build/DeadChannel.exe. The generated font include is
+provided. Regenerating it separately requires Pillow and DejaVu fonts.
+
+Engine regression:
+  gcc -O2 -g -fsanitize=address,undefined -o build/test src/test.c
+  ASAN_OPTIONS=detect_leaks=0 ./build/test
+
+Win32-ABI executable smoke test (stubbed Win32 on Linux, not Wine):
+  gcc -O2 -o build/check_pe scripts/check_pe.c
+  ./build/check_pe build/DeadChannel.exe

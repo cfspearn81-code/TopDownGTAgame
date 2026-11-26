@@ -1,0 +1,450 @@
+/* Lane traffic and pedestrians are transient world state, not save data.
+ * Included by game.c after move/open_space. Car 0 is owned, car 2 is reserved
+ * for Hot Property, and the final slot is still the scripted work loaner. */
+#define STREET_HALF_L 15.5f
+#define STREET_HALF_W 8.f
+#define STREET_WALK 38.f
+#define STREET_CIVILIANS 40
+
+typedef struct {int l,t,r,b;} StreetLoop;
+static const StreetLoop streetLoops[]={
+ {1,1,4,3},{1,2,3,5},{3,1,6,3},{4,2,7,4},
+ {2,4,4,6},{4,4,7,6},{1,5,3,7},{3,5,6,7},{5,5,7,7}
+};
+typedef struct {int live,loop,next;float pace;} StreetDriver;
+enum{STREET_LEAVE,STREET_EN_ROUTE,STREET_ARRIVE};
+typedef struct {float x,y,cx,cy;} StreetAddress;
+typedef struct {int goal,visits,cross,leg;float tx,ty,mx,my,ax,ay,pause,crossX,crossY,blocked;} StreetWalk;
+static StreetDriver streetDrivers[LEN(cars)];
+static StreetWalk streetWalks[STREET_CIVILIANS];
+static int streetJunctionOwner[64];
+
+static int street_overlap(const Car*a,const Car*b){
+ float x=b->x-a->x,y=b->y-a->y;
+ if(d2(x,y)>=36.f*36.f)return 0;
+ float ac=cs(a->a),as=sn(a->a),bc=cs(b->a),bs=sn(b->a);
+ float parallel=absf(ac*bc+as*bs),perp=absf(ac*bs-as*bc);
+ float l=STREET_HALF_L*(1+parallel)+STREET_HALF_W*perp;
+ float w=STREET_HALF_W*(1+parallel)+STREET_HALF_L*perp;
+ return absf(x*ac+y*as)<l&&absf(y*ac-x*as)<w&&absf(x*bc+y*bs)<l&&absf(y*bc-x*bs)<w;
+}
+/* Exact line against the same building footprints used by solid().
+ * Subsampling can miss the tip of a wall, especially across diagonal corners. */
+static int street_clip_axis(float pos,float delta,float low,float high,float*t0,float*t1){
+ if(absf(delta)<.00001f)return pos>low&&pos<high;
+ float a=(low-pos)/delta,b=(high-pos)/delta;
+ if(a>b){float c=a;a=b;b=c;}
+ if(a>*t0)*t0=a;if(b<*t1)*t1=b;
+ return *t0<*t1;
+}
+static int street_line_open(float x,float y,float tx,float ty,float radius){
+ if(x<35||y<35||tx<35||ty<35||x>ROOM-36||y>ROOM-36||tx>ROOM-36||ty>ROOM-36)return 0;
+ float dx=tx-x,dy=ty-y;
+ for(int yy=cl((int)((dy<0?ty:y)-radius)/256,0,7);yy<=cl((int)((dy>0?ty:y)+radius)/256,0,7);yy++)
+  for(int xx=cl((int)((dx<0?tx:x)-radius)/256,0,7);xx<=cl((int)((dx>0?tx:x)+radius)/256,0,7);xx++){
+   const int*row=lot[yy*8+xx];
+   for(int i=1;i<=row[0];i++){
+    const Building*b=buildings+row[i];float t0=0,t1=1;
+    if(street_clip_axis(x,dx,b->x-radius,b->x+b->w+radius,&t0,&t1)&&
+       street_clip_axis(y,dy,b->y-radius,b->y+b->h+radius,&t0,&t1))return 0;
+   }
+  }
+ return 1;
+}
+static int street_on_camera(float x,float y){
+ int left=cl((int)p.x-W/2,0,ROOM-W),top=cl((int)p.y-H/2,0,ROOM-H);
+ return x>=left-25&&x<=left+W+25&&y>=top-31&&y<=top+H+31;
+}
+/* Test the actual rotated body against building boxes. Sparse chassis probes
+ * missed building corners, and an embedded old car could drive deeper in. */
+static float street_wall_depth(const Car*c){
+ float co=cs(c->a),si=sn(c->a),ac=absf(co),as=absf(si);
+ float rx=STREET_HALF_L*ac+STREET_HALF_W*as,ry=STREET_HALF_L*as+STREET_HALF_W*ac;
+ float l=c->x-rx,h=c->x+rx,t=c->y-ry,b=c->y+ry,depth=0;
+ if(l<35)depth=35-l;if(t<35&&35-t>depth)depth=35-t;
+ if(h>ROOM-36&&h-(ROOM-36)>depth)depth=h-(ROOM-36);
+ if(b>ROOM-36&&b-(ROOM-36)>depth)depth=b-(ROOM-36);
+ for(int yy=cl((int)t/256,0,7);yy<=cl((int)b/256,0,7);yy++)
+  for(int xx=cl((int)l/256,0,7);xx<=cl((int)h/256,0,7);xx++){
+   const int*row=lot[yy*8+xx];
+   for(int i=1;i<=row[0];i++){
+    const Building*v=buildings+row[i];float wx=v->w*.5f,wy=v->h*.5f;
+    float dx=v->x+wx-c->x,dy=v->y+wy-c->y;
+    float a=rx+wx-absf(dx),b=ry+wy-absf(dy);
+    if(a<=0||b<=0)continue;
+    float u=STREET_HALF_L+wx*ac+wy*as-absf(dx*co+dy*si);
+    float w=STREET_HALF_W+wx*as+wy*ac-absf(dy*co-dx*si);
+    if(u<=0||w<=0)continue;
+    if(b<a)a=b;if(u<a)a=u;if(w<a)a=w;
+    if(a>depth)depth=a;
+   }
+  }
+ return depth;
+}
+static int street_hits_wall(const Car*c){return street_wall_depth(c)>0.f;}
+static int street_car_clear(int id,const Car*old,const Car*next){
+ float penetration=street_wall_depth(next);
+ if(penetration>0.f&&(!old||penetration+.001f>=street_wall_depth(old)))return 0;
+ for(int j=0;j<nc;j++){
+  if(j==id||(j==0&&!sv.owned))continue;
+  const Car*b=cars+j;
+  if(street_overlap(next,b)&&(!old||!street_overlap(old,b)||
+      d2(next->x-b->x,next->y-b->y)<=d2(old->x-b->x,old->y-b->y)))return 0;
+ }
+ return 1;
+}
+static int street_move_car(int id,float dx,float dy){
+ Car*c=cars+id,next=*c;next.x+=dx;next.y+=dy;
+ if(!street_car_clear(id,c,&next))return 0;
+ *c=next;return 1;
+}
+static int street_turn_car(int id,float angle){
+ Car*c=cars+id,next=*c;next.a=angle;
+ float penetration=street_wall_depth(&next);
+ if(penetration>0.f&&penetration+.001f>=street_wall_depth(c))return 0;
+ for(int j=0;j<nc;j++)if(j!=id&&(j!=0||sv.owned)&&
+      street_overlap(&next,cars+j)&&!street_overlap(c,cars+j))return 0;
+ c->a=angle;return 1;
+}
+static float street_foot_car_depth(const Car*c,float x,float y,float feet){
+ float dx=x-c->x,dy=y-c->y,r=STREET_HALF_L+feet+STREET_HALF_W+feet;
+ if(absf(dx)>r||absf(dy)>r)return 0;
+ float co=cs(c->a),si=sn(c->a);
+ float along=STREET_HALF_L+feet-absf(dx*co+dy*si);
+ float across=STREET_HALF_W+feet-absf(dy*co-dx*si);
+ return along>0&&across>0?(along<across?along:across):0;
+}
+static int street_foot_car_clear(float x,float y,int ignore,float feet){
+ for(int i=0;i<nc;i++)if(i!=ignore&&(i||sv.owned)){
+  if(street_foot_car_depth(cars+i,x,y,feet)>0)return 0;
+ }
+ return 1;
+}
+/* Foot movement collides with every body, including wrecks, but people
+ * loaded beside a parked car or displaced by a rear impact can step out. */
+static int street_foot_move_clear(float x,float y){
+ if(solid(x,y,10))return 0;
+ for(int i=0;i<nc;i++)if(i||sv.owned){
+  const Car*c=cars+i;float after=street_foot_car_depth(c,x,y,7.f);
+  if(after<=0)continue;
+  float before=street_foot_car_depth(c,p.x,p.y,7.f);
+  if(after>before+.001f||(absf(after-before)<=.001f&&d2(x-c->x,y-c->y)<=d2(p.x-c->x,p.y-c->y)))return 0;
+ }
+ return 1;
+}
+static void street_player_step(float dx,float dy){
+ if(dx&&street_foot_move_clear(p.x+dx,p.y))p.x+=dx;
+ if(dy&&street_foot_move_clear(p.x,p.y+dy))p.y+=dy;
+}
+static int street_foot_clear(float x,float y,int ignore){
+ return open_space(x,y)&&street_foot_car_clear(x,y,ignore,7.f);
+}
+/* Transactional: find room before taking a payment or issuing a job.
+ * The separate apply marks a previously moving slot as no longer ambient. */
+static int street_find_car_space(int id,Car*car,float x,float y){
+ static const unsigned char radius[]={23,27,32,37,45,58,74,94,116};
+ for(int r=0;r<LEN(radius);r++)for(int i=0;i<16;i++){
+  float heading=i*.3926991f,dx=cs(heading)*radius[r],dy=sn(heading)*radius[r];
+  for(int j=0;j<2;j++){
+   Car next=*car;next.x=x+dx;next.y=y+dy;
+   next.a=wrap(car->a+j*1.570796f);next.s=0.f;
+   if(street_car_clear(id,0,&next)){*car=next;return 1;}
+  }
+ }
+ return 0;
+}
+static void street_stage_car(int id,Car car){
+ cars[id]=car;streetDrivers[id].live=0;
+}
+static int street_near_car(void){
+ if(p.car>=0)return -1;
+ float best=38.f*38.f;
+ int choice=-1;
+ for(int i=0;i<nc;i++){
+  const Car*c=cars+i;
+  float dx=c->x-p.x,dy=c->y-p.y,d=d2(dx,dy);
+  if(c->cond<=0||(i==0&&!sv.owned)||d>=best)continue;
+  if(street_line_open(p.x,p.y,c->x,c->y,2)){best=d;choice=i;}
+ }
+ return choice;
+}
+/* +1 entered, 0 unrelated/unavailable, -1 moving too fast to board. */
+static int street_enter_car(int i){
+ if(p.car>=0||i<0||i>=nc||i!=street_near_car())return 0;
+ Car*c=cars+i;
+ if(absf(c->s)>58.f)return -1;
+ streetDrivers[i].live=0;
+ p.car=i;p.x=c->x;p.y=c->y;p.a=c->a;
+ return 1;
+}
+static int street_exit_car(void){
+ if(p.car<0||p.car>=nc)return 0;
+ Car*c=cars+p.car;
+ if(absf(c->s)>78.f)return 0;
+ float co=cs(c->a),si=sn(c->a);
+ /* Prefer a curbside door; check the other door, then behind the car.
+  * Never silently eject into a wall, another vehicle or fast traffic. */
+ static const float candidates[][2]={{0,21},{0,-21},{-25,0},{-19,19},{-19,-19},{25,0},{19,19},{19,-19}};
+ for(int i=0;i<LEN(candidates);i++){
+  float u=candidates[i][0],v=candidates[i][1],x=c->x+u*co-v*si,y=c->y+u*si+v*co;
+  if(!street_foot_clear(x,y,p.car)||!street_line_open(c->x,c->y,x,y,3))continue;
+  int safe=1;
+  for(int j=0;j<nc;j++)if(j!=p.car&&absf(cars[j].s)>14.f){
+   Car*d=cars+j;
+   if(d2(d->x-x,d->y-y)>90.f*90.f)continue;
+   float a=cs(d->a),b=sn(d->a),ahead=((x-d->x)*a+(y-d->y)*b)*(d->s>0?1:-1),side=absf((y-d->y)*a-(x-d->x)*b);
+   if(ahead>=-8&&ahead<20+absf(d->s)*.60f&&side<14){safe=0;break;}
+  }
+  if(safe){p.x=x;p.y=y;p.car=-1;c->s=0;return 1;}
+ }
+ return 0;
+}
+static void street_loop_point(int which,int n,float*x,float*y){
+ const StreetLoop *l=streetLoops+which;
+ float left=l->l*256+10.f,right=l->r*256-10.f,top=l->t*256+10.f,bottom=l->b*256-10.f;
+ static const signed char o[][2]={{-17,0},{-5,5},{0,17},{0,-17},{-5,-5},{-17,0},
+    {17,0},{5,-5},{0,-17},{0,17},{5,5},{17,0}};
+ n%=12;
+ *x=((n<6)?right:left)+o[n][0];*y=((n<3||n>=9)?top:bottom)+o[n][1];
+}
+static int street_yield(const Car*c,float fx,float fy){
+ /* No ambient vehicle flattens a pedestrian. Brake early for anyone
+  * ahead in this lane and wait for a crossing to clear. */
+ float limit=22.f+c->s*.54f;
+ for(int i=0;i<STREET_CIVILIANS;i++)if(peds[i].hp>0&&peds[i].role==0&&streetWalks[i].cross){
+  float dx=peds[i].x-c->x,dy=peds[i].y-c->y;
+  float along=dx*fx+dy*fy,side=absf(dy*fx-dx*fy);
+  if(along>=-13&&along<limit&&side<13.5f){
+   /* If the chassis is already on the stripe and the pedestrian is
+    * holding just outside it, roll clear instead of mutual yield. The
+    * per-step body check below still never drives through the person. */
+   float co=cs(c->a),si=sn(c->a),bodySide=absf(dy*co-dx*si);
+   if(absf(dx*co+dy*si)<STREET_HALF_L&&bodySide>=STREET_HALF_W+3.f)continue;
+   return 1;
+  }
+ }
+ if(p.car<0&&!p.dead){
+  float dx=p.x-c->x,dy=p.y-c->y;
+  if(dx*fx+dy*fy>=-12&&dx*fx+dy*fy<limit&&absf(dy*fx-dx*fy)<14.f)return 1;
+ }
+ return 0;
+}
+static int street_ambient_step(int id,float dx,float dy){
+ Car*c=cars+id,next=*c;next.x+=dx;next.y+=dy;
+ float co=cs(next.a),si=sn(next.a);
+ for(int j=0;j<STREET_CIVILIANS+1;j++){
+  float ux,uy;
+  if(j==STREET_CIVILIANS){if(p.car>=0||p.dead)continue;ux=p.x-next.x;uy=p.y-next.y;}
+  else{if(peds[j].hp<=0||peds[j].role)continue;ux=peds[j].x-next.x;uy=peds[j].y-next.y;}
+  if(d2(ux,uy)<24.f*24.f&&absf(ux*co+uy*si)<STREET_HALF_L+3.f&&absf(uy*co-ux*si)<STREET_HALF_W+3.f){
+   if(d2(ux,uy)<=d2(ux+dx,uy+dy))return 0;
+  }
+ }
+ return street_move_car(id,dx,dy);
+}
+static int street_junction(float x,float y){
+ int bx=(int)(x+128.f)/256,by=(int)(y+128.f)/256;
+ return (bx>0&&bx<8&&by>0&&by<8&&absf(x-bx*256.f)<92.f&&absf(y-by*256.f)<92.f)?8*by+bx:-1;
+}
+static void street_tick_traffic(float dt){
+ /* Two perpendicular drivers can reach a turn nose-to-nose and each
+  * stop forever. Reserve enough space for stopping distance and the
+  * full diagonally turning rear chassis, not just the crosswalk itself. */
+ for(int j=0;j<LEN(streetJunctionOwner);j++){
+  int id=streetJunctionOwner[j];
+  if(id<0||id>=nc||!streetDrivers[id].live||p.car==id||cars[id].owner||cars[id].cond<=0||street_junction(cars[id].x,cars[id].y)!=j)
+   streetJunctionOwner[j]=-1;
+ }
+ for(int i=0;i<nc;i++)if(streetDrivers[i].live&&p.car!=i&&!cars[i].owner&&cars[i].cond>0){
+  int j=street_junction(cars[i].x,cars[i].y);
+  if(j>=0&&streetJunctionOwner[j]<0)streetJunctionOwner[j]=i;
+ }
+ for(int i=0;i<nc;i++){
+  StreetDriver*d=streetDrivers+i;
+  if(!d->live||p.car==i||cars[i].cond<=0||cars[i].owner)continue;
+  Car*c=cars+i;float tx,ty;
+  street_loop_point(d->loop,d->next,&tx,&ty);
+  float dx=tx-c->x,dy=ty-c->y,dist=sq(d2(dx,dy));
+  if(dist<.02f){d->next=(d->next+1)%12;continue;}
+  float fx=dx/dist,fy=dy/dist,desired=look(dx,dy),turn=wrap(desired-c->a);
+  float cap=3.8f*dt;
+  if(turn>cap)turn=cap;
+  if(turn<-cap)turn=-cap;
+  street_turn_car(i,wrap(c->a+turn));
+  float goal=d->pace;
+  if(d->next%3!=0||dist<38)goal=32.f;
+  int j=street_junction(c->x,c->y);
+  if((j>=0&&streetJunctionOwner[j]!=i)||street_yield(c,fx,fy))goal=0;
+  float ahead=6+c->s*.26f;if(ahead>dist)ahead=dist;
+  Car probe=*c;probe.x+=fx*ahead;probe.y+=fy*ahead;
+  if(!street_car_clear(i,c,&probe))goal=0;
+  float accel=(goal<c->s?135.f:92.f)*dt;
+  c->s=c->s<goal?(c->s+accel<goal?c->s+accel:goal):(c->s-accel>goal?c->s-accel:goal);
+  float amount=c->s*dt;if(amount>dist)amount=dist;
+  if(amount<=0)continue;
+  if(!street_ambient_step(i,fx*amount,fy*amount))c->s=0;
+  else if(dist-amount<.02f)d->next=(d->next+1)%12;
+ }
+}
+
+static float street_nearest_line(float at){return ((int)(at+128.f)/256)*256.f;}
+static float street_curb(float at,int tie){
+ float line=street_nearest_line(at);
+ return line+((at>line||(at==line&&tie))?STREET_WALK:-STREET_WALK);
+}
+static float street_side_coordinate(float at,int tie){
+ float line=street_nearest_line(at),d=at-line;if(absf(d)>=STREET_WALK)return at;
+ return street_curb(at,tie);
+}
+static StreetAddress street_venue_address(int site,int tie){
+ const Place*l=loc+site;
+ float cx=street_curb(l->x,tie&1),cy=street_curb(l->y,tie&2);
+ /* Zoned storefronts face south and open onto the next east/west
+  * sidewalk. Use their own frontage, not the other side of the block. */
+ float inset=l->x%256;
+ if(inset>=STREET_WALK&&inset<=256.f-STREET_WALK){
+  float south=((l->y>>8)+1)*256.f-STREET_WALK;
+  if(street_line_open(cx,south,l->x,south,4)&&street_line_open(l->x,south,l->x,l->y,4))
+   return (StreetAddress){l->x,south,cx,south};
+ }
+ StreetAddress a={street_side_coordinate(l->x,tie&1),cy,cx,cy};
+ StreetAddress b={cx,street_side_coordinate(l->y,tie&2),cx,cy};
+ /* Named storefronts needn't be at intersections. Approach the nearest
+  * reachable point on their curb, horizontally or vertically, via a corner. */
+ float da=d2(a.x-l->x,a.y-l->y),db=d2(b.x-l->x,b.y-l->y);
+ int passA=street_line_open(a.cx,a.cy,a.x,a.y,4),passB=street_line_open(b.cx,b.cy,b.x,b.y,4);
+ if(da<=db&&passA)return a;
+ if(passB)return b;
+ if(passA)return a;
+ return (StreetAddress){cx,cy,cx,cy};
+}
+static void street_civ_goal(int i){
+ StreetWalk*w=streetWalks+i;
+ StreetAddress a=street_venue_address(w->goal,i+w->visits);
+ w->ax=a.x;w->ay=a.y;w->tx=a.cx;w->ty=a.cy;
+}
+static void street_spawn_civilian_at(int i,int address,StreetAddress a){
+ peds[i]=(Ped){a.x,a.y,0,0,2,0,0,0,0};
+ StreetWalk*w=streetWalks+i;
+ *w=(StreetWalk){.goal=(address+1+i%5)%LEN(loc),.leg=STREET_LEAVE,.mx=a.cx,.my=a.cy,.pause=(i%6)*.38f};
+ street_civ_goal(i);
+}
+static void street_spawn_civilian(int i){
+ int address=i%LEN(loc);
+ street_spawn_civilian_at(i,address,street_venue_address(address,i));
+}
+static int street_respawn_civilian(int i){
+ for(int n=0;n<LEN(loc);n++){
+  int address=(i+n)%LEN(loc);
+  StreetAddress a=street_venue_address(address,i+n);
+  if(!street_on_camera(a.x,a.y)&&street_foot_clear(a.x,a.y,-1)){
+   street_spawn_civilian_at(i,address,a);return 1;
+  }
+ }
+ return 0;
+}
+static int street_civ_traffic(const Ped*q,float tx,float ty){
+ /* A stopped car is a physical obstruction too. Don't step into one on
+  * a marked crossing just because it has zero closing speed. */
+ for(int n=1;n<=10;n++)
+  if(!street_foot_car_clear(q->x+(tx-q->x)*n*.1f,q->y+(ty-q->y)*n*.1f,-1,3.f))return 1;
+ for(int i=0;i<nc;i++){
+  const Car*c=cars+i;
+  if((i==0&&!sv.owned)||c->cond<=0||absf(c->s)<8.f||d2(c->x-q->x,c->y-q->y)>116.f*116.f)continue;
+  float co=cs(c->a)*(c->s>0?1:-1),si=sn(c->a)*(c->s>0?1:-1),spd=absf(c->s);
+  int acrossX=absf(tx-q->x)>absf(ty-q->y);
+  if(acrossX&&absf(si)>.55f){
+   float t=(q->y-c->y)/si;
+   float x=c->x+co*t;
+   if(t>=-18&&t<20+spd*1.18f&&x>min((int)q->x,(int)tx)-13&&x<max((int)q->x,(int)tx)+13)return 1;
+  }else if(!acrossX&&absf(co)>.55f){
+   float t=(q->x-c->x)/co;
+   float y=c->y+si*t;
+   if(t>=-18&&t<20+spd*1.18f&&y>min((int)q->y,(int)ty)-13&&y<max((int)q->y,(int)ty)+13)return 1;
+  }
+ }
+ return 0;
+}
+static float street_corner_step(float value,float target,int*cross){
+ if(absf(value-target)<.4f)return target;
+ float center=street_nearest_line(value),dir=target>value?1.f:-1.f;
+ if(absf(value-(center-dir*STREET_WALK))<.5f){
+  float out=center+dir*STREET_WALK;
+  if((target-out)*dir>=0){*cross=1;return out;}
+ }else{
+  float out=center+dir*(256-STREET_WALK);
+  if((target-out)*dir>=0)return out;
+ }
+ return target;
+}
+static void street_tick_civilian(int i,float dt){
+ Ped*q=peds+i;StreetWalk*w=streetWalks+i;q->s=0;
+ if(w->pause>0){w->pause-=dt;return;}
+ if(d2(w->mx-q->x,w->my-q->y)<.18f){
+  q->x=w->mx;q->y=w->my;w->cross=0;w->blocked=0;
+  if(w->leg==STREET_LEAVE)w->leg=STREET_EN_ROUTE;
+  if(w->leg==STREET_ARRIVE){
+   w->mx=w->tx;w->my=w->ty;w->leg=STREET_LEAVE;
+   w->goal=(w->goal+1+(i+w->visits++)%5)%LEN(loc);
+   w->pause=1.6f+(i%5)*.55f;
+   street_civ_goal(i);return;
+  }
+  if(d2(w->tx-q->x,w->ty-q->y)<.18f){
+   /* Exact-corner destinations are already reached; keep them in the
+    * arrival phase so their next tick begins the same pause as mid-block. */
+   w->leg=STREET_ARRIVE;w->mx=w->ax;w->my=w->ay;
+  }else if(absf(q->x-w->tx)>.4f)w->mx=street_corner_step(q->x,w->tx,&w->cross);
+  else w->my=street_corner_step(q->y,w->ty,&w->cross);
+  if(w->cross){
+   if(street_civ_traffic(q,w->mx,w->my)){w->mx=q->x;w->my=q->y;w->cross=0;w->pause=.18f;return;}
+   w->crossX=q->x;w->crossY=q->y;
+  }
+ }
+ float dx=w->mx-q->x,dy=w->my-q->y,n=sq(d2(dx,dy));
+ if(n<.001f)return;
+ float speed=w->cross?62.f:27.f+(i%6)*2.f;
+ if(p.heat>35.f&&d2(p.x-q->x,p.y-q->y)<110.f*110.f)speed+=17.f;
+
+ q->a=look(dx,dy);float step=speed*dt;if(step>n)step=n;
+ float x=q->x+dx*(step/n),y=q->y+dy*(step/n);
+ if(!solid(x,y,4)&&street_foot_car_clear(x,y,-1,3.f)){
+  q->x=x;q->y=y;q->s=speed;w->blocked=0;
+ }else if(w->cross==1&&(w->blocked+=dt)>.40f){
+  /* A car can turn toward a stripe after a civilian has started crossing.
+   * Don't leave both users yielding forever: return to the same curb, then
+   * wait for a second opening. Never step off the zebra into traffic. */
+  w->mx=w->crossX;w->my=w->crossY;w->cross=2;w->blocked=0;w->pause=.15f;
+ }
+
+}
+static void street_spawn(void){
+ z(streetDrivers,sizeof streetDrivers);z(streetWalks,sizeof streetWalks);
+ for(int j=0;j<LEN(streetJunctionOwner);j++)streetJunctionOwner[j]=-1;
+ nc=3;
+ cars[0]=(Car){284,528,0,0,0,1,100};
+ cars[1]=(Car){485.25f,813,1.570796f,0,1,0,100};
+ cars[2]=(Car){538,720,1.570796f,0,2,0,100};
+ for(int k=0;k<120&&nc<28;k++){
+  int j=1+rnd()%7,block=1+rnd()%6,side=rnd()%2?1:-1,t=rnd()%LEN(specs);
+  float x=j*256+side*26.75f,y=block*256+61+rnd()%135,a=side*1.570796f;
+  if(k%2){float q=x;x=y;y=q;a=side>0?0:3.141593f;}
+  Car c={x,y,a,0,t,0,100};int clear=1;
+  for(int i=0;i<nc;i++)if(street_overlap(cars+i,&c)){clear=0;break;}
+  if(clear&&!street_hits_wall(&c))cars[nc++]=c;
+ }
+ for(int k=0;k<13;k++){
+  int loop=k%LEN(streetLoops),n=(k*7)%4*3;
+  float ax,ay,bx,by;
+  street_loop_point(loop,(n+11)%12,&ax,&ay);street_loop_point(loop,n,&bx,&by);
+  float f=.18f+(k%5)*.146f;
+  Car c={ax+(bx-ax)*f,ay+(by-ay)*f,look(bx-ax,by-ay),31.f,k%LEN(specs),0,100};
+  if(street_car_clear(nc,0,&c)){
+   cars[nc]=c;streetDrivers[nc]=(StreetDriver){1,loop,n,45.f+(k%4)*4.f};nc++;
+  }
+ }
+ /* Keep the pre-job loaner just off the turning lanes near Wrecker Yard. */
+ cars[nc++]=(Car){1818.75f,1049,1.570796f,0,2,2,100};
+ for(int i=0;i<LEN(peds);i++){
+  if(i<STREET_CIVILIANS)street_spawn_civilian(i);else peds[i]=(Ped){.role=1};
+ }
+}

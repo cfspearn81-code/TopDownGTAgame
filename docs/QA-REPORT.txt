@@ -1,0 +1,15 @@
+SAVE MANAGEMENT / UPRIGHT PREVIEW QA
+
+- Replayed the exact packaged Windows x64 executable through its entry
+  point with simulated Win32 calls. Verified Delete keyboard shortcut,
+  default cancellation with Enter, explicit mouse confirmation, the
+  single DeleteFileW call to the intended slot, and the ability to load
+  and resave the surviving slot. Also replayed new career creation and
+  letterboxed map controls. No physical Windows 11 test.
+- Sanitized game-code integration checks covered cancellation, active
+  career protection, failed deletion, correct target only, restoring
+  the active path, deletion of the main slot from the title screen and
+  reuse of a vacant slot. All 360 front previews still render distinct
+  images. Raster checks verified visible jacket area and arrow clearance.
+- Existing gameplay regression suite passed. Preview PNGs are actual
+  in-game frames.

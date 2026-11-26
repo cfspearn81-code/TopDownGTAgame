@@ -1,0 +1,52 @@
+DEAD CHANNEL / PORT VANTA
+Career Files: Save Management for Windows 11 x64
+
+1. Extract the entire ZIP to a normal folder and open DeadChannel.exe.
+   Look for "Dead Channel | Career Files - Save Management" in the window title.
+2. Select an existing Career File and choose Load / Resume. Or choose
+   New Career, make a character, and select Start Career.
+3. New characters start in Apartment 4 with $0, fists and no car. Walk
+   to the teal door and press E. Mara's first job at Mercury Dispatch
+   introduces the city and pays for your next move.
+
+CAREER FILES
+F3 / Pause > Save Menu: open the save list from a live career.
+F4: open the creator for a separate new career.
+Mouse / Up and Down: select a save; Enter or Load / Resume confirms.
+To remove a save, select it and choose Delete Save or press Delete.
+Verify the name and file number, then click Delete Save again. On the
+keyboard, press Right, then Enter. Enter alone cancels. The career
+you're currently playing is protected; close and reopen the game and
+delete it from the launch screen if you want to remove it.
+Left / Right changes pages. Playtime, portrait, clean cash (green) and
+street cash (red) come from the save. Older saves didn't track playtime;
+after playing in this version, their clock is marked "Since update."
+
+CHARACTER CREATOR
+Up / Down selects a category. Left / Right cycles options. Click a row's
+arrows to change that feature. Click Name or press E in that row to edit
+the name. Enter accepts the name, Esc cancels the name edit.
+Space: shuffle the look. F2 browses 360 preset looks; also use the arrows
+in the preview panel. M turns the preview. Presets can all be edited.
+Enter or Start Career creates the save. Esc cancels before that point.
+Your choices show on the save card and on the player in the game.
+
+CITY CONTROLS
+WASD or arrow keys: move, steer, accelerate and brake
+E: enter a building, interact, or get out of a vehicle
+Enter: get into a stopped or slow nearby car
+X: punch. Space: fists or equipped weapon
+Shift: sprint / handbrake. T: accept another unlocked taxi fare
+M: map; left click sets a pin, right click clears it
+F1: field guide. F2: low FX. F5: save. Esc: pause / back
+Close the window to save your live career. Title/creator don't create
+or write a career unless you choose Start Career.
+
+YOUR EXISTING SAVES
+Use the same Windows account. The game still reads its existing saves
+under %LOCALAPPDATA%\DeadChannel (career.dat, opening.dat and fresh-*.dat).
+It does not write over another career when creating a character. Once
+saved in this version, a save is upgraded to the new format; back up the
+folder first if you also want to run an older executable with those saves.
+Active jobs and pursuits reset when changing careers or reopening the
+game. There is no installer, browser, network requirement or audio.

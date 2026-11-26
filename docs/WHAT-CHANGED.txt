@@ -1,0 +1,23 @@
+CAREER FILES: SAVE MANAGEMENT
+
+- Added Delete Save with a confirmation showing the character name and
+  file number. It defaults to Cancel and protects the live career.
+- Changed the live character preview to an upright projection with a
+  visible torso and legs, without changing the in-game camera.
+
+EARLIER CAREER FILES UPDATE
+
+- Save cards with the character's actual model, name, playtime and two
+  wallet balances. A larger preview and an opening-shift status appear
+  for the selected file. Use the built-in list to switch careers.
+- Character creation before every new career. Ten appearance categories
+  plus a name, original layered pixel art, four-way live preview, shuffle
+  and a lookbook of 360 distinct starting looks. Edit any starter preset.
+  The editor is inspired by the mix-and-match approach in
+  The Escapists 2 (https://store.steampowered.com/app/641990/), with
+  original visuals in Dead Channel's style.
+- The little white facing arrow projects farther forward, especially
+  when facing north, to clear the head even with tall hair.
+- Older saves remain playable without visiting the creator. Previous
+  releases did not record playtime, so their clock starts with this version.
+- Includes the previous City Interiors update and its gameplay fixes.

@@ -1,0 +1,51 @@
+DEAD CHANNEL / CITY INTERIORS QA UPDATE
+
+Scope: the City Interiors release after the 78-building expansion and the
+red/green wallet fix. This update preserves the existing save format.
+
+Confirmed defects fixed
+- Walking could pass straight through parked cars. Foot movement now respects
+  vehicle hulls and still provides an exit if a wreck overlaps the player.
+- Some streets could gridlock indefinitely as turns competed with crossings.
+  Turn reservations now include the whole turn at the approach. A walker can
+  retreat to the curb and retry when a car blocks a crossing.
+- Police could stall on a reachable corner outside the coarse route grid.
+  They now use a short, wall-checked approach where needed.
+- A shot could check the center of your aim instead of its target and score
+  through a wall. The shot and punch now check the actual target line.
+- Downed civilians could visibly reappear nearby. Respawns wait for a clear
+  off-camera position.
+- Some account notes and grow labels protruded. They now wrap. Stale
+  interaction captions are cleared when entering a different room.
+- First-paycheck help used to stay forever; it retires after the player buys
+  a pistol or completes another legal job.
+- The white aiming arrow moves forward enough to clear the head when the
+  character faces up. Tested at 32 angles.
+- Save reads validate timers and balances; money arithmetic cannot overflow.
+
+Verification
+- 180,000 gameplay frames and 2,178 sampled renders under sanitizers, with
+  walking, driving, venues, map/pause/help, and live jobs/production.
+- Ten simulated minutes of integrated street traffic. All 13 vehicles kept
+  running, no car/ped overlaps or off-crosswalk center crossings in that run.
+- 15,275 GPS routes, 1,090 police approaches and 3,155 behind-wall shot cases.
+- Enter, interact and exit at all 78 physical buildings, plus the four
+  separate staff/grow rooms. Checked long balances in menus and on the street.
+- Economy tests covered deposits, timed closing, one-time manual claim,
+  legacy saves, job payouts, grow batches and property ownership.
+
+Known limits
+- Testing used the Linux game core and a simulated Win32 harness that actually
+  loaded the packaged EXE. This is not a playtest on a physical Windows PC.
+- Long stress runs are repeatable coverage, not proof against every bug.
+- In-progress jobs and police pursuits are not restored by relaunch. Pay,
+  property, inventory, ledgers and completed progression still save normally.
+
+Mission playtest detail
+Keyboard-only replays on the shipped City Interiors executable completed
+Courier, Taxi (two consecutive paid fares), Harbor Recovery, Glass Mile
+Sprint, Vault Run, Signal Raid, and Rival Collection. Hot Property reached
+its second stage in that replay; a separate current-source integration
+test verified the stolen-car requirement, final checkpoint and payout.
+Saved payouts survived reload. The QA update then passed the focused
+engine tests and simulated Windows startup/save/map checks again.

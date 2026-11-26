@@ -1,0 +1,20 @@
+DEAD CHANNEL / CAREER FILES
+Verification on the delivered Windows x64 build and shared game code
+
+- The exact EXE ran under a Linux harness that supplies simulated Win32
+  calls. Replays covered fresh creation, mouse and keyboard editing,
+  file creation without replacing an existing file, launch from an
+  existing file, migration fixtures for revisions 2, 4, 5 and 6, and
+  letterboxed and full-size map controls after load.
+- Integration tests checked 360 distinct rasterized lookbook previews,
+  typing and cancelling, failed-save recovery, no write on cancelling
+  the creator, pagination, blocked loads of unreadable saves, old save
+  migration, elapsed time, and preserving the portrait and two cash
+  balances across sessions. The white arrow clears the tallest hair
+  in a raster check across 128 facing angles.
+- Regression tests covered all 78 building doors, the first courier
+  route, vehicle conditions, taxi riders, police, GPS and business
+  persistence. The sanitizer soak covered 180,000 fixed-step ticks and
+  2,178 renders from 18 starting contexts, without a sanitizer error.
+- This did not run on a physical Windows 11 PC. Screenshots in Previews
+  are actual game frames, not mockups.
