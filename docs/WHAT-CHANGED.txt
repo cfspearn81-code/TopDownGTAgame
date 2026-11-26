@@ -1,3 +1,15 @@
+STREET HANDLING
+
+- The driving camera looks ahead in the direction of travel. A dash over
+  the radar shows the model, forward or reverse travel, and relative speed.
+- Responding officers appear on the radar and atlas. CLEARING shows when
+  a pursuit is nearly over. The HUD also shows remaining armor.
+- Getting back into the same stolen car during a session keeps its original
+  theft report. Taxi calls appear in eligible vehicles. Enter prioritizes
+  a car you can board, and the prompts tell you when to slow down.
+- Fixed a lethal wreck beside a door opening the building on the same
+  button press. Also fixed the atlas opening over a paused street session.
+
 PORT VANTA CONTRACTS
 
 - Courier work uses two deliveries and a signed manifest. Taxi riders

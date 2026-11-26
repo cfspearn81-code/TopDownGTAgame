@@ -305,6 +305,15 @@ static void nav_overlay(const NavView*v,int large){
  if(navLeg&&!nav_same(navCurb,navGoal)){int x=nav_x(v,navCurb.x),y=nav_y(v,navCurb.y);
   if(nav_inside(v,x,y,large?8:5)){disc(x,y,large?7:4,NAV_DARK);diamond(x,y,large?6:3,NAV_WALK);if(large)dot(x,y,NAV_WALK);}
  }
+ if(p.heat>0){
+  for(int i=0;i<DISPATCH_UNITS;i++){
+   int state=dispatchUnits[i].state;
+   const Ped *unit=peds+DISPATCH_FIRST+i;
+   if(unit->hp<=0||(state!=D_RESPONSE&&state!=D_SEARCH))continue;
+   int x=nav_x(v,(int)unit->x),y=nav_y(v,(int)unit->y);
+   if(nav_inside(v,x,y,5)){disc(x,y,4,NAV_INK);disc(x,y,2,0x80aeff);}
+  }
+ }
  const int xp=nav_x(v,(int)p.x),yp=nav_y(v,(int)p.y);
  nav_heading(xp,yp,large);
  if(large&&navHover){NavPoint q=nav_pin();int x=nav_x(v,q.x),y=nav_y(v,q.y);
@@ -319,6 +328,15 @@ static void minimap(void){
   for(int i=first+1;i<navCount;i++)d+=nav_dist(navNodes[i-1],navNodes[i]);}
  if(!mapOn){
   const int w=170,h=120,x=W-w-24,y=H-h-40,span=742;
+  if(p.car>=0){
+   const Car *ride=&cars[p.car];const CarSpec *spec=&specs[ride->type];
+   box(x-4,y-39,w+8,33,NAV_INK,NAV_RIM);
+   textat(x+4,y-37,spec->name,PAPER,0);
+   const char *gear=ride->s< -2?"REV":ride->s>2?"DRIVE":"STOP";
+   textat(x+w-textw(gear,0)-4,y-37,gear,ride->s< -2?GOLD:MUTED,0);
+   rect(x+4,y-14,w-8,4,NAV_CURB);
+   rect(x+4,y-14,cl((int)(absf(ride->s)*(w-8)/spec->vmax),0,w-8),4,TEAL);
+  }
   box(x-4,y-4,w+8,h+30,NAV_INK,NAV_RIM);
   const NavView v={x,y,w,h,(int)p.x-span/2,(int)p.y-span*h/(2*w),span};
   nav_overlay(&v,0);box(x+5,y+4,22,21,NAV_INK,NAV_RIM);center(x+16,y+4,"N",PAPER,0);
@@ -344,6 +362,7 @@ static void minimap(void){
  tri(44,416,38,428,50,428,PAPER);textat(61,414,"YOUR HEADING",PAPER,0);
  dot(39,450,NAV_WALK);dot(44,450,NAV_WALK);dot(49,450,NAV_WALK);textat(61,440,"WALK FROM CURB",NAV_WALK,0);
  diamond(44,477,6,GOLD);textat(61,466,"JOB VEHICLE",GOLD,0);
+ if(p.heat>0){disc(44,503,3,0x80aeff);textat(61,492,"RESPONDING POLICE",0x80aeff,0);}
  textat(732,53,navKeyboard?"SELECTED":"MAP POINTER",NAV_VIOLET,0);rect(732,79,190,1,NAV_RIM);
  if(navSelected>=0){
   const Place*l=loc+navSelected;

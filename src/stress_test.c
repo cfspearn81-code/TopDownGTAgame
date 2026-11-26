@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <math.h>
+#include <string.h>
 static U state=0x8eaf35a1u;
 static U draw(void){state^=state<<13;state^=state>>17;state^=state<<5;return state;}
 static void assert_state(void){
@@ -25,12 +26,15 @@ static void seed_round(int round){
  else if(round%4==1){open_interior(round%LEN(loc));}
  else if(round%4==2){for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){walkin_open(i);break;}}
 }
-int main(void){
+int main(int argc,char **argv){
+ const int extended=argc==2&&!strcmp(argv[1],"--extended");
+ assert(argc==1||extended);
+ const int rounds=extended?48:18, ticks=extended?25000:10000;
  static const U actions[]={0,UP,LEFT,DOWN,RIGHT,UP|BRAKE,LEFT|BRAKE,DOWN|RIGHT,UP|LEFT,UP|FIRE,UP|RIGHT|FIRE,FIRE,PUNCH,USE,ENTER,SAVE,HELP,ESC,MAP,GFX,TAXI_NEXT,SLOT,NEW_SLOT,USE|ENTER,LEFT|RIGHT|BRAKE};
  unsigned frames=0,renders=0;
- for(int seed=0;seed<18;seed++){
+ for(int seed=0;seed<rounds;seed++){
    seed_round(seed);U hold=0;int dur=0;
-   for(int f=0;f<10000;f++){
+   for(int f=0;f<ticks;f++){
     if(--dur<=0){
       unsigned r=draw();hold=actions[r%LEN(actions)];
       dur=(r>>8)%48+1;if(hold&(USE|ENTER|SAVE|HELP|ESC|MAP|GFX|TAXI_NEXT|SLOT|NEW_SLOT))dur=1;
@@ -42,6 +46,6 @@ int main(void){
     assert_state();frames++;
    }
  }
- printf("Sanitized soak: %u fixed-step gameplay ticks, %u render passes, 18 starting contexts/seeds.\n",frames,renders);
+ printf("Sanitized soak: %u fixed-step gameplay ticks, %u render passes, %d starting contexts/seeds.\n",frames,renders,rounds);
  return 0;
 }

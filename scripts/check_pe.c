@@ -19,7 +19,24 @@ static unsigned fsz[252],offset;static unsigned char vdisk[252][1024],pending[10
 typedef int64_t (A *HostProc)(void*,D,Q,int64_t);static HostProc winproc;
 static Q A ok(void){return 1;}
 static Q A nil(void){return 0;}
+/* The optional street tour streams (tick count, key mask) pairs. */
+static int tourFrames,tourHold;
+static unsigned tourMask,tourSaveHash;
+static void next_tour_keys(void){
+ if(!tourHold)assert(scanf("%d %u",&tourHold,&tourMask)==2&&tourHold>0);
+ tourHold--;
+}
 static Q A key(int k){
+ if(tourFrames){
+  static const struct {int key;unsigned bit;} bindings[]={
+   {'W',1},{'S',2},{'A',4},{'D',8},{'E',16},{0x20,32},{0x10,64},
+   {0x1b,128},{'M',256},{0x74,512},{13,1024},{0x70,2048},{0x71,4096},
+   {0x72,8192},{0x73,16384},{'X',32768},{'T',65536},{0x2e,131072}
+  };
+  for(unsigned i=0;i<sizeof bindings/sizeof *bindings;i++)
+   if(bindings[i].key==k)return (tourMask&bindings[i].bit)?0x8000:0;
+  return 0;
+ }
  if(deleteTest)return ((k==0x28&&frame==1)||(k==0x2e&&frame==3)||(k==13&&(frame==6||frame==20))||(k==0x74&&frame==62))?0x8000:0;
  if(pointerScenario)return ((k==13&&frame==1)||(k=='M'&&(frame==5||frame==50))||(k==0x74&&frame==66))?0x8000:0;
  if(loadCareer&&opening!=2){
@@ -29,9 +46,20 @@ static Q A key(int k){
     (k=='S'&&frame>=14&&frame<=63)||(k=='E'&&frame==65)||(k==0x74&&frame==70))return 0x8000;
  return 0;
 }
-static void A die(D code){assert(frame==75&&code==0);longjmp(jb,1);}
-static Q A ticks(void){ms+=17;return ms;}
+static void A die(D code){assert(frame==(tourFrames?tourFrames:75)&&code==0);longjmp(jb,1);}
+static Q A ticks(void){
+ if(tourFrames){
+  /* Seed 17, then one 60 Hz simulation tick per host loop. */
+  if(ms++<2)return 17;
+  return 17+((ms-2)*1000+59)/60;
+ }
+ ms+=17;return ms;
+}
 static int A peek(Msg*m,void*w,D a,D b,D c){
+ if(tourFrames){
+  if(frame<tourFrames)return 0;
+  memset(m,0,sizeof *m);m->msg=0x12;return 1;
+ }
  if(deleteTest&&((frame==9&&deleteStage==0)||(frame==13&&deleteStage==1))){
    memset(m,0,sizeof *m);m->w=(void*)1;m->msg=0x0201;
    m->lp=deleteStage++==0?790+(460<<16):590+(332<<16);return 1;
@@ -89,7 +117,9 @@ static int A draw(void*dc,int x,int y,int w,int h,int sx,int sy,int sw,int sh,co
  if(pointerScenario==2)assert(x==0&&y==0&&w==1920&&h==1080);
  else if(pointerScenario)assert(x==0&&y==29&&w==1300&&h==731);
  else assert(w==960&&h==540);
- frame++;checksum=2166136261u;for(int i=0;i<960*540;i+=23)checksum=(checksum^b[i])*16777619u;
+ frame++;
+ if(tourFrames){if(frame<tourFrames)next_tour_keys();return sh;}
+ checksum=2166136261u;for(int i=0;i<960*540;i+=23)checksum=(checksum^b[i])*16777619u;
  if(previous!=checksum)volume++;previous=checksum;
  if(pointerScenario){
    const int pinx=610,piny=334;unsigned t=b[piny*960+pinx];int purple=0;
@@ -110,7 +140,10 @@ static const Bind bind[]={
  {"GetDC",ok},{"ReleaseDC",ok},{"LoadCursorW",ok},{"PostQuitMessage",nil},{"SetProcessDPIAware",ok},{"GetForegroundWindow",ok}
 };
 static D d(const unsigned char*a,size_t p){D x;memcpy(&x,a+p,4);return x;}static S s(const unsigned char*a,size_t p){S x;memcpy(&x,a+p,2);return x;}static Q q(const unsigned char*a,size_t p){Q x;memcpy(&x,a+p,8);return x;}
-int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("DC_OPENING");opening=mode?atoi(mode):0;mode=getenv("DC_POINTER");pointerScenario=mode?atoi(mode):0;deleteTest=getenv("DC_DELETE")!=0;if(argc>=3&&strcmp(argv[2],"-"))loadCareer=argv[2];if(argc==4)saveCareer=argv[3];
+int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("DC_OPENING");opening=mode?atoi(mode):0;mode=getenv("DC_POINTER");pointerScenario=mode?atoi(mode):0;deleteTest=getenv("DC_DELETE")!=0;if(argc==3&&!strcmp(argv[2],"--tour")){
+ assert(scanf("%d %x",&tourFrames,&tourSaveHash)==2&&tourFrames>0);
+ next_tour_keys();
+ }else if(argc>=3&&strcmp(argv[2],"-"))loadCareer=argv[2];if(argc==4)saveCareer=argv[3];
  if(loadCareer){int i=opening==1?1:0;FILE*fixture=fopen(loadCareer,"rb");assert(fixture);fsz[i]=fread(vdisk[i],1,sizeof vdisk[i],fixture);assert(fsz[i]>0&&fsz[i]<sizeof vdisk[i]);fclose(fixture);}
  if(deleteTest){assert(fsz[0]);fsz[2]=fsz[0];memcpy(vdisk[2],vdisk[0],fsz[2]);}
  FILE*f=fopen(argv[1],"rb");assert(f);fseek(f,0,SEEK_END);long n=ftell(f);rewind(f);unsigned char*file=malloc(n);assert(file&&fread(file,1,n,f)==(size_t)n);fclose(f);
@@ -120,6 +153,13 @@ int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("
  D imp=d(file,opt+120);assert(imp);for(D t=imp;d(img,t);t+=20){D lookup=d(img,t),iat=d(img,t+16);for(int i=0;q(img,lookup+i*8);i++){const char*name=(const char*)img+q(img,lookup+i*8)+2;void*fn=0;for(int j=0;j<(int)(sizeof bind/sizeof *bind);j++)if(!strcmp(name,bind[j].n))fn=bind[j].p;if(!fn)fprintf(stderr,"Unmapped import: %s\n",name);assert(fn);memcpy(img+iat+i*8,&fn,8);}}
  if(!setjmp(jb)){typedef void (A *WinEntry)(void);WinEntry start=(WinEntry)(img+d(file,opt+16));start();assert(!"PE entrypoint returned unexpectedly");}
  assert(saved>0&&safeWrites==saved&&(!loadCareer||readCareer));
+ if(tourFrames){
+  assert(fsz[0]>=4);
+  D actual=d(vdisk[0],fsz[0]-4);
+  printf("Street tour: %d frames, %d atomic writes, final save %08x (expected %08x).\n",frame,safeWrites,actual,tourSaveHash);
+  assert(creates==1&&actual==tourSaveHash&&!tourHold);
+  return 0;
+ }
  if(deleteTest){assert(deleteStage==2&&deleteCalls==1&&fsz[0]&&!fsz[2]&&!creates);puts("Native entrypoint: cancel, confirm, exact slot deleted, other slot still loads and saves.");return 0;}
  if(!loadCareer||opening==2){assert(creates==1&&createStage==6&&saved>=2);
    int slot=opening==2&&loadCareer?2:0;

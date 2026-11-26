@@ -12,3 +12,11 @@ Engine regression:
 Win32-ABI executable smoke test (stubbed Win32 on Linux, not Wine):
   gcc -O2 -o build/check_pe scripts/check_pe.c
   ./build/check_pe build/DeadChannel.exe
+
+Full keyboard tour, including the exact Windows executable:
+  bash scripts/test.sh --tour
+Extended sanitizer soak (48 starting contexts):
+  bash scripts/test.sh --extended
+The tour uses gzip to stream scripts/qa/street-tour.txt.gz into check_pe.
+The first line contains the frame count and expected final save checksum.
+The remaining lines contain a run length and the game's integer key mask.

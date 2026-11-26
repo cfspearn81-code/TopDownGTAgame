@@ -1,8 +1,8 @@
 DEAD CHANNEL / PORT VANTA
-Port Vanta Contracts for Windows 11 x64
+Street Handling for Windows 11 x64
 
 1. Extract the entire ZIP to a normal folder and open DeadChannel.exe.
-   Look for "Dead Channel | Port Vanta Contracts" in the window title.
+   Look for "Dead Channel | Street Handling" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -41,6 +41,11 @@ M: map; left click sets a pin, right click clears it
 F1: field guide. F2: low FX. F5: save. Esc: pause / back
 The gold job marker leads to the assigned vehicle. F5 also saves with the
 atlas open.
+When driving, the camera leads into turns and reverses with the car. The
+dash above the radar shows the vehicle model, direction and speed. Slow
+down with Shift before trying to exit at speed. Blue radar dots mark
+responding officers. Wait for CLEARING to disappear before a hot handoff.
+The thin teal bar below health shows your remaining armor.
 Business clocks run in the atlas and at the counter. Pause and the field
 guide freeze them.
 Close the window to save your live career. Title/creator don't create

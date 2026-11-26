@@ -1,10 +1,25 @@
 # Dead Channel | Project handoff
 
-**Current release** — Port Vanta Contracts, November 25, 2026.
-Dead Channel is an original, offline single-player game for native Windows 11
-x64. The [Windows ZIP](downloads/Dead-Channel-Port-Vanta-Contracts-Windows-11-x64.zip)
-contains the complete playable game. Save format revision 7 loads existing
-careers, including revisions 2–6. Use the native build and original game assets.
+**Current build** — Street Handling, November 26, 2026. The
+[Windows x64 ZIP](downloads/Dead-Channel-Street-Handling-Windows-11-x64.zip)
+contains the native game, player notes and rebuildable source. Save revision 7
+continues to load careers from revisions 2–6.
+
+## Street Handling
+
+- The camera eases ahead with forward and reverse velocity. Civilian and
+  officer respawn checks use that same camera rectangle. The dash shows the
+  vehicle model, direction and speed relative to its rated maximum.
+- The radar and atlas mark officers assigned to the current pursuit. The HUD
+  shows armor and reports the final part of a pursuit as CLEARING. Handoffs
+  open when heat reaches zero.
+- Re-entering a previously stolen car during a session preserves its theft
+  report. It remains ineligible for licensed fares. A nearby boardable car
+  takes priority over a faster one. Entry and exit prompts reflect speed.
+- A lethal wreck finishes the downed transition before processing interaction.
+  The pause menu keeps the atlas closed until gameplay resumes.
+- The previous [Port Vanta Contracts ZIP](downloads/Dead-Channel-Port-Vanta-Contracts-Windows-11-x64.zip)
+  is available alongside its recorded checksum.
 
 **Maintenance contract:** Update this document before uploading every new
 build, even a hotfix. The next build entry should say what changed, what
@@ -165,6 +180,18 @@ or unreadable disks. Leave the existing disk path selected after a failed
 operation. Do not use actual player saves as test fixtures.
 
 ## Verification and remaining work
+
+The Street Handling keyboard tour starts a new career, finishes the eight
+contracts, uses the counters and doors in all 78 buildings, buys the Mercury
+franchise and collects a settlement. Run `bash scripts/test.sh --tour` to replay
+its 57,765 fixed steps through the Windows executable using simulated Win32.
+The fixture stores a final save digest and run-length encoded keyboard input.
+
+The extended sanitizer run passed 1,200,000 ticks and 14,496 renders across
+48 starting contexts. Run `bash scripts/test.sh --extended` to repeat it.
+The follow-on economy playthrough covered all five garage cars, all three
+franchises, both tier-three facilities, the three stock sales, Revenue and
+Breakwater. See the [QA report](docs/QA-REPORT.txt) for scope and results.
 
 `bash scripts/test.sh` checks new career, portraits/presets, save migrations,
 deletion and failure behavior, gameplay through all doors, business and wallet

@@ -93,7 +93,7 @@ typedef struct{const char*name;int price;float vmax,acc,turn;U c;} CarSpec;
 static const CarSpec specs[]={
 {"MOTE",125,151,104,2.8f,0x59bbad},{"VECTRA",360,193,145,2.3f,0x94b2f5},{"PALLAS",620,167,110,1.8f,0xeab052},{"NIGHTJAR",970,237,165,2.7f,0xdf648f},{"COURIER 4",480,174,112,2.95f,0xbbd377}
 };
-typedef struct{float x,y,a,s;int type,owner,cond;}Car;
+typedef struct{float x,y,a,s;int type,owner,cond,reported;}Car;
 typedef struct{float x,y,a,s;int hp,role,next;float life,cool;}Ped;
 static Car cars[42];static int nc;
 static Ped peds[52];
@@ -136,6 +136,19 @@ static Player p;
 enum{PAUSE_MENU=12};
 static int scene=0,menu=-1,sel=0,mapOn=0,wason=0,cx,cy,deadAnim,saveFlash,fastGfx,sideSlot;static float crashFlash;
 static float anim,footcycle,punchFlash,pedHit[LEN(peds)],shelterT;static int walking;
+static float cameraLeadX,cameraLeadY;
+static void update_camera_lead(void){
+ float vx=0,vy=0;
+ if(p.car>=0){
+  const Car *car=&cars[p.car];
+  vx=cs(car->a)*car->s*.48f;
+  vy=sn(car->a)*car->s*.34f;
+ }
+ cameraLeadX+=(vx-cameraLeadX)*.055f;
+ cameraLeadY+=(vy-cameraLeadY)*.055f;
+}
+static int camera_left(void){return cl((int)(p.x+cameraLeadX)-W/2,0,ROOM-W);}
+static int camera_top(void){return cl((int)(p.y+cameraLeadY)-H/2,0,ROOM-H);}
 static U prev;
 static int by=-1,near=-1,lastCar=-1,helpBack=1;
 #define CASH_GREEN 0x85F36Bu
@@ -259,6 +272,7 @@ static void profiles_tick(U tap);
 static void profiles_pointer(int sx,int sy,U clicks);
 static void profiles_paint(void);
 static void spawnPlayer(void){
+ cameraLeadX=cameraLeadY=0;
  p=(Player){0};p.x=sv.x;p.y=sv.y;
  if(!open_space(p.x,p.y)){
    int xx=cl(((int)p.x+128)/256,1,7)*256,yy=cl(((int)p.y+128)/256,1,7)*256;
@@ -692,8 +706,10 @@ static void enterExit(void){
  if(!result)return;
  lastCar=i;
  if(job.kind==JOB_HOT&&job.step==0&&i==jobRide){
-  advanceJob();heat(70);tell("Target acquired. Shake the police before the handoff.");
- }else if(!cars[i].owner){heat(38);tell("Vehicle reported stolen.");}
+  cars[i].reported=1;advanceJob();heat(70);tell("Target acquired. Shake the police before the handoff.");
+ }else if(!cars[i].owner&&!cars[i].reported){
+  cars[i].reported=1;heat(38);tell("Vehicle reported stolen.");
+ }
 
 }
 void tick(U keys){
@@ -727,7 +743,7 @@ void tick(U keys){
   return;
  }
  if(tap&HELP){helpBack=1;scene=2;return;}
- if(tap&MAP){mapOn=!mapOn;if(mapOn)navigation_input(tap);return;}
+ if((tap&MAP)&&menu<0){mapOn=!mapOn;if(mapOn)navigation_input(tap);return;}
  if(mapOn){if(tap&ESC)mapOn=0;else navigation_input(tap);return;}
  if(tap&GFX){fastGfx=!fastGfx;tell(fastGfx?"Low FX on: rain and dynamic glows off.":"Full FX on.");}
  if((tap&TAXI_NEXT)&&menu<0)next_fare();
@@ -771,6 +787,7 @@ void tick(U keys){
    c->s=0;
    if(!street_exit_car())p.car=-1;
    health(27);
+   if(p.dead)return;
    if((job.kind==JOB_HOT||job.kind==JOB_RECOVERY||job.kind==JOB_SPRINT)&&job.step>0&&c-cars==jobRide){
     end_job();tell("Job failed: the assigned vehicle was wrecked.");
    }else tell("Wrecked. Find another ride or visit Nightglass Motors.");
@@ -793,6 +810,7 @@ void tick(U keys){
  if((tap&ENTER)&&!(tap&USE)&&p.car<0&&near>=0)enterExit();
  if(job.kind==1&&taxi.phase>=TAXI_RIDING&&p.car!=taxi.ride)taxi_tick(0);
  p.quiet-=dt;if(p.quiet<=0&&p.heat>0){float rate=p.car>=0?26:19;p.heat-=dt*rate;if(p.heat<0)p.heat=0;}
+ update_camera_lead();
  npcTick(dt);
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0){fx[i].t-=dt;fx[i].x+=fx[i].vx*dt;fx[i].y+=fx[i].vy*dt;}
 }
@@ -1034,7 +1052,7 @@ static void hud(void){
  }
  else if(sv.intro==1||sv.intro==2){append(v,"FIRST SHIFT");objective="Enter Mercury Dispatch. Talk to Mara.";}
  else if(sv.intro==3){append(v,"FIRST PAYCHECK");objective="M: pick Vanta Armory, Motors, or more work.";}
- if(!objective&&sv.taxiFares&&p.car>=0){append(v,"NEW CALL AVAILABLE");objective="T: accept the next taxi fare.";}
+ if(!objective&&sv.taxiFares&&p.car>=0&&cars[p.car].owner){append(v,"NEW CALL AVAILABLE");objective="T: accept the next taxi fare.";}
  if(objective){
   int width=max(500,max(textw(objective,0),textw(v,0))+26);
   box(16,16,width,53,DARK,0x415766);rect(16,16,3,53,LIME);
@@ -1043,9 +1061,11 @@ static void hud(void){
  box(650,16,294,79,DARK,0x415766);
  draw_wallet(650,16,294);
  rect(845,70,82,6,0x34434b);rect(845,70,p.hp*82/100,6,0x6ea7ee);
- if(p.car>=0){fmt(v,"CAR ",cars[p.car].cond);textat(688,64,v,cars[p.car].cond<40?GOLD:MUTED,0);}else textat(688,64,sv.gear<0?"FISTS":"PULSE",MUTED,0);
+ if(p.car>=0){fmt(v,"CAR ",cars[p.car].cond);textat(670,64,v,cars[p.car].cond<40?GOLD:MUTED,0);}else textat(670,64,sv.gear<0?"FISTS":"PULSE",MUTED,0);
  int h=(p.heat>15)+(p.heat>80)+(p.heat>150);
  if(h>0){textat(761,64,"HEAT",PINK,0);for(int i=0;i<h;i++)diamond(813+i*9,76,3,PINK);}
+ else if(p.heat>0)textat(761,64,"CLEARING",PINK,0);
+ if(sv.armor){rect(845,80,82,3,0x34434b);rect(845,80,sv.armor*82/90,3,TEAL);}
  if(sv.audit||sv.charges){
   box(675,101,269,48,0x221923,0x9a486d);
   textat(688,103,sv.audit?"REVENUE EN ROUTE":"CASE HOLD",CASH_RED,0);
@@ -1053,12 +1073,15 @@ static void hud(void){
   textat(688,124,v,PAPER,0);
  }
  const char*use=job_street_prompt();
- if(!use&&p.car>=0)use="E  EXIT CAR";
+ if(!use&&p.car>=0)use=absf(cars[p.car].s)>STREET_EXIT_SPEED?"SHIFT  SLOW TO EXIT":"E  EXIT CAR";
  else if(!use){
   int shell=ordinary_door_near();
   if(choose_place(by,shell)){a=append(v,"E  ENTER ");append(a,loc[by].label);use=v;}
   else if(shell>=0){a=append(v,"E  ENTER ");append(a,walkin_name(shell));use=v;}
-  else if(near>=0)use=cars[near].owner?"GET IN  [ENTER]":"STEAL VEHICLE  [ENTER]";
+  else if(near>=0){
+   if(absf(cars[near].s)>STREET_BOARD_SPEED)use="WAIT FOR CAR TO SLOW";
+   else use=cars[near].owner||cars[near].reported?"GET IN  [ENTER]":"STEAL VEHICLE  [ENTER]";
+  }
  }
  if(use){int w=textw(use,0)+26;box((W-w)/2,487,w,30,DARK,0x566a75);center(W/2,491,use,PAPER,0);}
  if(p.noticeT>0){int w=min(735,25+textw(notice,0));box(16,438,w,28,DARK,0x455766);textat(28,440,notice,notice_color(),0);}
@@ -1073,7 +1096,7 @@ void paint(void){
  if(scene==3){interior_paint();return;}
  if(scene==4){walkin_paint();return;}
  if(scene==1&&mapOn){minimap();return;}
- cx=cl((int)p.x-W/2,0,ROOM-W);cy=cl((int)p.y-H/2,0,ROOM-H);
+ cx=camera_left();cy=camera_top();
  typedef U V4 __attribute__((vector_size(16),aligned(1),may_alias));
  for(int y=0;y<H;y++){const V4 *q=(const V4*)(city+(cy+y)*ROOM+cx);V4 *r=(V4*)(pixels+y*W);for(int x=0;x<W/4;x++)r[x]=q[x];}
  if(!fastGfx)for(int i=0;i<100;i++){int x=(i*197+((int)(anim*28))%W)%W,y=(i*233+((int)(anim*174))%H)%H;

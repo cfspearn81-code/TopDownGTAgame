@@ -51,6 +51,12 @@ int main(void){
  int moving=-1;for(int i=2;i<nc;i++)if(streetDrivers[i].live){moving=i;break;}assert(moving>0);
  move_to(cars[moving].x,cars[moving].y);cars[moving].s=35;press(ENTER);
  assert(p.car==moving&&!streetDrivers[moving].live&&p.heat>=38);cars[moving].s=0;assert(street_exit_car());
+ /* Parking and re-entering an already reported car is the same theft.
+  * It still cannot take taxi dispatch calls. */
+ float theftHeat=p.heat;
+ press(ENTER);assert(p.car==moving&&p.heat==theftHeat&&!cars[moving].owner);
+ sv.taxiFares=1;press(TAXI_NEXT);assert(job.kind<0);sv.taxiFares=0;
+ press(USE);assert(p.car<0);
  for(int i=0;i<LEN(loc);i++){
   const VenuePlan *v=zone_plan(i);int id=zone_idx[i];Building*b=buildings+id;
   assert(zone_is_building(id)&&zone_owner[v->gy*8+v->gx]==i&&solid(b->x+b->w/2,b->y+b->h/2,1)&&open_space(loc[i].x,loc[i].y));
@@ -270,6 +276,28 @@ int main(void){
  walk(0,610);assert(shelterT==0&&p.hp==100&&p.heat==0);leave();
  p.hp=1;p.hit=0;health(10);walk(0,50);press(ENTER);
  assert(!p.dead&&sv.cash==50&&d2(p.x-loc[9].x,p.y-loc[9].y)<9);
+ /* A lethal wreck next to a venue must finish the downed transition
+  * even when the player presses the interact key on that tick. */
+ init_city();scene=1;sv.owned=1;p.car=0;p.hp=1;
+ cars[0]=(Car){loc[0].x,loc[0].y,0,0,0,1,0};
+ tick(USE);assert(p.dead&&scene==1&&menu<0);
+ walk(0,50);press(ENTER);assert(!p.dead&&scene==1);
+
+ /* An available parked car wins over a closer fast-moving vehicle. */
+ p.x=p.y=1024;
+ cars[1]=(Car){1024,1044,0,75,0,0,100};
+ cars[2]=(Car){1054,1024,0,0,0,0,100};
+ assert(street_near_car()==2);
+ cars[2].cond=0;assert(street_near_car()==1);
+ press(ESC);assert(menu==PAUSE_MENU);press(MAP);assert(!mapOn&&menu==PAUSE_MENU);press(ESC);
+ /* Lead follows travel in both directions and the world edges stay bounded. */
+ p.car=0;cars[0]=(Car){1024,1024,0,150,0,1,100};
+ for(int i=0;i<120;i++)update_camera_lead();
+ assert(camera_left()>1024-W/2+60&&camera_top()==1024-H/2);
+ cars[0].s=-50;for(int i=0;i<120;i++)update_camera_lead();
+ assert(camera_left()<1024-W/2);p.x=35;assert(camera_left()==0);
+ spawnPlayer();assert(cameraLeadX==0&&cameraLeadY==0);
+ puts("Passed: vehicle re-entry, parked car selection, pause/map isolation, lethal wreck interaction and driving camera.");
  puts("Passed: stopped recovery handoff, licensed circuit, exact Vectra, two radio studios, carried lockbox, guarded consignment, restitution and safehouse recovery.");
  puts("Passed: apartment spawn with zero cash/fists; doorway/counter walk; three indoor deliveries; weapon purchase; property batch while menu and map stay open; solid car, crash and repair; moving car theft; punch; finite dispatch; warm lights and low FX; GPS/manual route, automatic foot and driving checkpoints, taxi boarding/drop-off/cancellation plus T and 100 varied offers, wallet semantics, 78 building paths, and save checksum.");
 }

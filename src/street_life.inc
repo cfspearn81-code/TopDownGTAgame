@@ -3,6 +3,8 @@
  * The final slot holds the current job vehicle. */
 #define STREET_HALF_L 15.5f
 #define STREET_HALF_W 8.f
+#define STREET_BOARD_SPEED 58.f
+#define STREET_EXIT_SPEED 78.f
 #define STREET_WALK 38.f
 #define STREET_CIVILIANS 40
 
@@ -52,7 +54,7 @@ static int street_line_open(float x,float y,float tx,float ty,float radius){
  return 1;
 }
 static int street_on_camera(float x,float y){
- int left=cl((int)p.x-W/2,0,ROOM-W),top=cl((int)p.y-H/2,0,ROOM-H);
+ int left=camera_left(),top=camera_top();
  return x>=left-25&&x<=left+W+25&&y>=top-31&&y<=top+H+31;
 }
 /* Test the actual rotated body against building boxes. Sparse chassis probes
@@ -171,12 +173,14 @@ static void street_stage_car(int id,Car car){
 static int street_near_car(void){
  if(p.car>=0)return -1;
  float best=38.f*38.f;
- int choice=-1;
+ int choice=-1;int boardable=0;
  for(int i=0;i<nc;i++){
   const Car*c=cars+i;
   float dx=c->x-p.x,dy=c->y-p.y,d=d2(dx,dy);
-  if(c->cond<=0||(i==0&&!sv.owned)||d>=best)continue;
-  if(street_line_open(p.x,p.y,c->x,c->y,2)){best=d;choice=i;}
+  if(c->cond<=0||(i==0&&!sv.owned)||d>=38.f*38.f)continue;
+  int slow=absf(c->s)<=STREET_BOARD_SPEED;
+  if(slow<boardable||(slow==boardable&&d>=best))continue;
+  if(street_line_open(p.x,p.y,c->x,c->y,2)){best=d;choice=i;boardable=slow;}
  }
  return choice;
 }
@@ -184,7 +188,7 @@ static int street_near_car(void){
 static int street_enter_car(int i){
  if(p.car>=0||i<0||i>=nc||i!=street_near_car())return 0;
  Car*c=cars+i;
- if(absf(c->s)>58.f)return -1;
+ if(absf(c->s)>STREET_BOARD_SPEED)return -1;
  streetDrivers[i].live=0;
  p.car=i;p.x=c->x;p.y=c->y;p.a=c->a;
  return 1;
@@ -192,7 +196,7 @@ static int street_enter_car(int i){
 static int street_exit_car(void){
  if(p.car<0||p.car>=nc)return 0;
  Car*c=cars+p.car;
- if(absf(c->s)>78.f)return 0;
+ if(absf(c->s)>STREET_EXIT_SPEED)return 0;
  float co=cs(c->a),si=sn(c->a);
  /* Prefer a curbside door; check the other door, then behind the car.
   * Never silently eject into a wall, another vehicle or fast traffic. */
