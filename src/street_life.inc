@@ -45,9 +45,9 @@ static int street_line_open(float x,float y,float tx,float ty,float radius){
  float dx=tx-x,dy=ty-y;
  for(int yy=cl((int)((dy<0?ty:y)-radius)/256,0,7);yy<=cl((int)((dy>0?ty:y)+radius)/256,0,7);yy++)
   for(int xx=cl((int)((dx<0?tx:x)-radius)/256,0,7);xx<=cl((int)((dx>0?tx:x)+radius)/256,0,7);xx++){
-   const int*row=lot[yy*8+xx];
-   for(int i=1;i<=row[0];i++){
-    const Building*b=buildings+row[i];float t0=0,t1=1;
+   const BlockScenery*block=scenery+yy*8+xx;
+   for(int i=0;i<block->count;i++){
+    const StreetBounds*b=block->walls+i;float t0=0,t1=1;
     if(street_clip_axis(x,dx,b->x-radius,b->x+b->w+radius,&t0,&t1)&&
        street_clip_axis(y,dy,b->y-radius,b->y+b->h+radius,&t0,&t1))return 0;
    }
@@ -69,9 +69,9 @@ static float street_wall_depth(const Car*c){
  if(b>ROOM-36&&b-(ROOM-36)>depth)depth=b-(ROOM-36);
  for(int yy=cl((int)t/256,0,7);yy<=cl((int)b/256,0,7);yy++)
   for(int xx=cl((int)l/256,0,7);xx<=cl((int)h/256,0,7);xx++){
-   const int*row=lot[yy*8+xx];
-   for(int i=1;i<=row[0];i++){
-    const Building*v=buildings+row[i];float wx=v->w*.5f,wy=v->h*.5f;
+   const BlockScenery*block=scenery+yy*8+xx;
+   for(int i=0;i<block->count;i++){
+    const StreetBounds*v=block->walls+i;float wx=v->w*.5f,wy=v->h*.5f;
     float dx=v->x+wx-c->x,dy=v->y+wy-c->y;
     float a=rx+wx-absf(dx),b=ry+wy-absf(dy);
     if(a<=0||b<=0)continue;

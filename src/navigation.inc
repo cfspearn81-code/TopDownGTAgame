@@ -77,7 +77,13 @@ static void nav_slot(void){
  navSlot=sideSlot;navReady=navHasManual=navGoalKind=navCount=navLeg=0;
  navSelected=navManualLoc=navVenue=-1;navHover=navKeyboard=0;
 }
-static NavPoint nav_door(int i){return (NavPoint){loc[i].x,loc[i].y};}
+/* Named counters use the address-book index. Storefront pins carry the
+ * physical building index after that range. */
+static NavPoint nav_door(int i){
+ if(i<LEN(loc))return (NavPoint){loc[i].x,loc[i].y};
+ int shop=i-LEN(loc);return (NavPoint){ordinaryDoorX[shop],ordinaryDoorY[shop]};
+}
+static const char*nav_name(int i){return i<LEN(loc)?loc[i].label:walkin_name(i-LEN(loc));}
 static NavPoint nav_job_goal(void){
  int ride=job_vehicle_target();
  if(ride>=0)return (NavPoint){(int)cars[ride].x,(int)cars[ride].y};
@@ -126,6 +132,7 @@ static NavPoint nav_pin(void){
  int x=nav_road(navCursor.x),y=nav_road(navCursor.y);
  return nav_abs(x-navCursor.x)<=nav_abs(y-navCursor.y)?(NavPoint){x,navCursor.y}:(NavPoint){navCursor.x,y};
 }
+static void navigation_follow_job(void){navHasManual=0;navManualLoc=-1;navGoalKind=0;}
 static void nav_clear(void){navHasManual=0;navManualLoc=-1;tell("GPS waypoint cleared.");}
 static void nav_set(void){
  NavPoint to=nav_pin();
@@ -137,8 +144,14 @@ static void navigation_input(U tap){
  if(!navReady||(tap&MAP)){
   navReady=1;navHover=navKeyboard=0;navSelected=-1;navPointerX=navPointerY=-999;
  }
- // Optional non-pointer access. WASD/arrow keys are never captured by a map cursor.
+ // Space browses named venues; left and right browse storefront doors.
  if(tap&FIRE){navKeyboard=navHover=1;navSelected=(navSelected+1)%LEN(loc);navCursor=nav_door(navSelected);}
+ if(tap&(LEFT|RIGHT)){
+  int dir=tap&RIGHT?1:-1;
+  int b=navSelected>=LEN(loc)?navSelected-LEN(loc):dir>0?nb-1:0;
+  do{b=(b+nb+dir)%nb;}while(!ordinaryDoorY[b]);
+  navKeyboard=navHover=1;navSelected=LEN(loc)+b;navCursor=nav_door(navSelected);
+ }
  if((tap&ENTER)&&navHover){if(navHasManual&&nav_same(navManual,nav_pin()))nav_clear();else nav_set();}
 }
 static void navigation_pointer(int sx,int sy,U clicks){
@@ -154,6 +167,12 @@ static void navigation_pointer(int sx,int sy,U clicks){
  for(int i=0;i<LEN(loc);i++){
   int dx=sx-NAV_MAP_X-loc[i].x*NAV_MAP_SIZE/ROOM,dy=sy-NAV_MAP_Y-loc[i].y*NAV_MAP_SIZE/ROOM,d=dx*dx+dy*dy;
   if(d<closest){navSelected=i;closest=d;}
+ }
+ for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){
+  NavPoint door=nav_door(LEN(loc)+i);
+  int dx=sx-NAV_MAP_X-door.x*NAV_MAP_SIZE/ROOM,dy=sy-NAV_MAP_Y-door.y*NAV_MAP_SIZE/ROOM;
+  int d=dx*dx+dy*dy;
+  if(d<closest&&d<=7*7){navSelected=LEN(loc)+i;closest=d;}
  }
  if(clicks&1)nav_set();
 }
@@ -188,8 +207,9 @@ static void nav_terrain(const NavView*v,int large){
  }
  for(int i=0;i<nb;i++){const Building*b=buildings+i;if(b->w<=0||b->h<=0)continue;
   nav_land(v,b->x-4,b->y-3,b->w+11,b->h+9,0x212a34);
-  nav_land(v,b->x,b->y,b->w,b->h,0x536172);
-  if(large)nav_land(v,b->x+4,b->y+4,b->w-8,b->h/3,0x647384);
+  StreetBounds shell=building_bounds(b);
+  nav_land(v,shell.x,shell.y,shell.w,shell.h,0x536172);
+  if(large)nav_land(v,shell.x+4,shell.y+4,b->w-8,b->h/3,0x647384);
  }
  for(int i=1;i<=7;i++){
   const int a=i*256;
@@ -289,6 +309,11 @@ static void nav_overlay(const NavView*v,int large){
   nav_label(v,460,102,"GLASS MILE");nav_label(v,380,950,"TIDE MARKET");nav_label(v,1140,944,"NIGHTGLASS");
   nav_label(v,1680,638,"EAST FREIGHT");nav_label(v,565,1710,"LANTERN WARD");nav_label(v,1436,1748,"BREAKWATER");
  }
+ if(large)for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){
+  int x=nav_x(v,ordinaryDoorX[i]),y=nav_y(v,ordinaryDoorY[i]);
+  if(tram_hall(i)){box(x-5,y-5,11,11,NAV_INK,GOLD);line(x-3,y-2,x+3,y-2,GOLD);line(x,y-2,x,y+3,GOLD);}
+  else rect(x-1,y-1,3,3,0xb3b9ad);
+ }
  nav_route(v,large);
  for(int i=0;i<LEN(loc);i++){int x=nav_x(v,loc[i].x),y=nav_y(v,loc[i].y);if(nav_inside(v,x,y,large?10:4))nav_icon(x,y,i,large);}
  NavPoint objective={0,0};
@@ -319,6 +344,28 @@ static void nav_overlay(const NavView*v,int large){
  if(large&&navHover){NavPoint q=nav_pin();int x=nav_x(v,q.x),y=nav_y(v,q.y);
   diamond(x,y,14,PAPER);line(x-17,y,x-11,y,PAPER);line(x+11,y,x+17,y,PAPER);line(x,y-17,x,y-11,PAPER);line(x,y+11,x,y+17,PAPER);
  }
+}
+static const char*nav_venue_note(int i,char *status){
+ int k=loc[i].kind,li=legal_index_for_kind(k);
+ if(li>=0&&sv.legit[li].owned){
+  LegalBusiness*b=sv.legit+li;
+  if(sv.audit||sv.charges)return "Revenue hold. Visit the annex to check your case.";
+  if(b->pending){
+   char*q=number(append(status,"Rear desk: $"),b->pending);
+   if(b->cooldown>0)legal_duration(append(q," in "),b->cooldown);
+   else append(q," ready to collect.");
+  }else legal_duration(append(status,"Next franchise income in "),LEGAL_INTERVAL-b->elapsed);
+  return status;
+ }
+ if((k==4||k==5)&&sv.b[k-4].own){
+  Business*b=sv.b+k-4;
+  char*q=number(append(status,"Stock: "),warehouse_units(k-4));
+  if(b->timer>0)legal_duration(append(q,". Batch ready in "),b->timer);
+  else if(!warehouse_has_room(k-4))append(q,". Warehouse full.");
+  else append(q,sv.units<batch_supply(k-4)?". Buy supplies at Ferry Market.":". Terminal ready.");
+  return status;
+ }
+ return loc[i].note;
 }
 static void minimap(void){
  nav_update();
@@ -353,7 +400,7 @@ static void minimap(void){
  textat(31,161,"L-CLICK   SET GPS",MUTED,0);
  textat(31,190,"R-CLICK   CLEAR GPS",MUTED,0);
  textat(31,219,"M / ESC   CLOSE MAP",MUTED,0);
- textat(31,253,"ENTER   TOGGLE PIN",MUTED,0);
+ textat(31,232,"ENTER   TOGGLE PIN",MUTED,0);textat(31,254,"< / >   SHOP DOORS",MUTED,0);
  textat(31,276,"SPACE   NEXT VENUE",MUTED,0);
  textat(31,303,"LEGEND",PAPER,0);rect(30,327,183,1,NAV_RIM);
  line(37,345,51,345,NAV_VIOLET);textat(61,335,"GPS ROUTE",NAV_VIOLET,0);
@@ -362,11 +409,14 @@ static void minimap(void){
  tri(44,416,38,428,50,428,PAPER);textat(61,414,"YOUR HEADING",PAPER,0);
  dot(39,450,NAV_WALK);dot(44,450,NAV_WALK);dot(49,450,NAV_WALK);textat(61,440,"WALK FROM CURB",NAV_WALK,0);
  diamond(44,477,6,GOLD);textat(61,466,"JOB VEHICLE",GOLD,0);
+ if(p.heat<=0){box(39,498,11,11,NAV_INK,GOLD);center(44,492,"T",GOLD,0);textat(61,492,"TRAM HALL",GOLD,0);}
  if(p.heat>0){disc(44,503,3,0x80aeff);textat(61,492,"RESPONDING POLICE",0x80aeff,0);}
  textat(732,53,navKeyboard?"SELECTED":"MAP POINTER",NAV_VIOLET,0);rect(732,79,190,1,NAV_RIM);
  if(navSelected>=0){
-  const Place*l=loc+navSelected;
-  wrapped(733,90,l->label,l->tint,20);wrapped(733,144,l->note,MUTED,20);
+  char status[96];
+  const char*note=navSelected<LEN(loc)?nav_venue_note(navSelected,status):
+      tram_hall(navSelected-LEN(loc))?"Passenger tram. Walk to the timetable for a $5 ride.":"Storefront entrance. Click to route to the door.";
+  wrapped(733,90,nav_name(navSelected),navSelected<LEN(loc)?loc[navSelected].tint:GOLD,18);wrapped(733,144,note,MUTED,18);
  }else if(navHover){
   textat(732,94,"STREET WAYPOINT",PAPER,0);wrapped(733,129,"Click to pin the highlighted road.",MUTED,20);
  }else{
@@ -374,7 +424,7 @@ static void minimap(void){
  }
  textat(732,257,"GUIDANCE",NAV_VIOLET,0);rect(732,281,190,1,NAV_RIM);
  const char *kind=navGoalKind==4?"JOB VEHICLE":navGoalKind==3?"MANUAL WAYPOINT":navGoalKind==2?"ACTIVE CHECKPOINT":navGoalKind==1?"MERCURY DISPATCH":"NO ACTIVE ROUTE";
- if(navGoalKind==2&&navVenue>=0)kind=loc[navVenue].label;
+ if(navVenue>=0&&(navGoalKind==2||navGoalKind==3))kind=nav_name(navVenue);
  if(navGoalKind==2&&job_room()>=0)kind=walkin_name(job_room());
  wrapped(733,292,kind,PAPER,20);
  if(navGoalKind){

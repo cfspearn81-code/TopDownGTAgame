@@ -1,12 +1,23 @@
 /* Jobs own their vehicles and objectives for the current session. Save files
  * record the outcome and payout, with no reference to transient city actors. */
-static const int courierStops[]={2,3,0};
+static const int courierRoutes[][2]={{2,3},{8,10},{11,2},{3,6},{10,8}};
+static int courierRoute,sprintBest;
+static const char *courier_objective(void){
+ static char message[80];
+ if(job.step==2)return "Return the signed manifest to Mara.";
+ char*end=append(message,"Deliver the parcel to ");
+ end=append(end,loc[courierRoutes[courierRoute][job.step]].label);append(end,".");
+ return message;
+}
+static char*sprint_time(char*out,int tenths){
+ out=number(out,tenths/10);out=append(out,".");out=number(out,tenths%10);return append(out,"s");
+}
 static int jobBuildings[2]={-1,-1};
 static int rivalsDeployed;
 enum{JOB_RIVAL_FIRST=STREET_CIVILIANS,JOB_RIVAL_COUNT=2};
 
 static int job_venue(void){
- if(job.kind==JOB_COURIER)return courierStops[job.step];
+ if(job.kind==JOB_COURIER)return job.step==2?0:courierRoutes[courierRoute][job.step];
  if(job.kind==JOB_VAULT&&job.step==1)return 1;
  if(job.kind==JOB_RIVALS&&job.step==1)return 7;
  return -1;
@@ -16,7 +27,7 @@ static int job_room(void){
  return -1;
 }
 static int job_has_clock(void){
- return job.kind>=0&&!(job.kind==JOB_COURIER&&sv.intro==2)&&!(job.kind==JOB_SPRINT&&job.step==0);
+ return job.kind==JOB_TAXI||job.kind==JOB_HOT||(job.kind==JOB_SPRINT&&job.step>0);
 }
 static int job_vehicle_target(void){
  if(jobRide<0)return -1;
@@ -89,14 +100,22 @@ static void beginJob(int kind){
  if(kind==JOB_TAXI&&!taxi_offer()){tell("No fare available. Try again shortly.");return;}
  if(kind!=JOB_TAXI)job=next;
  jobRide=ride;
+ navigation_follow_job();
  rivalsDeployed=0;
  if(ride>=0)street_stage_car(ride,vehicle);
  menu=-1;
  switch(kind){
  case JOB_COURIER:
   if(sv.intro==1)sv.intro=2;
-  for(int i=0;i<LEN(courierStops);i++)job_set_venue(i,courierStops[i]);
-  tell("Manifest signed. Take the first parcel to Ferry Market.");
+  courierRoute=sv.intro<=2?0:sv.legal%LEN(courierRoutes);
+  job_set_venue(0,courierRoutes[courierRoute][0]);job_set_venue(1,courierRoutes[courierRoute][1]);job_set_venue(2,0);
+  if(courierRoute){
+   int miles=0,from=0;
+   for(int i=0;i<3;i++){int to=i==2?0:courierRoutes[courierRoute][i];
+    miles+=taxi_road_distance(loc[from].x,loc[from].y,loc[to].x,loc[to].y);from=to;}
+   job.price=100+miles/48;
+  }
+  tell(courier_objective());
   break;
  case JOB_TAXI:tell("Take a licensed car to the rider and stop at the curb.");break;
  case JOB_RECOVERY:
@@ -137,16 +156,24 @@ static void advanceJob(void){
  int kind=job.kind;
  int tip=kind==JOB_TAXI?taxi_tip_amount(job.price,taxi.crashes,taxi.damage,taxi.rough):0;
  int bonus=kind==JOB_COURIER&&sv.intro==2?25:0;
- const char *result=jobNames[kind];
+ char race[80];const char *result=jobNames[kind];
  if(kind<JOB_VAULT){
   sv.legal++;
   if(kind==JOB_TAXI)sv.taxiFares++;
-  if(sv.intro<3){sv.intro=3;result="First paycheck. Visit Vanta Armory or take another job.";}
+  if(sv.intro<3){sv.intro=3;result="First paycheck. Your first car is $125 at Nightglass.";}
   else if(sv.intro==3)sv.intro=4;
   if(sv.charges&&(kind==JOB_COURIER||kind==JOB_RECOVERY)&&++sv.restitution>=3){
    sv.charges=0;sv.restitution=0;result="Restitution cleared.";
   }
  }else sv.crime++;
+ if(kind==JOB_SPRINT){
+  int time=max(1,(int)((95.f-job.time)*10+.5f));
+  int record=!sprintBest||time<sprintBest;
+  if(record)sprintBest=time;
+  char*end=sprint_time(append(race,"Finish "),time);
+  if(record)append(end," / session best.");else sprint_time(append(end," / best "),sprintBest);
+  result=race;
+ }
  gain(kind<JOB_VAULT,job.price+tip+bonus,result);
  end_job();request_save();
 }
@@ -157,7 +184,7 @@ static int interior_job_drop(int venue){
  }
  advanceJob();
  if(job.kind==JOB_COURIER)
-  tell(job.step==1?"Ferry signed. Deliver the next parcel to Nightglass Motors.":"Nightglass signed. Return the manifest to Mara.");
+  tell(courier_objective());
  return 1;
 }
 static const char *job_room_action(int building){
@@ -239,8 +266,7 @@ static int job_use_street(void){
 }
 static const char *job_objective(void){
  switch(job.kind){
- case JOB_COURIER:return job.step==0?"Deliver supplies to Ferry Market.":
-     job.step==1?"Deliver parts to Nightglass Motors.":"Return both signatures to Mara.";
+ case JOB_COURIER:return courier_objective();
  case JOB_RECOVERY:return job.step==0?"Find the stalled van. Press E beside it to restart it.":
      p.car!=jobRide?"Get into the recovered van.":"Stop in Dax's marked service bay and press E.";
  case JOB_SPRINT:return p.car<0||!cars[p.car].owner?"Enter a licensed car for the sprint.":

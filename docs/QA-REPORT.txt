@@ -1,3 +1,27 @@
+CITY RHYTHM QA
+
+- Reviewed the city render, all 15 named venues, 63 storefronts, four rear
+  rooms, five garage vehicles and the player and NPC figure renders. Compared
+  the maps and rotated vehicle models before and after the changes. Checked
+  the taxi, sprint, tram timetable and atlas in actual gameplay frames.
+- Checked all 114 trunk obstacles, the exposed roof and wall edges of every
+  active building, angled car collision, and clear park paths. Checked road
+  connections and map selection at every storefront. A legacy-style position
+  inside an extended roof loaded on nearby clear ground.
+- The new keyboard tour creates a career and completes all eight contract
+  types plus a repeat courier manifest. It visits 15 named venues and all
+  63 ordinary buildings, uses all 63 fixtures, buys Mercury, and collects its
+  settlement. It then pins Blue Hour Tram Hall using the atlas, pays the fare,
+  rides to Harbourlight Tram Hall, exits to the street and saves.
+- The Windows executable replay on simulated Win32 ran 60,569 frames with
+  26 atomic writes and final save digest f3397161. Final balances were $426
+  clean cash and $970 dirty money, with five legal and four street completions.
+- The standard game, profile, economy and executable checks passed. Targeted
+  cases cover blocked tram purchases, independent shop GPS pins, repeat
+  courier destinations, and cancelling or completing a braking exit. The
+  extended sanitizer run covered 1,200,000 ticks and 14,496 renders across
+  48 starting contexts. Physical Windows 11 testing remains outstanding.
+
 SIDEWALK PATROLS QA
 
 - Followed the eight officers at their posts, on neighborhood patrol, during

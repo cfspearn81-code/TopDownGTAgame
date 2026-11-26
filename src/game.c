@@ -53,10 +53,16 @@ static void wrapped(int x,int y,const char*s,U c,int limit){char a[94];while(*s)
 
 typedef struct{int x,y,w,h,ht;U roof,wall;}Building;
 static Building buildings[140];static int nb,lot[64][3];
+typedef struct{int x,y,w,h;} StreetBounds;
+/* Each block holds its building silhouettes followed by its tree trunks. */
+typedef struct{StreetBounds walls[10];int count,treesFrom;} BlockScenery;
+static BlockScenery scenery[64];
+static void setup_scenery(void);
 static int ordinaryDoorX[LEN(buildings)],ordinaryDoorY[LEN(buildings)];
 static void setup_ordinary_doors(void);
 static int zone_is_building(int i);
 static const char *walkin_name(int i);
+static int tram_hall(int i);
 static void walkin_open(int building);
 static int contract_room(int kind,int x,int y,int exclude);
 static void walkin_tick(U keys,U tap);
@@ -64,6 +70,7 @@ static void walkin_paint(void);
 static void bake_scenery(void);
 static void zone_venues(void);
 static void navigation_input(U tap);
+static void navigation_follow_job(void);
 static void navigation_pointer(int sx,int sy,U clicks);
 static void open_interior(int loc_index);
 static void interior_tick(U keys,U tap);
@@ -155,10 +162,11 @@ static int by=-1,near=-1,lastCar=-1,helpBack=1;
 #define CASH_RED   0xFF535Cu
 static char notice[100];
 static U noticeInk;
+static int storefrontCaption;
 static U notice_color(void){return noticeInk?noticeInk:PAPER;}
-static void tell(const char*s){append(notice,s);p.noticeT=4.4f;noticeInk=0;}
+static void tell(const char*s){storefrontCaption=0;append(notice,s);p.noticeT=4.4f;noticeInk=0;}
 static void wallet_note(const char*s,int a,int clean){
- char*q=append(notice,s);q=append(q,clean?"  CLEAN +$":"  DIRTY MONEY +$");number(q,a);
+ storefrontCaption=0;char*q=append(notice,s);q=append(q,clean?"  CLEAN +$":"  DIRTY MONEY +$");number(q,a);
  p.noticeT=4.4f;noticeInk=clean?CASH_GREEN:CASH_RED;
 }
 static void cashNote(const char*s,int a){wallet_note(s,a,1);}
@@ -177,7 +185,20 @@ static void draw_wallet(int x,int y,int w){
 }
 static int spend(int x){if(sv.cash<x){tell("Not enough credits.");return 0;}sv.cash-=x;return 1;}
 static void ground(int x,int y,int w,int h,U c){for(int j=max(0,y);j<min(ROOM,y+h);j++)for(int i=max(0,x);i<min(ROOM,x+w);i++)city[j*ROOM+i]=c;}
-static int solid(float x,float y,float r){if(x<35||x>ROOM-36||y<35||y>ROOM-36)return 1;int* a=lot[((int)y>>8)*8+((int)x>>8)];for(int i=0;i<a[0];i++){Building *b=buildings+a[i+1];if(x+r>b->x&&x-r<b->x+b->w&&y+r>b->y&&y-r<b->y+b->h)return 1;}return 0;}
+static StreetBounds building_bounds(const Building*b){
+ int blockX=b->x/256*256,blockY=b->y/256*256;
+ int x=b->x,y=max(blockY+42,b->y-b->ht);
+ return (StreetBounds){x,y,min(blockX+214,x+b->w+b->ht/2+1)-x,b->y+b->h+1-y};
+}
+static int solid(float x,float y,float r){
+ if(x<35||x>ROOM-36||y<35||y>ROOM-36)return 1;
+ const BlockScenery*block=&scenery[((int)y/256)*8+(int)x/256];
+ for(int i=0;i<block->count;i++){
+  const StreetBounds*b=block->walls+i;
+  if(x+r>b->x&&x-r<b->x+b->w&&y+r>b->y&&y-r<b->y+b->h)return 1;
+ }
+ return 0;
+}
 static int open_space(float x,float y){return !solid(x,y,10);}
 static void move(float *x,float*y,float dx,float dy,float r){if(!solid(*x+dx,*y,r))*x+=dx;if(!solid(*x,*y+dy,r))*y+=dy;}
 static void particle(float x,float y,int n,U c){while(n--){Particle*q=fx+(fn++%LEN(fx));q->x=x;q->y=y;q->vx=(int)(rnd()%151)-75;q->vy=(int)(rnd()%151)-75;q->t=.2f+(rnd()%36)*.01f;q->c=c;}}
@@ -189,7 +210,7 @@ static void setupCity(void){
   int n=1+(kind%3!=0);for(int k=0;k<n;k++){lot[iy*8+ix][k+1]=nb;lot[iy*8+ix][0]=n;Building*b=buildings+nb++;b->x=tx+53+k*88+rnd()%9;b->y=ty+70+rnd()%29;b->w=min(n==1?130:68,tx+200-b->x);b->h=min(65+(int)(rnd()%43),ty+210-b->y);b->ht=9+rnd()%22;static const U roofs[]={0x485b66,0x52606d,0x584867,0x596157,0x6a555c,0x4c6263};b->roof=roofs[rnd()%LEN(roofs)];b->wall=mix(b->roof,DARK,4);ground(b->x-4,b->y-4,b->w+17,b->h+16,0x1a262d);}
  }
  for(int i=1;i<8;i++)for(int j=1;j<8;j++){int x=i*256,y=j*256;for(int k=-21;k<22;k+=6){ground(x+k,y-38,3,8,0x8a9988);ground(x+k,y+31,3,8,0x8a9988);ground(x-38,y+k,8,3,0x8a9988);ground(x+31,y+k,8,3,0x8a9988);}ground(x-29,y-29,5,5,0x669686);ground(x+25,y+25,5,5,0x669686);}
- zone_venues();setup_ordinary_doors();
+ zone_venues();setup_ordinary_doors();setup_scenery();
 }
 #include "street_life.inc"
 static void dispatch_reset(void);
@@ -271,12 +292,21 @@ static void profiles_open(int create);
 static void profiles_tick(U tap);
 static void profiles_pointer(int sx,int sy,U clicks);
 static void profiles_paint(void);
+static int stoppingToExit;
 static void spawnPlayer(void){
+ stoppingToExit=0;
  cameraLeadX=cameraLeadY=0;
  p=(Player){0};p.x=sv.x;p.y=sv.y;
  if(!open_space(p.x,p.y)){
-   int xx=cl(((int)p.x+128)/256,1,7)*256,yy=cl(((int)p.y+128)/256,1,7)*256;
-   p.x=xx;p.y=yy;
+   /* Older careers can be parked inside a newly solid canopy or roof.
+    * Find a nearby clear footing before falling back to the block's curb. */
+   int found=0;
+   for(int radius=4;radius<=240&&!found;radius+=4)for(int i=0;i<16;i++){
+    float a=i*.3926991f,x=sv.x+cs(a)*radius,y=sv.y+sn(a)*radius;
+    if(street_foot_clear(x,y,-1)){p.x=x;p.y=y;found=1;break;}
+   }
+   if(!found){p.x=street_curb(sv.x,1);p.y=street_curb(sv.y,1);}
+
  }
  p.hp=cl(sv.hp,15,100);p.car=-1;cars[0].type=sv.selection;cars[0].cond=sv.owned?cl(sv.carCond[sv.selection],0,100):0;
 }
@@ -313,7 +343,7 @@ static void add(const char*n,const char*note,int action){add_colored(n,note,acti
 static void priced(const char*n,int price,const char*note,int action){char*d=append(strings[nopt],n);fmt(d,"  $",price);add(strings[nopt],note,action);}
 #include "legal_business.inc"
 static int carNear(void){return street_near_car();}
-static int placeNear(void){float best=45*45;int chosen=-1;for(int i=0;i<LEN(loc);i++){float d=d2(loc[i].x-p.x,loc[i].y-p.y);if(d<best){chosen=i;best=d;}}return chosen;}
+static int placeNear(void){float best=45*45;int chosen=-1;for(int i=0;i<LEN(loc);i++){float d=d2(loc[i].x-p.x,loc[i].y-p.y);if(d<best&&street_line_open(p.x,p.y,loc[i].x,loc[i].y,3)){chosen=i;best=d;}}return chosen;}
 static int ordinary_door_near(void){
  if(p.car>=0)return -1;
  float closest=27.f*27.f;int selected=-1;
@@ -394,6 +424,7 @@ static void next_fare(void){
  if(!sv.taxiFares){tell("Complete a Taxi Fare from Mercury Dispatch first.");return;}
  if(p.car<0||!cars[p.car].owner){tell("Use an owned or licensed car for taxi calls.");return;}
  if(!taxi_offer()){tell("No nearby fare available yet.");return;}
+ navigation_follow_job();
  char msg[100];char*q=append(msg,"New fare: pick up ");q=append(q,riders[taxi.rider].name);q=append(q," near ");q=append(q,loc[taxi.pickup].label);append(q,".");
  tell(msg);
 }
@@ -415,7 +446,9 @@ static void taxi_tick(float dt){
  }
  if(job.kind!=1||p.dead)return;
  if(taxi.phase>=TAXI_RIDING&&p.car!=taxi.ride){job.kind=-1;taxi.linger=0;tell("Fare cancelled: you left the taxi.");return;}
- int nearStop=d2(p.x-job.xs[job.step],p.y-job.ys[job.step])<37*37&&absf(p.y-(job.ys[job.step]+13))<=22;
+ /* The painted pickup includes the curb where the rider is standing. */
+ int nearStop=d2(p.x-job.xs[job.step],p.y-job.ys[job.step])<37*37&&
+              p.y>=taxi.curb[job.step]-1&&p.y<=job.ys[job.step]+35;
  int stopped=p.car>=0&&cars[p.car].owner&&absf(cars[p.car].s)<5;
  switch(taxi.phase){
  case TAXI_WAIT:
@@ -599,6 +632,7 @@ static void doOpt(int a){
    tell("No clear curb space. Try the garage again.");return;
   }
   if(newCar&&!canDirtyPurchase(specs[i].price))return;
+  if(newCar&&sv.intro==3)sv.intro=4;
   street_stage_car(0,next);
   sv.owned|=1<<i;sv.selection=i;sv.vehicleCond=sv.carCond[i]=cond;lastCar=0;p.car=-1;
   tell(cond?"Ride ready by the curb.":"Wreck at the curb; use Service at the desk.");menu=-1;request_save();return;
@@ -698,7 +732,11 @@ static void npcTick(float dt){
  dispatch_tick(dt);
 }
 static void enterExit(void){
- if(p.car>=0){if(!street_exit_car())tell("Slow down or pull over to exit safely.");return;}
+ if(p.car>=0){
+  if(absf(cars[p.car].s)>STREET_EXIT_SPEED){stoppingToExit=1;tell("Hold E to brake and step out.");}
+  else if(!street_exit_car())tell("The door is blocked. Pull into a clear space.");
+  return;
+ }
  int i=carNear();
  if(i<0)return;
  int result=street_enter_car(i);
@@ -714,6 +752,7 @@ static void enterExit(void){
 }
 void tick(U keys){
  const float dt=1.f/60; U tap=keys&~prev;prev=keys;
+ if(!(keys&USE)||scene!=1||menu>=0||mapOn||p.dead||p.car<0)stoppingToExit=0;
  // Keep fractional frame precision during long sessions.
  anim+=dt;if(anim>=3600.f)anim-=3600.f;
  if(scene==0||scene==5){profiles_tick(tap);return;}
@@ -758,12 +797,19 @@ void tick(U keys){
  street_tick_traffic(dt);
  if(p.car>=0){Car*c=cars+p.car;const CarSpec*s=specs+c->type;
   float speedBefore=absf(c->s),angleBefore=c->a;int taxiImpact=0;
+  if(stoppingToExit){y=0;keys|=BRAKE;}
   if(y<0)c->s+=s->acc*dt;if(y>0)c->s-=s->acc*1.25f*dt;
   if(!y)c->s*=.977f;if(keys&BRAKE)c->s*=.90f;
   float limit=s->vmax*(.50f+.005f*c->cond);if(c->s>limit)c->s=limit;if(c->s<-limit*.38f)c->s=-limit*.38f;
   float f=absf(c->s);if(f>7&&x)street_turn_car(p.car,wrap(c->a+x*s->turn*(keys&BRAKE?1.3f:1)*dt*(c->s>0?1:-1)));
   float xx=c->x,yy=c->y;
-  street_move_car(p.car,cs(c->a)*c->s*dt,sn(c->a)*c->s*dt);
+  float dx=cs(c->a)*c->s*dt,dy=sn(c->a)*c->s*dt;
+  if(!street_move_car(p.car,dx,dy)){
+   /* At a shallow angle the tires can still carry the car along the wall. */
+   int grazed=absf(dx)>2.5f*absf(dy)?street_move_car(p.car,dx,0):
+              absf(dy)>2.5f*absf(dx)?street_move_car(p.car,0,dy):0;
+   if(grazed)c->s*=.995f;
+  }
   if(d2(c->x-xx,c->y-yy)<f*f*dt*dt*.32f&&f>16){
    int damage=cl((int)(f*f/930),1,37);taxiImpact=damage;c->cond=max(0,c->cond-damage);c->s*=-.27f;
    if(damage>=3){particle(xx,yy,14,GOLD);if(crashFlash<=0){char msg[45];fmt(msg,"CRASH  /  CONDITION ",c->cond);tell(msg);}crashFlash=.45f;}
@@ -793,6 +839,10 @@ void tick(U keys){
    }else tell("Wrecked. Find another ride or visit Nightglass Motors.");
   }
  }else{float v=(keys&BRAKE?183:123)*dt*(x&&y?.707107f:1);if(x||y)p.a=look(x,y);street_player_step(x*v,y*v);if(keys&PUNCH)punch();else if(keys&FIRE)shoot();}
+ if(stoppingToExit&&p.car>=0&&absf(cars[p.car].s)<5){
+  stoppingToExit=0;
+  if(!street_exit_car())tell("The door is blocked. Pull into a clear space.");
+ }
  check_arrival(checkpointX,checkpointY);
  job_rival_encounter();
  taxi_tick(dt);
@@ -803,7 +853,6 @@ void tick(U keys){
    int shell=ordinary_door_near();
    if(choose_place(by,shell))open_interior(by);
    else if(shell>=0)walkin_open(shell);
-   else enterExit();
   }
  }
  if(scene!=1)return;
@@ -815,7 +864,7 @@ void tick(U keys){
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0){fx[i].t-=dt;fx[i].x+=fx[i].vx*dt;fx[i].y+=fx[i].vy*dt;}
 }
 int get_scene(void){return scene;}
-void clear_input(void){prev=0;}
+void clear_input(void){prev=0;stoppingToExit=0;}
 void pointer_input(int sx,int sy,U clicks){if(scene==0||scene==5){profiles_pointer(sx,sy,clicks);return;}if(scene==1&&mapOn&&!p.dead)navigation_pointer(sx,sy,clicks);}
 
 static int sx(float x){return(int)x-cx;}static int sy(float y){return(int)y-cy;}
@@ -851,11 +900,21 @@ static void carbody(Car*c,int x,int y){
  for(int i=0;i<4;i++)disc(x+(int)(vx[i]*.66f*ca-vy[i]*sa),y+(int)(vx[i]*.66f*sa+vy[i]*ca),3,0x0d141c);
  tri(ax[0],ay[0],ax[1],ay[1],ax[2],ay[2],color);tri(ax[0],ay[0],ax[2],ay[2],ax[3],ay[3],color);
  for(int i=0;i<4;i++)line(ax[i],ay[i],ax[(i+1)%4],ay[(i+1)%4],mix(color,DARK,i==0?2:5));
- int roofFront=c->type==3?1:5,roofBack=c->type==2?-11:-8;
- for(int u=roofBack;u<=roofFront;u++)for(int v=-5;v<=5;v++){
-   U cc=u==roofFront||u==roofBack?0xb3c9cf:u==roofFront-1||u==roofBack+1?0x283b50:v==-5||v==5?0x203038:mix(color,0x22283e,3);
-   if(c->type==4&&v==0)cc=0x80a36c;
-   dot(x+(int)(u*ca-v*sa),y+(int)(u*sa+v*ca),cc);
+ /* Sample the cabin in car space so diagonal windshields stay filled.
+  * Cabin length, glazing and trim distinguish the five garage models. */
+ static const int rear[]={-8,-7,-11,-6,-13},front[]={4,5,6,1,7};
+ int back=rear[c->type],nose=front[c->type];
+ for(int py=-16;py<=16;py++)for(int px=-16;px<=16;px++){
+  float u=px*ca+py*sa,v=absf(py*ca-px*sa);
+  if(u<back||u>nose||v>5.6f)continue;
+  U fill=mix(color,0x203041,2);
+  if(v>4.6f)fill=0x233941;
+  else if(u>nose-3.f)fill=v<3?0x9bbfc6:0x7095a4;
+  else if(c->type==4&&u<-1)fill=((int)(u+14)%4)?0xa5af89:0x6f805f;
+  else if(u<back+2)fill=0x58717d;
+  else if(c->type==3&&v<1.3f)fill=0xe7dbbe;
+  else if(c->type==2&&v>3.5f)fill=0x9ba7aa;
+  dot(x+px,y+py,fill);
  }
  for(int i=0;i<2;i++){int k=i?5:-5;int x1=x+(int)(13*ca+k*sa),y1=y+(int)(13*sa-k*ca),x2=x-(int)(14*ca+k*sa),y2=y-(int)(14*sa-k*ca);
   disc(x1,y1,2,0xffe0a3);dot(x1,y1,0xffebbf);disc(x2,y2,1,0xff567f);}
@@ -882,7 +941,8 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
   if(!hero||jacket!=PINK)jacket=charTop[k[TOP_TONE]];
  }
  U seam=mix(jacket,ink,4),rim=mix(jacket,PAPER,3);
- if(previewRig)rect(x-6,y+2,13,2,0x151d27);else disc(x+3,y+4,8,0x151d27);
+ if(previewRig)rect(x-6,y+2,13,2,0x151d27);
+ else for(int dy=-3;dy<=3;dy++){int half=7-absf(dy);line(x+2-half,y+3+dy,x+2+half,y+3+dy,0x19232b);}
  for(int side=-1;side<=1;side+=2){
   Pt hip=rig(x,y,co,si,-2,side*3,5),boot=rig(x,y,co,si,-2+step*side,side*4,0);
   Pt knee={(hip.x+boot.x)/2,(hip.y+boot.y)/2};
@@ -893,9 +953,10 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
   disc(boot.x,boot.y,2,shoe);dot(boot.x,boot.y-1,look?mix(shoe,PAPER,4):0x829aab);
  }
  int w=7+wide+(top==2||top==3);
- Pt lt=rig(x,y,co,si,1,-w,10),rt=rig(x,y,co,si,1,w,10),rb=rig(x,y,co,si,-4,4+wide,5),lb=rig(x,y,co,si,-4,-4-wide,5);
+ int chest=previewRig?1:3;
+ Pt lt=rig(x,y,co,si,chest,-w,10),rt=rig(x,y,co,si,chest,w,10),rb=rig(x,y,co,si,-4,4+wide,5),lb=rig(x,y,co,si,-4,-4-wide,5);
  quad(lt,rt,rb,lb,ink);
- quad(rig(x,y,co,si,1,2-w,10),rig(x,y,co,si,1,w-2,10),rig(x,y,co,si,-4,3+wide,6),rig(x,y,co,si,-4,-3-wide,6),jacket);
+ quad(rig(x,y,co,si,chest,2-w,10),rig(x,y,co,si,chest,w-2,10),rig(x,y,co,si,-4,3+wide,6),rig(x,y,co,si,-4,-3-wide,6),jacket);
  line(lt.x,lt.y,rt.x,rt.y,rim);line(lb.x,lb.y,rb.x,rb.y,seam);
  if(top==2||top==4||top==5)line((lt.x+rt.x)/2,(lt.y+rt.y)/2,(lb.x+rb.x)/2,(lb.y+rb.y)/2,top==4?rim:seam);
  for(int side=-1;side<=1;side+=2){
@@ -909,7 +970,7 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
   disc(hand.x,hand.y,1,skin);
  }
  Pt head=rig(x,y,co,si,1,0,14);int hx=head.x,hy=head.y;
- if(previewRig)rod((Pt){hx,hy+3},rig(x,y,co,si,1,0,10),1,mix(skin,ink,2));
+ rod((Pt){hx,hy+3},rig(x,y,co,si,1,0,10),1,mix(skin,ink,2));
  if(top==3)disc(hx,hy+3,5,seam);
  if(hs==8){disc(hx-(int)(co*4),hy-(int)(si*4)+2,2,hair);}
  if(hs==9){rect(hx-4,hy-3,9,8,hair);rect(hx-3,hy+4,7,2,mix(hair,ink,2));}
@@ -951,6 +1012,7 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
  }
 }
 static void person(int x,int y,U jacket,int step,float a,int style,int hue){figure(x,y,jacket,step,a,style,hue,style==4?&sv.look:0);}
+static const char* storefront_sign(int i);
 static void building(Building*b){
  int x=b->x,y=b->y,w=b->w,h=b->h,r=b->ht,f=y+h-r;int id=(x*13+y*29)%7;
  U tint=y<550?0xd087f4:x<870?0xf4a77d:y>1150?0x79f1de:0x8db0ff;
@@ -973,8 +1035,8 @@ static void building(Building*b){
   if(w>100){disc(x+w-26,y-r+31,13,mix(roof,tint,3));disc(x+w-26,y-r+31,10,0x354d57);line(x+w-32,y-r+31,x+w-20,y-r+31,top);}
  }
  for(int j=8;j<w-7;j+=10){U c=((x+j+y)%7<2)?tint:mix(0x233842,tint,3);rect(x+j,f+3,6,2,c);if(r>15)rect(x+j+4,f+9,5,2,mix(c,front,2));}
- if(id<=2&&w>65){static const char *brand[]={"MOTEL","NITE","OFFICES","VANTA","HOTEL","GARAGE","RAIL","POST"};
-   if(w>77)center(x+w/2,y-r+h-29,brand[(x/256+3*(y/256)+id)%LEN(brand)],tint,0);
+ if(id<=2&&w>65){const char*sign=storefront_sign((int)(b-buildings));
+   if(textw(sign,0)<w-10)center(x+w/2,y-r+h-29,sign,tint,0);
    else{for(int j=0;j<3;j++)rect(x+10+j*15,y-r+h-25,8,3,mix(tint,roof,4));}}
  line(x,y-r,x+w-1,y-r,mix(top,tint,3));
  line(x,y-r,x,f,0x839ba0);
@@ -983,10 +1045,10 @@ static void light(int x,int y,int radius,U color,int weight){
  int rr=radius*radius;
  for(int j=max(0,y-radius);j<min(ROOM,y+radius);j++)for(int i=max(0,x-radius);i<min(ROOM,x+radius);i++){int d=(i-x)*(i-x)+(j-y)*(j-y);int a=(rr-d)*weight/rr;if(a>0){U*q=city+j*ROOM+i;*q=mix(*q,color,min(7,a));}}
 }
-static void sceneryTree(int x,int y,int id){
+static void tree_crown(int x,int y,int id){
  const U greens[]={0x356c58,0x4c845e,0x4f786e,0x578c6d};
  U a=greens[id%4];
- disc(x+5,y+5,12,0x172823);rect(x-2,y-1,4,10,0x715b4a);
+ rect(x-2,y-1,4,10,0x715b4a);
  disc(x,y-8,11,0x253e3b);disc(x-3,y-11,8,a);disc(x+3,y-11,6,mix(a,0x91bb78,2));
 }
 #include "district_art.inc"
@@ -997,6 +1059,31 @@ static void setup_ordinary_doors(void){
   if(b->w<=0||b->h<=0||zone_is_building(i))continue;
   int x=b->x+b->w/2+b->ht/4,y=b->y+b->h+15;
   ordinaryDoorX[i]=x;ordinaryDoorY[i]=y;
+ }
+}
+static void setup_scenery(void){
+ z(scenery,sizeof scenery);
+ for(int tile=0;tile<64;tile++){
+  BlockScenery*block=scenery+tile;
+  const int*row=lot[tile];
+  for(int n=1;n<=row[0];n++)block->walls[block->count++]=building_bounds(buildings+row[n]);
+  block->treesFrom=block->count;
+  if(zone_is_lot(tile))continue;
+  int ox=(tile%8)*256,oy=(tile/8)*256;
+  /* Plant on grass in each quadrant; both paved park paths stay clear. */
+  static const int grove[][2]={{69,82},{100,103},{166,77},{191,106},{79,162},{100,193},{157,174},{191,192}};
+  static const int yard[][2]={{58,192},{196,193}};
+  const int (*places)[2]=row[0]?yard:grove;
+  int count=row[0]?LEN(yard):LEN(grove);
+  for(int i=0;i<count;i++){
+   int x=ox+places[i][0],y=oy+places[i][1],clear=1;
+   for(int n=1;n<=row[0];n++){
+    int id=row[n];StreetBounds b=building_bounds(buildings+id);
+    if(x+13>b.x&&x-13<b.x+b.w&&y+6>b.y&&y-28<b.y+b.h)clear=0;
+    if(absf(x-ordinaryDoorX[id])<24&&absf(y-ordinaryDoorY[id])<38)clear=0;
+   }
+   if(clear)block->walls[block->count++]=(StreetBounds){x-3,y-3,6,6};
+  }
  }
 }
 static void paint_ordinary_door(int i){
@@ -1014,21 +1101,29 @@ static void bake_scenery(void){
  for(int gy=0;gy<8;gy++)for(int gx=0;gx<8;gx++){
    int x=gx*256,y=gy*256,id=(gx*79+gy*23)%11;
    for(int k=46;k<224;k+=54){int xx=x+k,yy=y+34;line(xx,yy,xx+22,yy,0x4d5b67);rect(xx,yy,1,14,0x53606a);}
-   if(zone_is_lot(gy*8+gx)){}
-   else if(lot[gy*8+gx][0]==0){for(int j=0;j<9;j++)sceneryTree(x+56+(j%3)*58+(id*j)%11,y+65+(j/3)*56,id+j);}
-   else{sceneryTree(x+46,y+182,id);sceneryTree(x+201,y+191,id+2);rect(x+61,y+173,16,8,0x445162);rect(x+61,y+173,16,2,0x708596);}
+   BlockScenery*block=scenery+gy*8+gx;
+   for(int i=block->treesFrom;i<block->count;i++){
+    StreetBounds trunk=block->walls[i];
+    disc(trunk.x+8,trunk.y+1,12,0x172823);
+    tree_crown(trunk.x+3,trunk.y-4,id+i);
+   }
    if(gx&&gy){int xx=x+31,yy=y-34;U c=y<600?0x845987:x>1300?0x388b8c:0x8d7352;light(xx,yy,46,c,4);
     rect(xx-1,yy-1,3,13,0x293842);rect(xx-4,yy-4,8,4,mix(c,PAPER,5));
     if((gx+gy)%2==0){int tx=x-34,ty=y+38;light(tx,ty,27,0x549e92,3);rect(tx,ty,2,10,0x4b6364);rect(tx-2,ty-4,6,5,TEAL);}
    }
  }
  z(roofMask,sizeof roofMask);
+ for(int tile=0;tile<64;tile++){
+  const BlockScenery*block=scenery+tile;
+  for(int i=0;i<block->count;i++){
+   StreetBounds b=block->walls[i];
+   for(int y=b.y;y<b.y+b.h;y++)for(int x=b.x;x<b.x+b.w;x++)roofMask[y*ROOM+x]=1;
+  }
+ }
  for(int i=0;i<nb;i++){Building*b=buildings+i;if(b->w<=0||b->h<=0)continue;
   int tx=(b->x/256)*256,ty=(b->y/256)*256;
   clipLeft=tx+42;clipTop=ty+42;clipRight=tx+214;clipBottom=ty+214;
   if(!zone_is_building(i))building(b);
-  for(int y=max(clipTop,b->y-b->ht-1);y<min(clipBottom,b->y+b->h+1);y++)
-   for(int x=max(clipLeft,b->x);x<min(clipRight,b->x+b->w+b->ht/2+1);x++)roofMask[y*ROOM+x]=1;
  }
  clipLeft=clipTop=0;clipRight=clipBottom=ROOM;
  for(int i=0;i<LEN(loc);i++)zone_art(i);
@@ -1047,11 +1142,15 @@ static void hud(void){
  if(job.kind>=0){
   a=append(v,jobNames[job.kind]);a=append(a,"  ");a=number(a,job.step+1);
   a=append(a,"/");a=number(a,job.total);
+  if(job.kind==JOB_TAXI&&taxi_occupied()){
+   a=append(a,"  FARE $");a=number(a,job.price);a=append(a,"  TIP $");
+   a=number(a,taxi_tip_amount(job.price,taxi.crashes,taxi.damage,taxi.rough));
+  }
   if(job_has_clock())fmt(a,"  SEC ",(int)job.time);
   objective=job.kind==JOB_TAXI?(job_vehicle_target()>=0?"Enter the marked taxi or use your own car.":taxi_objective()):job_objective();
  }
  else if(sv.intro==1||sv.intro==2){append(v,"FIRST SHIFT");objective="Enter Mercury Dispatch. Talk to Mara.";}
- else if(sv.intro==3){append(v,"FIRST PAYCHECK");objective="M: pick Vanta Armory, Motors, or more work.";}
+ else if(sv.intro==3){append(v,"FIRST PAYCHECK");objective=sv.owned?"M: choose another job or a city destination.":"Your first car is $125 at Nightglass Motors.";}
  if(!objective&&sv.taxiFares&&p.car>=0&&cars[p.car].owner){append(v,"NEW CALL AVAILABLE");objective="T: accept the next taxi fare.";}
  if(objective){
   int width=max(500,max(textw(objective,0),textw(v,0))+26);
@@ -1073,7 +1172,7 @@ static void hud(void){
   textat(688,124,v,PAPER,0);
  }
  const char*use=job_street_prompt();
- if(!use&&p.car>=0)use=absf(cars[p.car].s)>STREET_EXIT_SPEED?"SHIFT  SLOW TO EXIT":"E  EXIT CAR";
+ if(!use&&p.car>=0)use=stoppingToExit?"BRAKING  /  HOLD E":absf(cars[p.car].s)>STREET_EXIT_SPEED?"HOLD E  BRAKE AND EXIT":"E  EXIT CAR";
  else if(!use){
   int shell=ordinary_door_near();
   if(choose_place(by,shell)){a=append(v,"E  ENTER ");append(a,loc[by].label);use=v;}
@@ -1091,6 +1190,66 @@ static void modal(int x,int y,int w,int h,U c){for(int i=0;i<W*H;i++)pixels[i]=(
 #include "interiors.inc"
 #include "streetside_interiors.inc"
 #include "profiles.inc"
+typedef struct{int x,y,kind,id;} StreetSprite;
+enum{SPRITE_CAR,SPRITE_PED,SPRITE_RIDER,SPRITE_HERO,SPRITE_TREE};
+static void add_sprite(StreetSprite*list,int*count,int x,int y,int kind,int id){
+ if(x<cx-44||x>cx+W+44||y<cy-44||y>cy+H+44)return;
+ int i=(*count)++;
+ while(i>0&&list[i-1].y>y){list[i]=list[i-1];i--;}
+ list[i]=(StreetSprite){x,y,kind,id};
+}
+/* Actors behind a facade can extend beyond their foot position. Restore
+ * only the visible face where that sprite overlaps the baked building. */
+static void cover_behind_buildings(int x,int y){
+ int tile=(y/256)*8+x/256;
+ if((U)tile>=64)return;
+ const int*row=lot[tile];
+ for(int i=1;i<=row[0];i++){
+  const Building*b=buildings+row[i];StreetBounds shell=building_bounds(b);
+  if(y>=b->y+b->h||y+18<shell.y||x+34<shell.x||x-34>=shell.x+shell.w)continue;
+  int left=max(cx,max(x-34,shell.x)),right=min(cx+W,min(x+35,shell.x+shell.w));
+  int top=max(cy,max(y-49,shell.y)),end=min(cy+H,min(y+19,shell.y+shell.h));
+  for(int yy=top;yy<end;yy++){
+   /* The east wall slopes away from the top-right corner. */
+   int edge=b->x+b->w+cl((yy-(b->y-b->ht))/2,0,b->ht/2);
+   for(int xx=left;xx<min(right,edge);xx++)pixels[(yy-cy)*W+xx-cx]=city[yy*ROOM+xx];
+  }
+ }
+}
+static void draw_street_actors(void){
+ /* A viewport including sprite margins covers at most 6 x 4 city blocks. */
+ static StreetSprite list[LEN(cars)+LEN(peds)+2+6*4*8];int count=0;
+ for(int i=0;i<nc;i++)if(i||sv.owned)add_sprite(list,&count,cars[i].x,cars[i].y,SPRITE_CAR,i);
+ for(int i=0;i<LEN(peds);i++)if(peds[i].hp>0||peds[i].life>0)
+  add_sprite(list,&count,peds[i].x,peds[i].y,SPRITE_PED,i);
+ if((job.kind==JOB_TAXI&&taxi.phase!=TAXI_RIDING)||(taxi.phase==TAXI_WALKING&&taxi.linger>0))
+  add_sprite(list,&count,taxi.x,taxi.y,SPRITE_RIDER,0);
+ if(p.car<0&&!p.dead)add_sprite(list,&count,p.x,p.y,SPRITE_HERO,0);
+ for(int gy=cl((cy-44)/256,0,7);gy<=cl((cy+H+44)/256,0,7);gy++)
+  for(int gx=cl((cx-44)/256,0,7);gx<=cl((cx+W+44)/256,0,7);gx++){
+   const BlockScenery*block=scenery+gy*8+gx;
+   for(int i=block->treesFrom;i<block->count;i++){
+    StreetBounds t=block->walls[i];add_sprite(list,&count,t.x+3,t.y+3,SPRITE_TREE,(gx*79+gy*23)%11+i);
+   }
+  }
+ for(int j=0;j<count;j++){
+  StreetSprite v=list[j];int x=v.x-cx,y=v.y-cy;
+  switch(v.kind){
+  case SPRITE_TREE:tree_crown(x,y-7,v.id);break;
+  case SPRITE_CAR:carbody(cars+v.id,x,y);break;
+  case SPRITE_HERO:person(x,y,p.hit>0&&((int)(anim*20)&1)?PINK:0xc6d979,walking?(int)(sn(footcycle)*5):0,p.a,4,3);break;
+  case SPRITE_RIDER:
+   person(x,y,riders[taxi.rider].outfit,taxi.phase==TAXI_WAIT?0:(int)(sn(anim*15)*5),taxi.a,0,riders[taxi.rider].face);
+   if(job.kind==JOB_TAXI){center(x,y-36,riders[taxi.rider].name,0xe2b3ff,0);diamond(x,y+5,8,0xb988f2);}break;
+  case SPRITE_PED:{
+   int i=v.id;Ped*q=peds+i;
+   if(q->hp<=0){line(x-6,y-3,x+6,y+3,0x815763);disc(x-7,y-4,3,0x85757b);break;}
+   U c=pedHit[i]>0?0xffdfbc:q->role==1?(dispatch_posted(i)?0x668df0:(((int)(anim*9)&1)?0x668df0:PINK)):q->role==2?PINK:(i%2)?0x92b7b4:0xca8c71;
+   person(x,y,c,q->s<=2?0:(int)(sn(anim*(q->role?16:11)+i)*4),q->a,q->role,i);break;}
+  }
+  if(v.kind!=SPRITE_TREE)cover_behind_buildings(v.x,v.y);
+ }
+}
 void paint(void){
  if(scene==0||scene==5){profiles_paint();return;}
  if(scene==3){interior_paint();return;}
@@ -1108,19 +1267,8 @@ void paint(void){
  }
  if((sv.intro==1||sv.intro==2)&&job.kind<0){int tx=sx(loc[0].x),ty=sy(loc[0].y);mark(cl(tx,27,W-27),cl(ty,150,H-70),16+(int)(sn(anim*4)*3),LIME);}
  for(int i=0;i<nc;i++)if(i==p.car||absf(cars[i].s)>9)projectLights(cars+i);
- for(int i=0;i<nc;i++){Car*c=cars+i;if(c->cond<=0&&i==0&&!sv.owned)continue;int x=sx(c->x),y=sy(c->y);if(x>-25&&x<W+25&&y>-25&&y<H+25)carbody(c,x,y);}
- for(int i=0;i<LEN(peds);i++){Ped*q=peds+i;int x=sx(q->x),y=sy(q->y);if(x<-22||x>W+22||y<-29||y>H+22)continue;if(q->hp<=0){if(q->life>0){line(x-6,y-3,x+6,y+3,0x815763);disc(x-7,y-4,3,0x85757b);}continue;}
- U c=pedHit[i]>0?0xffdfbc:q->role==1?(dispatch_posted(i)?0x668df0:(((int)(anim*9)&1)?0x668df0:PINK)):q->role==2?PINK:(i%2)?0x92b7b4:0xca8c71;person(x,y,c,q->s<=2?0:(int)(sn(anim*(q->role?16:11)+i)*4),q->a,q->role,i);
- }
- if((job.kind==1&&taxi.phase!=TAXI_RIDING)||(taxi.phase==TAXI_WALKING&&taxi.linger>0)){
-  int px=sx(taxi.x),py=sy(taxi.y);if(px>-26&&py>-33&&px<W+26&&py<H+26){
-   int stride=taxi.phase==TAXI_WAIT?0:(int)(sn(anim*15)*5);
-   person(px,py,riders[taxi.rider].outfit,stride,taxi.a,0,riders[taxi.rider].face);
-   if(job.kind==1){center(px,py-36,riders[taxi.rider].name,0xe2b3ff,0);diamond(px,py+5,8,0xb988f2);}
-  }
- }
+ draw_street_actors();
  int x=sx(p.x),y=sy(p.y);
- if(p.car<0&&!p.dead)person(x,y,p.hit>0&&(int)(anim*20)&1?PINK:0xc6d979,walking?(int)(sn(footcycle)*5):0,p.a,4,3);
  if(p.trail>0){int xx=x,yy=y;for(int j=15;j<(sv.gear>0?166:113);j+=5){if(solid(p.x+cs(p.a)*j,p.y+sn(p.a)*j,1))break;xx=x+(int)(cs(p.a)*j);yy=y+(int)(sn(p.a)*j);}line(x,y,xx,yy,GOLD);}
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0)disc(sx(fx[i].x),sy(fx[i].y),2,fx[i].c);
  if(job.kind==JOB_RIVALS&&job.step==0&&rivalsDeployed){
@@ -1133,7 +1281,15 @@ void paint(void){
   NavPoint target=nav_job_goal();
   int x=sx(target.x),y=sy(target.y);
   U color=ride>=0?GOLD:job.kind<4?TEAL:PINK;
-  if(x<30||x>W-30||y<82||y>H-60){
+  if(job.kind==JOB_SPRINT&&ride<0&&x>=30&&x<W-30&&y>=82&&y<H-60){
+   int leg=job.step?job.step-1:0,next=job.step?job.step:1;
+   int horizontal=absf(job.xs[next]-job.xs[leg])>absf(job.ys[next]-job.ys[leg]);
+   for(int stripe=-22;stripe<22;stripe+=5){
+    U ink=((stripe+22)/5)%2?DARK:PAPER;
+    rect(horizontal?x-2:x+stripe,horizontal?y+stripe:y-2,horizontal?4:5,horizontal?5:4,ink);
+   }
+   center(x,y-42,job.step==0?"START":job.step==job.total-1?"FINISH":"GATE",GOLD,0);
+  }else if(x<30||x>W-30||y<82||y>H-60){
    int ax=cl(x,30,W-35),ay=cl(y,105,H-74);
    // Keep an off-screen marker away from the wallet and minimap.
    if(ax>=630&&ay<165)ay=165;

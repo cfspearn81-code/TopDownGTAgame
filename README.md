@@ -5,11 +5,13 @@ Port Vanta. This is not GTA, a GTA port, or a browser game. The city, artwork,
 and game code are original to this project; the bundled font license is in
 [`docs/FONT-LICENSE.txt`](docs/FONT-LICENSE.txt).
 
-**Play:** [Download the Sidewalk Patrols Windows x64 ZIP](downloads/Dead-Channel-Sidewalk-Patrols-Windows-11-x64.zip?raw=true).
+**Play:** [Download the City Rhythm Windows x64 ZIP](downloads/Dead-Channel-City-Rhythm-Windows-11-x64.zip?raw=true).
 Extract the ZIP and run `DeadChannel.exe`. No installer, network, or account
-is required. The window title reads `Dead Channel | Sidewalk Patrols`.
-Previous local saves still load. Officers patrol on sidewalks and yield at
-crosswalks. The red wallet shows dirty money.
+is required. The window title reads `Dead Channel | City Rhythm`.
+Existing careers still load. City Rhythm adds tram travel, rotating courier
+runs, timed race finishes, and atlas pins for every storefront. Park paths
+are clear, trees have solid trunks, and building collision follows the roof
+and side walls.
 
 Begin in Apartment 4, take Mara's courier job, and explore 78 enterable
 buildings. Earn clean cash from legal jobs, take street contracts, drive and

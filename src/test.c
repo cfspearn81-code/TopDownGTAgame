@@ -83,6 +83,66 @@ static void sidewalk_patrol_test(void){
  assert(q->x==550&&q->y==550&&!w->cross);
  puts("Passed: sidewalk posts, neighborhood beats, pursuit, return, and crosswalk traffic.");
 }
+static void city_rhythm_test(void){
+ init_city();scene=1;nc=0;
+ int trees=0,shops=0,tram=-1;
+ for(int tile=0;tile<64;tile++){
+  BlockScenery*block=scenery+tile;
+  for(int i=0;i<block->count;i++){
+   StreetBounds b=block->walls[i];
+   float x=b.x+b.w*.5f,y=b.y+b.h*.5f;
+   assert(solid(b.x+1,b.y+1,0)&&solid(b.x+b.w-1,b.y+b.h-1,0));
+   assert(!street_line_open(b.x-15,y,b.x+b.w+15,y,1));
+   Car car={.x=x,.y=y,.a=.78f};assert(street_hits_wall(&car));
+   if(i<block->treesFrom)continue;
+   trees++;p.x=b.x-11;p.y=y;float before=p.x;
+   for(int j=0;j<18;j++)street_player_step(2,0);
+   assert(p.x>=before&&p.x<=b.x-10);
+  }
+  if(!lot[tile][0]){
+   int x=(tile%8)*256,y=(tile/8)*256;
+   assert(street_line_open(x+48,y+126,x+208,y+126,10));
+   assert(street_line_open(x+126,y+48,x+126,y+208,10));
+  }
+ }
+ assert(trees>0);
+ for(int i=0;i<nb;i++){
+  const Building*b=buildings+i;if(!b->w)continue;
+  int roofY=max(b->y/256*256+42,b->y-b->ht);
+  int east=min(b->x/256*256+213,b->x+b->w+b->ht/2-1);
+  assert(solid(b->x+b->w/2,roofY+1,0));
+  assert(solid(east,b->y+b->h/2,0));
+  assert(street_hits_wall(&(Car){.x=east+2,.y=b->y+b->h/2,.a=.78f}));
+ }
+ for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){
+  shops++;p.x=ordinaryDoorX[i];p.y=ordinaryDoorY[i];assert(open_space(p.x,p.y));
+  NavPoint door=nav_door(LEN(loc)+i);mapOn=1;
+  navigation_pointer(NAV_MAP_X+door.x*NAV_MAP_SIZE/ROOM,NAV_MAP_Y+door.y*NAV_MAP_SIZE/ROOM,0);
+  assert(navSelected==LEN(loc)+i);mapOn=0;
+  NavAnchor connections[6];assert(nav_anchors(door,connections)>0);
+  if(tram_hall(i))tram=i;
+ }
+ assert(shops==63&&tram>=0);
+ walkin_open(tram);wi_x=wi_f[0].x+wi_f[0].w/2;wi_y=wi_f[0].y+wi_f[0].h+10;
+ assert(wi_at_station());sv.cash=4;press(ENTER);assert(walkin_active==tram&&sv.cash==4);
+ sv.cash=10;p.heat=50;press(ENTER);assert(walkin_active==tram&&sv.cash==10);p.heat=0;
+ beginJob(JOB_COURIER);press(ENTER);assert(walkin_active==tram&&sv.cash==10);end_job();
+ int stop=tram_destination(tram);press(ENTER);
+ assert(walkin_active==stop&&sv.cash==5&&sv.x==ordinaryDoorX[stop]&&sv.y==ordinaryDoorY[stop]);
+ press(USE);assert(scene==1&&p.x==ordinaryDoorX[stop]);
+ sv.intro=4;sv.legal=1;beginJob(JOB_COURIER);int first=job_venue();assert(!job_has_clock());
+ job_clock_tick(400);assert(job.kind==JOB_COURIER);
+ for(int i=0;i<3;i++)assert(interior_job_drop(job_venue()));
+ beginJob(JOB_COURIER);assert(job_venue()!=first);end_job();
+ sv.owned=1;nc=1;p.car=0;p.x=900;p.y=512;cars[0]=(Car){900,512,0,125,0,1,100};
+ press(USE);assert(p.car==0&&!stoppingToExit);
+ cars[0].s=125;walk(USE,90);assert(p.car==-1&&absf(cars[0].s)<5);
+ nc=2;cars[1]=(Car){p.x+24,p.y,0,0,1,0,100};p.heat=0;
+ press(USE);assert(p.car<0&&!cars[1].reported&&p.heat==0);
+ const Building*b=buildings+zone_idx[0];sv.x=b->x+b->w/2;sv.y=b->y-b->ht+2;
+ spawnPlayer();assert(open_space(p.x,p.y)&&d2(p.x-sv.x,p.y-sv.y)<45*45);
+ printf("Passed: %d tree trunks, roof edges, park paths, all storefront pins and approaches, trams, courier rotation, braking exits and old save positions.\n",trees);
+}
 int main(void){
  init_city();assert(nb<=LEN(buildings));assert(scene==0&&sv.cash==0&&sv.gear==-1&&sv.owned==0&&job.kind<0);
  frame("build/title.ppm");press(ENTER);assert(scene==5);press(ENTER);assert(scene==3&&interior_active_loc==12);walk(0,20);frame("build/apartment.ppm");
@@ -352,6 +412,7 @@ int main(void){
  cars[0].s=-50;for(int i=0;i<120;i++)update_camera_lead();
  assert(camera_left()<1024-W/2);p.x=35;assert(camera_left()==0);
  spawnPlayer();assert(cameraLeadX==0&&cameraLeadY==0);
+ city_rhythm_test();
  sidewalk_patrol_test();
  puts("Passed: vehicle re-entry, parked car selection, pause/map isolation, lethal wreck interaction and driving camera.");
  puts("Passed: stopped recovery handoff, licensed circuit, exact Vectra, two radio studios, carried lockbox, guarded consignment, restitution and safehouse recovery.");
