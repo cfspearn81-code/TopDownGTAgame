@@ -5,7 +5,7 @@ enum {
  LEGAL_MENU_FIRST=16,LEGAL_REAR_FIRST=19,
  LEGAL_OPEN=100,LEGAL_BUY_FIRST=101,LEGAL_DEPOSIT_FIRST=104,LEGAL_COUNTER_BACK=107,
  LEGAL_CLAIM_FIRST=108,
- LEGAL_INTERVAL=120,LEGAL_DAY_SECONDS=480,LEGAL_MIN_WINDOW=45,LEGAL_MIN_TRANSFER=5
+ LEGAL_INTERVAL=120,LEGAL_MIN_WINDOW=45,LEGAL_MIN_TRANSFER=5
 };
 typedef struct {
  int kind,cost,payout,limit;
@@ -43,7 +43,7 @@ static void legal_make_menu(int i){
  const LegalBusinessSpec*s=legal_specs+i;
  const LegalBusiness*b=sv.legit+i;
  if(!b->owned){
-  if(sv.audit||sv.charges)add("FRANCHISE BUYING ON HOLD","Resolve the current Revenue case before buying property.",0);
+  if(sv.charges)add("FRANCHISE BUYING ON HOLD","Resolve the current Revenue case before buying property.",0);
   else priced("BUY FRANCHISE",s->cost,s->buyNote,LEGAL_BUY_FIRST+i);
  }else{
   char*status=append(strings[nopt],"NEXT CLEAN PAYOUT  $");
@@ -57,7 +57,7 @@ static void legal_counter_menu(int i){
  if(i<0||i>=LEN(legal_specs))return;
  const LegalBusiness*b=sv.legit+i;
  if(!b->owned)add("OWNER ACCESS ONLY","Buy this franchise from the public counter first.",0);
- else if(sv.audit||sv.charges)add("ACCOUNT ON HOLD","Resolve the Revenue case to use the account desk.",0);
+ else if(sv.charges)add("ACCOUNT ON HOLD","Resolve the Revenue case to use the account desk.",0);
  else if(b->pending>0){
   char*label;
   if(b->cooldown>0.f){
@@ -69,7 +69,7 @@ static void legal_counter_menu(int i){
   }
  }else{
   const int amount=legal_amount(i);
-  char*label=append(strings[nopt],"TODAY CLOSES IN ");legal_duration(label,LEGAL_DAY_SECONDS-sv.dayClock);
+  char*label=append(strings[nopt],"TODAY CLOSES IN ");legal_duration(label,DAY_SECONDS-sv.dayClock);
   add(strings[nopt],"Deposits made in the final 45 seconds clear at tomorrow's closing.",0);
   if(amount>=LEGAL_MIN_TRANSFER){
    label=append(strings[nopt],"DEPOSIT $");label=number(label,amount);append(label," DIRTY MONEY");
@@ -95,7 +95,7 @@ static int legal_opt(int action,int*currentMenu){
   return 1;
  }
  if((front>=0&&action!=LEGAL_BUY_FIRST+i)||(rear>=0&&action!=LEGAL_DEPOSIT_FIRST+i&&action!=LEGAL_CLAIM_FIRST+i))return 1;
- if(sv.audit||sv.charges){tell("Franchise transaction blocked by Revenue. Visit the Annex.");return 1;}
+ if(sv.charges){tell("Franchise transaction blocked by Revenue. Visit the Annex.");return 1;}
  if(front>=0){
   if(b->owned){tell("This franchise is already yours.");return 1;}
   if(sv.cash<s->cost){tell("Not enough clean credits to buy this franchise.");return 1;}
@@ -115,9 +115,9 @@ static int legal_opt(int action,int*currentMenu){
  if(b->pending>0){tell("One deposit per desk. Collect this one first.");return 1;}
  const int amount=legal_amount(i);
  if(amount<LEGAL_MIN_TRANSFER){tell("Bring at least $5 in dirty money to deposit.");return 1;}
- sv.dirty-=amount;b->pending=legal_net(amount);b->cooldown=LEGAL_DAY_SECONDS-sv.dayClock;
+ sv.dirty-=amount;b->pending=legal_net(amount);b->cooldown=DAY_SECONDS-sv.dayClock;
  if(b->cooldown<LEGAL_MIN_WINDOW){
-  b->cooldown+=LEGAL_DAY_SECONDS;tell("Deposit recorded. Collect here after tomorrow's closing.");
+  b->cooldown+=DAY_SECONDS;tell("Deposit recorded. Collect here after tomorrow's closing.");
  }else tell("Deposit recorded. Collect here after the end of the game day.");
  request_save();
  return 1;
@@ -127,7 +127,7 @@ static void legal_seize(void){
 }
 static float legal_advance(float elapsed,float dt){
  /* Native play uses fixed 60 Hz ticks; keep that counter frame-aligned so
-  * an eight-minute day closes exactly on frame 28,800, including after save. */
+  * the day closes exactly on frame 86,400, including after save. */
  if(absf(dt-1.f/60.f)<.000001f)return (float)((int)(elapsed*60.f+.5f)+1)/60.f;
  return elapsed+dt;
 }
@@ -135,17 +135,19 @@ static float legal_advance(float elapsed,float dt){
  * countdown drift away from closing, peg it to the same day boundary. */
 static int legal_tick(float dt){
  if(!(dt>0.f))return 0;
- const float previousEnd=LEGAL_DAY_SECONDS-sv.dayClock,clock=legal_advance(sv.dayClock,dt);
- const int closed=(int)(clock/LEGAL_DAY_SECONDS);
- sv.dayClock=clock-closed*LEGAL_DAY_SECONDS;
+ const float previousEnd=DAY_SECONDS-sv.dayClock,clock=legal_advance(sv.dayClock,dt);
+ const int closed=(int)(clock/DAY_SECONDS);
+ sv.dayClock=clock-closed*DAY_SECONDS;
+ int reset=closed&&sv.dirtySpent>0;
+ if(closed)sv.dirtySpent=0;
  int income=0,ready=0;
  for(int i=0;i<LEN(legal_specs);i++){
   LegalBusiness*b=sv.legit+i;
   if(!b->owned)continue;
   if(b->pending>0&&b->cooldown>0.f){
-   const int closings=b->cooldown>previousEnd+LEGAL_DAY_SECONDS*.5f?2:1;
+   const int closings=b->cooldown>previousEnd+DAY_SECONDS*.5f?2:1;
    if(closed>=closings){b->cooldown=0.f;ready++;}
-   else b->cooldown=(closings-closed)*LEGAL_DAY_SECONDS-sv.dayClock;
+   else b->cooldown=(closings-closed)*DAY_SECONDS-sv.dayClock;
   }
   b->elapsed=legal_advance(b->elapsed,dt);
   if(b->elapsed>=LEGAL_INTERVAL){
@@ -159,5 +161,5 @@ static int legal_tick(float dt){
   if(ready)tell("Account cleared. Collect your credits at the same rear desk.");
   else if(income)cashNote("Clean franchise income.",income);
  }
- return income>0||ready>0;
+ return income>0||ready>0||reset;
 }

@@ -95,8 +95,10 @@ static void wi_layout(int b){
   wi_f[wi_n++]=(InteriorProp){x,y,a.w,a.h,a.t,t};
  }
 }
+#include "storefront_addresses.inc"
 static int wi_solid(float x,float y){
- if(x<wi_left+12||x>wi_right-12||y<wi_top+12||y>431)return 1;
+ if(y<wi_top+12||y>431)return 1;
+ if(x<wi_shell_edge((int)y,0)+12||x>wi_shell_edge((int)y,1)-12)return 1;
  for(int i=0;i<wi_n;i++){InteriorProp*f=wi_f+i;if(x>f->x-8&&x<f->x+f->w+8&&y>f->y-7&&y<f->y+f->h+7)return 1;}
  return 0;
 }
@@ -144,37 +146,23 @@ static void wi_draw(const InteriorProp*f,int enabled){
  case WI_SEATS:for(int j=3;j<w-15;j+=23){box(x+j,y+5,20,h-14,0x89576a,dk);rect(x+j+3,y+9,14,5,0xac7480);rect(x+j+2,y+h-14,16,3,0x69485e);}break;
  }
 }
+#include "storefront_setdress.inc"
 static void wi_bake(void){
- const WiRole*r=wiRoles+wi_role;U a=r->accent;
- U*old=surface;int l=wi_left,t=wi_top,rr=wi_right,b=442,ww=rr-l;
- surface=wi_back;
- for(int y=0;y<H;y++){U c=mix(0x101c27,0x222c39,(H-y)*5/H);rect(0,y,W,1,c);}
- for(int j=0;j<3;j++)box(l-12+j*4,t-14+j*3,ww+24-j*8,b-t+31-j*6,mix(r->floor,DARK,5),mix(r->floor,0x485457,3));
- rect(l,t,ww,b-t,r->floor);
- for(int y=t+2;y<b;y+=r->finish==2?5:r->finish==1?24:13){
-  int h=r->finish==2?5:r->finish==1?24:13,pitch=r->finish==2?8:r->finish==1?26:66,row=(y-t)/h;
-  line(l,y,rr-1,y,mix(r->floor,DARK,r->finish==2?1:2));for(int x=l+(row%2)*pitch/2;x<rr;x+=pitch){
-   if(r->finish==2){dot(x,y+2,mix(r->floor,PAPER,1));continue;}
-   line(x,y,x,min(y+h-1,b-1),mix(r->floor,DARK,2));
-   if((wi_hash((U)(x*13+y))+wi_seed)%5==0)line(x+2,y+2,min(rr-2,x+pitch-5),y+2,mix(r->floor,PAPER,1));
-  }
- }
- box(l-1,t-35,ww+2,36,mix(r->floor,a,2),mix(r->floor,DARK,4));
- for(int x=l+12;x<rr-10;x+=33)rect(x,t-30,1,27,mix(r->floor,DARK,2));
- unsigned side=wi_seed>>19;
- for(int i=0;i<2;i++){int x=(i?rr-96:l+19)+(int)(side%9);
-  box(x,t-25,68,17,0x6a8997,0x273a49);for(int q=0;q<3;q++)box(x+2+q*22,t-23,20,13,mix(0x456877,a,2),0x69828b);
- }
- int nx=(wi_f[0].x+wi_f[0].w/2),ny=wi_f[0].y+wi_f[0].h;
- int_lamp(nx,ny,96,a,2);
- if(wi_role==10||wi_role==0){box(l+27,wi_f[0].y+10,ww-54,93,mix(r->floor,0x704352,3),mix(r->floor,a,1));}
- if(wi_role==6||wi_role==8||wi_role==11||wi_role==13){for(int j=0;j<12;j++){int x=nx-36+j*6;line(x,ny+7,x+4,ny+4,mix(r->floor,GOLD,2));}}
- for(int i=0;i<wi_n;i++)wi_draw(wi_f+i,i==0||wi_f[i].type==WI_SCREEN?wi_sw[walkin_active]:0);
+ const WiFinish*f=wiFinish+wi_role;const WiAddress*ad=wiAddress+walkin_active;
+ U*old=surface;surface=wi_back;int b=442;
+ for(int y=0;y<H;y++)rect(0,y,W,1,mix(0x111d28,0x25313e,(H-y)*5/H));
+ wi_shell(f,ad->edition);
+ wi_wall(f,ad->edition);wi_inlay(f,ad->edition);
+ const int nx=wi_f[0].x+wi_f[0].w/2,ny=wi_f[0].y+wi_f[0].h;
+ int_lamp(nx,ny,78,f->light,2);
+ for(int i=0;i<wi_n;i++)wi_service(wi_f+i,ad->edition,i,i==0||wi_f[i].type==WI_SCREEN?wi_sw[walkin_active]:0);
  box(nx-9,ny-4,18,4,DARK,0x62767d);rect(nx-6,ny-3,12,2,wi_sw[walkin_active]?GOLD:TEAL);
- box(W/2-40,b-28,80,22,mix(r->floor,a,1),mix(r->floor,PAPER,2));for(int j=1;j<=5;j++)rect(W/2-32,b-26+j*3,64,1,mix(r->floor,DARK,2));
- rect(l-4,b,ww+8,5,0x243542);rect(W/2-35,b,70,5,a);
- center(W/2,b+6,"STREET EXIT",MUTED,0);
- surface=old;
+ int px=wi_plaque_x();
+ box(px-11,408,22,13,0x664e3f,0xe5c68e);rect(px-6,412,12,1,0xe5c68e);rect(px-6,415,8,1,0xd1b383);
+ box(W/2-36,b-15,72,16,mix(f->floor,0x2c3942,4),mix(f->floor,PAPER,2));
+ for(int j=0;j<4;j++)rect(W/2-31,b-12+3*j,62,1,mix(f->floor,DARK,3));
+ rect(W/2-33,b+1,66,4,wiRoles[wi_role].accent);
+ center(W/2,b+8,"STREET EXIT",MUTED,0);surface=old;
 }
 static void walkin_open(int building){
  if(building<0||building>=nb||buildings[building].w<=0||buildings[building].h<=0||zone_is_building(building))return;
@@ -199,8 +187,8 @@ static void walkin_tick(U keys,U tap){
  if(tap&ESC){if(menu>=0){menu=-1;return;}active(PAUSE_MENU);makeMenu();return;}
  if(menu>=0){makeMenu();if(!nopt){menu=-1;return;}if(tap&UP)sel=(sel+nopt-1)%nopt;if(tap&DOWN)sel=(sel+1)%nopt;if(tap&(USE|ENTER))doOpt(opt[sel].action);return;}
  int x=!!(keys&RIGHT)-!!(keys&LEFT),y=!!(keys&DOWN)-!!(keys&UP);
- float v=(keys&BRAKE?3.6f:2.5f)*(x&&y?.707107f:1.f);walking=x||y;
- if(walking){wi_angle=look(x,y);footcycle=wrap(footcycle+.25f);}
+ float v=(keys&BRAKE?WALKIN_RUN_STEP:WALKIN_WALK_STEP)*(x&&y?.707107f:1.f);walking=x||y;
+ if(walking){wi_angle=look(x,y);footcycle=wrap(footcycle+.25f*FOOT_PACE);}
  if(!wi_solid(wi_x+x*v,wi_y))wi_x+=x*v;
  if(!wi_solid(wi_x,wi_y+y*v))wi_y+=y*v;
  p.secs+=dt;job_clock_tick(dt);
@@ -213,8 +201,23 @@ static void walkin_tick(U keys,U tap){
   if(wi_at_station()&&tram_hall(walkin_active)){
    int to=tram_destination(walkin_active);if(to>=0){char msg[95];char*end=append(msg,"Next tram: ");append(end,walkin_name(to));tell(msg);storefrontCaption=1;}return;
   }
-  if(wi_at_station()){wi_sw[walkin_active]^=1;const WiRole*r=wiRoles+wi_role;tell(wi_sw[walkin_active]?r->on:r->off);storefrontCaption=1;wi_bake();}
+  if(wi_at_station()){wi_sw[walkin_active]^=1;const WiRole*r=wiRoles+wi_role;tell(wi_sw[walkin_active]?r->on:r->off);storefrontCaption=1;wi_bake();return;}
+  if(wi_at_plaque()){tell(wiPlaque[walkin_active]);storefrontCaption=1;}
  }
+}
+/* Keep the shop's headline at display size when possible. One-pixel
+ * tighter tracking saves Harbourlight Rooming House from the wallet. */
+static int wi_title_width(const char*s,int*big,int*tracking){
+ int w=textw(s,1),n=max(0,sl(s)-1),limit=(W-291)-22-12;
+ *big=1;*tracking=0;
+ if(w<=limit)return w;
+ if(w-n<=limit){*tracking=1;return w-n;}
+ *big=0;return textw(s,0);
+}
+static void wi_title(const char*s,U color){
+ int big,tracking;wi_title_width(s,&big,&tracking);
+ if(!tracking){textat(22,31,s,color,big);return;}
+ int x=22;for(;*s;s++){char one[]={*s,0};textat(x,31,one,color,big);x+=textw(one,big)-tracking;}
 }
 static void walkin_paint(void){
  if(walkin_active<0||walkin_active>=nb)return;
@@ -223,7 +226,7 @@ static void walkin_paint(void){
  for(int i=0;i<W*H;i++)pixels[i]=wi_back[i];
  person((int)wi_x,(int)wi_y,0x56baae,walking?(int)(sn(footcycle)*4):0,wi_angle,4,1);
  char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,district(b->x,b->y));q=append(q,"   /   ");append(q,r->section);
- textat(22,9,ad,MUTED,0);textat(22,31,walkin_name(walkin_active),r->accent,1);draw_wallet(W-291,10,270);
+ draw_day_clock(5);textat(DAY_BADGE_LABEL_X,9,ad,MUTED,0);wi_title(walkin_name(walkin_active),r->accent);draw_wallet(W-291,10,270);
  const InteriorProp*f=wi_f;int sx=f->x+f->w/2,sy=f->y-10;
  const char *task=job_room_action(walkin_active);
  U marker=task?PINK:r->accent;
@@ -232,7 +235,8 @@ static void walkin_paint(void){
  rect(16,477,W-32,1,0x475a65);
  const char*hint=wi_at_door()?"Return to street":
      wi_at_station()?(task?task:tram_hall(walkin_active)?"Departures    [ENTER] Ride tram / $5 clean":r->action):task?job_objective():"Walk to the lit station";
- textat(23,484,(wi_at_station()||wi_at_door())?"[E]":"WASD",r->accent,0);textat(81,484,hint,PAPER,0);
+ if(!wi_at_door()&&!wi_at_station()&&wi_at_plaque())hint="Read the address plaque";
+ textat(23,484,(wi_at_station()||wi_at_door()||wi_at_plaque())?"[E]":"WASD",r->accent,0);textat(81,484,hint,PAPER,0);
  if(p.noticeT>0)textat(23,509,notice,notice_color(),0);else if(saveFlash>0)textat(23,509,"Saved.",CASH_GREEN,0);else if(saveFlash<0)textat(23,509,"Save failed.",CASH_RED,0);
  if(menu>=0){paint_active_menu();draw_wallet(W-291,10,270);}
 }

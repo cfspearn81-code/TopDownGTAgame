@@ -6,12 +6,14 @@
 #include <string.h>
 static unsigned char saves[PROFILE_SLOTS][sizeof(Save)];
 static unsigned sizes[PROFILE_SLOTS];
-static int current,failCreate,failWrite,writes,failDelete,deletes;
+static int current,failCreate,failWrite,writes,failDelete,deletes,hidden,peerClaim,peerSlot;
 void disk_slot(int n){assert(n>=0&&n<PROFILE_SLOTS);current=n;}
-int disk_present(void){return sizes[current]>0;}
+int disk_present(void){return !hidden&&sizes[current]>0;}
 int disk_read(void*d,unsigned n){if(sizes[current]!=n)return 0;memcpy(d,saves[current],n);return 1;}
 int disk_write(const void*d,unsigned n){if(failWrite)return 0;assert(n==sizeof(Save));memcpy(saves[current],d,n);sizes[current]=n;writes++;return 1;}
-int disk_create(const void*d,unsigned n){if(failCreate||sizes[current])return 0;return disk_write(d,n);}
+int disk_create(const void*d,unsigned n){if(failCreate||sizes[current])return 0;
+ if(peerClaim){peerClaim=0;peerSlot=current;memcpy(saves[current],saves[0],sizes[0]);sizes[current]=sizes[0];return 0;}
+ return disk_write(d,n);}
 int disk_delete(void){if(failDelete||!sizes[current])return 0;sizes[current]=0;deletes++;return 1;}
 static void press(U k){tick(k);tick(0);}
 static void click(int x,int y){pointer_input(x,y,1);}
@@ -44,23 +46,24 @@ int main(void){
  }
  assert(torsoRows>=20);
 
- failCreate=1;click(785,476);assert(scene==5&&!writes&&profileError&&sv.rev==7&&!memcmp(&draft,&goal,sizeof goal));
+ failCreate=1;click(785,476);assert(scene==5&&!writes&&profileError&&sv.rev==SAVE_REV&&!memcmp(&draft,&goal,sizeof goal));
  failCreate=0;click(785,476);assert(scene==3&&interior_active_loc==12&&sideSlot==0&&writes==1);
  assert(!memcmp(&sv.look,&goal,sizeof goal)&&!strcmp(sv.name,"Riley Knox")&&sv.hp==100&&!sv.cash&&sv.gear==-1);
  for(int i=0;i<3600;i++)tick(0);
  assert(sv.playedTicks==3600);
  press(ESC);U time=sv.playedTicks;for(int i=0;i<120;i++)tick(0);assert(sv.playedTicks==time);
- sv.cash=4320;sv.dirty=1550;press(SLOT);assert(scene==0&&cardCount==1&&cards[0].ticks==time&&cards[0].cash==4320&&cards[0].dirty==1550);
+ sv.cash=4320;sv.dirty=1550;sv.bank=2460;sv.dirtySpent=133;revenue_open_case();sv.sweepTicks=9876;press(SLOT);assert(scene==0&&cardCount==1&&cards[0].ticks==time&&cards[0].cash==4320&&cards[0].dirty==1550);
  assert(!memcmp(&cards[0].look,&goal,sizeof goal));frame("build/career-cards.ppm");
  press(ESC);assert(scene==3&&menu==12);
- failWrite=1;press(NEW_SLOT);assert(scene==0&&profileError&&writes==2);press(NEW_SLOT);assert(scene==0);press(ESC);assert(scene==3);failWrite=0;
+ hidden=failWrite=1;press(NEW_SLOT);assert(scene==0&&profileError&&writes==2&&!cardCount);
+ press(NEW_SLOT);click(174,160);assert(scene==0);press(ESC);assert(scene==3);hidden=failWrite=0;
  press(NEW_SLOT);assert(scene==5);press(ESC);press(ESC);assert(scene==3&&sideSlot==0);
- press(NEW_SLOT);press(ENTER);assert(scene==3&&sideSlot==2&&!sv.cash&&!sv.dirty);
- init_city();assert(scene==0&&cardCount==2);cardSelected=0;press(ENTER);assert(sideSlot==0&&sv.cash==4320&&sv.dirty==1550&&sv.playedTicks>=time);
+ press(NEW_SLOT);press(ENTER);assert(scene==3&&sideSlot==2&&!sv.cash&&!sv.dirty&&!sv.bank&&!sv.dirtySpent&&!sv.charges&&!sv.sweepTicks);
+ init_city();assert(scene==0&&cardCount==2);cardSelected=0;press(ENTER);assert(sideSlot==0&&sv.cash==4320&&sv.dirty==1550&&sv.bank==2460&&sv.dirtySpent==133&&sv.charges&&sv.sweepTicks<9876&&sv.sweepTicks>=9872&&sv.playedTicks>=time);
  assert(!memcmp(&sv.look,&goal,sizeof goal)&&!strcmp(sv.name,"Riley Knox"));
  /* Rev6 uses the same economy bytes, with the hash in the new clock position. */
  sv.rev=6;sv.playedTicks=hashbytes(LEGACY6_SIZE-4);memcpy(saves[1],&sv,LEGACY6_SIZE);sizes[1]=LEGACY6_SIZE;
- disk_slot(1);load_save();assert(wason&&sv.rev==7&&sv.cash==4320&&sv.legacyClock&&!sv.playedTicks&&look_valid(&sv.look));
+ disk_slot(1);load_save();assert(wason&&sv.rev==SAVE_REV&&sv.cash==4320&&sv.legacyClock&&!sv.playedTicks&&!sv.bank&&!sv.dirtySpent&&sv.charges&&sv.sweepTicks==REVENUE_SWEEP_TICKS&&look_valid(&sv.look));
  /* Corrupt file stays selectable as unreadable and is not overwritten. */
  for(int i=3;i<8;i++){memcpy(saves[i],saves[0],sizes[0]);sizes[i]=sizes[0];}
  saves[3][12]^=1;
@@ -85,6 +88,14 @@ int main(void){
  press(DELETE_SLOT);assert(deleteOpen&&deleteCard.id==0);click(590,332);
  assert(deletes==2&&!sizes[0]&&sizes[8]&&sizes[3]);
  press(NEW_SLOT);press(ENTER);assert(sideSlot==0&&sizes[0]&&scene==3&&!sv.cash);
+ /* A competing creator takes the nominally free slot between probe and install. */
+ press(NEW_SLOT);peerClaim=1;press(ENTER);
+ assert(!peerClaim&&peerSlot==2&&sideSlot==9&&scene==3&&sizes[2]==sizes[0]&&!memcmp(saves[2],saves[0],sizes[0]));
+ /* No write or partial activation when every slot (including locked/corrupt ones) is occupied. */
+ for(int i=0;i<PROFILE_SLOTS;i++)if(!sizes[i]){memcpy(saves[i],saves[0],sizes[0]);sizes[i]=sizes[0];}
+ press(NEW_SLOT);int previousWrites=writes;press(ENTER);
+ assert(scene==5&&profileError&&sideSlot==9&&current==9&&writes==previousWrites);
+ press(ESC);press(ESC);assert(scene==3);
  /* Tall hair, north, full range: no arrow ink on the head. */
  sv.look.part[HAIR]=6;
  for(int i=0;i<128;i++){

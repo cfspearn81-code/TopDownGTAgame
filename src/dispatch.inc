@@ -158,7 +158,7 @@ static void dispatch_tick(float dt){
   }
   const float d=d2(p.x-q->x,p.y-q->y);
   const int eyes=wanted&&d<177.f*177.f&&street_line_open(q->x,q->y,p.x,p.y,2);
-  if(eyes&&d<65.f*65.f&&q->cool<=0&&dispatchStrike<=0){
+  if(eyes&&d<65.f*65.f&&q->cool<=0&&dispatchStrike<=0&&street_car_fraction(q->x,q->y,p.x,p.y,2,p.car)>=1.f){
    q->cool=1.36f;dispatchStrike=.66f;health(u->station?10:8);particle(p.x,p.y,5,PINK);
   }
   DispatchPoint dest=dispatchCall;

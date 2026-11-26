@@ -39,6 +39,7 @@ static void profiles_scan(void){
  cardSelected=selected;
 }
 static void profiles_init(void){
+ bank_ui_reset();
  deleteOpen=deleteArmed=profileSuccess=0;profileReturn=0;profileError=0;profileHoverX=profileHoverY=-1;createField=createWriting=createFacing=0;
  profiles_scan();styleSeed=taxiSeed^0x82ef1cabu;if(!styleSeed)styleSeed=1;
 }
@@ -58,6 +59,7 @@ static void confirm_delete(void){
  profileError=ok?"Save deleted.":"Could not delete that save. No other save was touched.";
 }
 static void new_profile(void){
+ if(profileReturn&&saveFlash<0)return; /* Includes a click on the empty catalog card. */
  draft=defaultLook;z(draftName,sizeof draftName);append(draftName,"Vanta Local");
  createField=1;createWriting=0;createFacing=0;createPreset=-1;profileError=0;scene=5;
 }
@@ -67,11 +69,13 @@ static void profiles_open(int create){
  profiles_scan();if(create&&!profileError)new_profile();
 }
 static void profiles_activate(void){
+ revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};
  sprintBest=0;end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
  navSlot=-1;walking=fn=deadAnim=saveFlash=0;punchFlash=crashFlash=0;lastCar=near=by=-1;
  lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;menu=-1;mapOn=0;profileReturn=0;profileError=0;
  if(sv.intro==0)open_interior(12);
  else{scene=1;tell(sv.intro<3?"FIRST SHIFT: follow the purple route to Mercury Dispatch.":"Career loaded. Press M to pick a destination.");}
+ bank_ui_reset();
 }
 static void profiles_choose(void){
  profileSuccess=0;
@@ -101,8 +105,10 @@ static void creator_commit(void){
  for(int i=0;i<PROFILE_SLOTS;i++){
    if(i==1)continue; /* Historical side-career path is load-only unless it already exists. */
    disk_slot(i);if(disk_present())continue;
-   if(disk_create(&sv,sizeof sv))id=i;
-   break;
+   if(disk_create(&sv,sizeof sv)){id=i;break;}
+   /* Another running copy may have claimed the slot since disk_present().
+    * Continue only when the slot is now occupied, not on general I/O failure. */
+   if(!disk_present())break;
  }
  if(id<0){disk_slot(oldSlot);cp(&sv,&held,sizeof sv);profileError="Could not write a new career. No existing save was replaced.";return;}
  sideSlot=id;

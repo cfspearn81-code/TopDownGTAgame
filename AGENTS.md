@@ -6,8 +6,10 @@ for Dead Channel, the original native Windows game, not John's Room or GTA.
 
 ## Required before uploading any new build
 
-1. Update **HANDOFF.md** first, including exactly what changed, what stayed
-   compatible, known gaps, and the build/version being prepared.
+1. The next AI agent or human maintainer must update **HANDOFF.md** first,
+   including exactly what changed, what stayed compatible, known gaps,
+   and the build/version being prepared. This is the project summary
+   and must be current before uploading any new build.
 2. Build and test the source; update the handoff's verification section with
    checks actually run and their results. Never report simulated Win32 or Linux
    tests as a real Windows run. Note any migration or regressions explicitly.

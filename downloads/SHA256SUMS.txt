@@ -3,3 +3,4 @@
 87a167481917d1340293add6637f555af6750d712dacd09faed011341e02bbbf  Dead-Channel-Street-Handling-Windows-11-x64.zip
 ae1f31d254c333fe8ca8fd5f859bb2e8f4536a0b536f92431bbbea34faf18bcf  Dead-Channel-Sidewalk-Patrols-Windows-11-x64.zip
 c47a954abb68e58c19418aab20a5c4fbc6a2fd36f3fcdb7d7c3e036b9eda9f55  Dead-Channel-City-Rhythm-Windows-11-x64.zip
+7547002a48b9d0b75edec2684de3ebba7ecfddf458ca9ff9d1dd627eae5b6cad  Dead-Channel-Easy-Entry-Windows-11-x64.zip

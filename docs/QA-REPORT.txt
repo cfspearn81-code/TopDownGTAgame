@@ -1,3 +1,192 @@
+EASY ENTRY QA
+
+- Keyboard regression covers boarding and stealing with E, releasing
+  and pressing E again to exit, ignoring Enter around cars, blocking
+  fast entry, and leaving job, door and ATM controls in priority order.
+- The 3,252-frame courier/taxi replay takes a short walk away from the
+  Dispatch door, tries Enter, then boards with E and later exits with E.
+  The native Windows PE ran this replay with simulated Win32 services:
+  five atomic writes, two legal jobs, $289 and full health; digest
+  16347d9b. Physical Windows testing remains outstanding.
+
+MIDNIGHT CLOCK: LANTERN FIX QA
+
+- Checked planting, watering, fertilizing and harvesting effects
+  against all occupied and empty pots in each of three tiers and both
+  Lantern crops, with both normal and Low FX enabled. Tier-one watering
+  was also reproduced and retested through a live keyboard-operated
+  Lantern batch in the Windows executable (7,964 frames and four
+  atomic writes). That run verified harvest, automatic next batch and
+  the two rendered shelf cartons after the slower carry route.
+- A disposable older save was loaded through the exact Windows PE with
+  a distributor, 60 Lantern stock and a harvest in progress. The operator
+  remained, the full batch was kept (65 stock), and no Lantern batch
+  requeued while full. Cinder still direct-shipped and requeued alongside
+  it. The result persisted across a second launch.
+- Walking and running measurements show the intended 20% reduction.
+  Street walking and sprinting now measure 98.4 and 146.4 units/s.
+  Apartment, storefront, civilian, officer, rival and taxi movement
+  were tested. Speed Tune's measured forward and reverse caps still
+  pass unchanged. A retreat-only clearance prevents pedestrian/vehicle
+  stand-offs revealed by the slower pace. The same-seed 36,000-tick
+  test kept all 13 traffic drivers moving, with no stop over 7 seconds.
+- The renderer checked 768 live poses. Bodies are around 11% smaller
+  in measured width and height, with stable feet. The original direction
+  arrow, career portraits and camera framing remain unchanged.
+- A fresh 3,208-frame input tour completed the opening courier job and
+  a taxi fare through the Windows entry point and saved $289 and full
+  health. Five atomic writes; final digest 80bb65f0. PE testing was
+  simulated Win32 on Linux, not a physical Windows machine.
+
+MIDNIGHT CLOCK: SPEED TUNE QA
+
+- Keyboard acceleration for each full-health model reached its former
+  10-condition cap: Mote 151.80, Vectra 180.40, Pallas 165.00, Nightjar
+  205.15, Courier 4 157.30 (world units per second). Damage still
+  reduces these caps. Tested brake-to-exit, reverse, cornering,
+  collision, sprint gates and stalled-van recovery.
+- A new keyboard recording finished the opening courier assignment and
+  a taxi fare through the rebuilt Windows executable, parked and exited,
+  and finished with $289 and full health. It ran 3,152 frames with five
+  atomic writes and digest cbaf0a26. Tested via simulated Win32 on Linux,
+  not a physical Windows PC.
+- Full integrated `bash scripts/test.sh --tour` passed on the shipped
+  source: all 82 rooms (including Ivo and Lantern), clock and Revenue
+  rollover, bank and save compatibility plus the revised driving tour.
+
+MIDNIGHT CLOCK QA
+
+- An 86,400-frame active-play test checked the 24-hour display, the
+  absence of the old eight-minute reset, and the exact midnight rollover.
+  Pause, save/reload, and the separately timed Revenue sweep were covered.
+- Disposable PE fixtures crossed both 08:00 and midnight. Only midnight
+  reset the spending meter. Wallets, bank and open-case countdown were
+  checked independently. Revisions 2–10 and pending deposits migrated
+  through the Windows entry point.
+- The current 2,941-frame courier/taxi replay passed with five writes and
+  digest 11d89be7. Compared with Revenue Deadline, only the saved revision
+  and checksum changed. Windows tests use Linux Win32 simulation, not a
+  physical Windows PC.
+- Vault 39 now draws Ivo's full sprite without the couch painting over
+  it. The regression detected the old overlap; the Windows executable
+  was walked to Ivo's counter and opened his contract menu.
+- Lantern tests hired both crew ranks at the terminal, checked the
+  working poses and 1,001 points on the aisle paths, and followed the
+  carton to the shelf while the next batch auto-queued. Real inventory
+  changes crossed the 19/20 and 50/51 thresholds; a Kiosk 09 sale cleared
+  the shelf on return. Cinder stock is excluded. A 7,618-frame simulation
+  through the rebuilt Windows entry point hired the worker, ran a full
+  batch and verified 19 to 24 stock, one to two cartons, and auto-queue.
+  Full integrated `bash scripts/test.sh --tour` passed, including 256
+  room interactions and 14,766 movement ticks.
+
+REVENUE DEADLINE QA
+
+- Tested a confirmed open case at 17,999, 18,000 and 36,000 active
+  gameplay ticks. Both clean and dirty cash on hand are seized at each
+  deadline, including after daily dirty-spend rollover. The protected
+  bank and the pending franchise ledger survive repeat wallet sweeps.
+- Empty wallets quietly reset the cadence. Paying the fine or clearing
+  service stops the timer. Pause, field guide and downed screens don't
+  advance it; active menus and the ATM do.
+- Exact PE smoke with a disposable case two ticks from seizure proved that
+  the two wallets went to zero, the bank and case stayed intact, and the
+  next countdown resumed when reopened. Confirmed Rev7/8 cases migrate
+  with a full five minutes; tested synthetic readers from Rev2 through 9.
+- The same 2,941-frame courier/taxi run passed with five atomic writes,
+  new digest 4264ed14, and identical gameplay state other than save schema.
+  Executable tests used simulated Win32, not a physical Windows PC.
+
+REVENUE & BANKING QA
+
+- Economies hit the exact $500/$501 boundary with real checkout actions,
+  preserved the crossing purchase, protected clean and bank cash, rolled
+  the meter at closing, and saved/reloaded. A separate reference ledger
+  tracked 24,000 randomized purchases and ATM operations over 160 game
+  days with sanitizer checks. Transfer rollback on a failed save also passed.
+- Keyboard play from an earned career bought two vehicles, incurred a
+  seizure only with the second purchase, reloaded the two cars and clean
+  bank balance, then withdrew the fine and cleared the case at Revenue.
+- Walked to and used all three ATMs, pinned them from the atlas, checked
+  one-shot input, and rendered the real seizure modal from a valid market
+  purchase. The alert settles after the initial shake, keeps movement
+  responsive, and is still visible without shake under Low FX.
+- Exact-EXE simulated Win32 at the Tide Market ATM opened with E, deposited
+  $100, withdrew $50, closed and saved the expected protected and on-hand
+  balances without using dirty cash. Rev2 through Rev8 fixtures passed.
+- Existing 2,941-frame courier/taxi run still passes with 5 writes. Its
+  new checksum d3e60759 is from the Rev8 schema; byte comparison showed
+  the same prior gameplay state, plus zero bank and dirty-spend fields.
+  This remains a Linux simulation of Win32, not a physical Windows run.
+
+FAST LANE QA
+
+- All five road cars started stationary and drove farther in three seconds
+  than a sprint over the same clear road (369 walking, 549 sprinting; Mote
+  673, Vectra 791, Pallas 714, Nightjar 901, Courier 4 682 world units).
+  Acceleration, braking, full-speed cornering, reverse speed, damage and
+  clearance were checked; successful timed six-gate sprint and stopped
+  recovery-van handoff used movement keys.
+- A new 2,941-frame recording used the exact Windows EXE under simulated
+  Win32 to complete the opening courier, board a real taxi passenger,
+  drive them to the curb, exit the car and save. Five atomic writes;
+  final digest 61e6cdde, clean cash $289, 100 HP and one fare.
+- The unpaid-service work was checked with full directional and counter
+  input for three courier assignments during a case and a paid fourth
+  assignment, plus automated tests for recovery, abandonment, paying off
+  a hold mid-shift, an audit becoming a case mid-shift, other job payouts
+  and save/reload. Passive franchise income is separate from service pay.
+- The regular suites and 1.2-million-tick sanitizer soak passed. This is not a
+  hardware Windows 11 playthrough. The 60,569-frame Inside Port Vanta
+  recording remains for that previous executable; it does not test the
+  faster driving. To run it, use bash scripts/test.sh --historical-tour
+  followed by the absolute path to the previous DeadChannel.exe.
+  For the new drive recording, run bash scripts/test.sh --tour.
+
+INSIDE PORT VANTA QA
+
+- The native indoor route and pixel render harness visited all 82 rooms:
+  15 named venues, four gated rear rooms and all 63 ordinary addresses.
+  Under ASan/UBSan it passed 248 E-key interaction routes and 14,362 walking
+  ticks, with entrances, exits, counters, gates, all unique address plaques
+  and installation titles, and Lantern's in-game batch progression.
+- Captured and inspected current native renderer frames. All 63 ordinary
+  collision footprints differ from City Polish; named and rear footprints
+  remain route-compatible. HUD-free image comparison measured visible
+  interior changes in all 82 rooms. Select examples are in Previews/.
+- The packaged Windows EXE replayed the unchanged 60,569-frame City Polish
+  tour with 26 atomic writes and final save digest 3ac6dd6b, covering eight
+  contracts, all 78 building entries, ordinary fixtures, tram travel and the
+  Mercury franchise settlement. This is an exact EXE test through simulated
+  Win32 on Linux, not a physical Windows run.
+- Repeat the tests with bash scripts/test.sh --tour. For native raster proof,
+  mkdir -p build/room-frames; build/interior_routes_test build/room-frames;
+  python3 scripts/qa/interior_gallery.py build/room-frames build/room-gallery
+  (Pillow required only for the gallery, not the game).
+
+CITY POLISH QA
+
+- Ran the packaged executable's input replay via simulated Win32 on
+  Linux: 60,569 frames, 26 atomic saves. The same recorded input finished
+  all eight contracts plus the repeat courier shift, visited all 78
+  buildings, used all 63 ordinary fixtures and exercised Mercury settlement
+  and tram travel. The final digest is 3ac6dd6b. Compared with City Rhythm's
+  292-byte final save, only health (5 to 7) and its checksum changed; payouts,
+  coordinates, playtime and career progress match.
+- Ran the integrated sanitizer suites and extended stress test: 1,200,000
+  fixed steps and 14,496 render passes across 48 scenarios. Targeted gameplay
+  coverage includes 1,440 franchise closing/desk combinations, obstructions,
+  laser tracer impact, 10,000 bounded skid events, and 78 rendered interiors
+  and 156 on-foot and in-car atlas views. The road pass also observed all
+  13 ambient drivers stay active during a 10-minute simulated route soak.
+- Reproduced the original cross-process staging error and passed 16
+  deterministic two-process races via file shims. Also checked denied, short,
+  and failed I/O, busy slots, canceled deletion, no-replace creation and
+  synthetic Rev2-7 careers through the executable entry point.
+- Physical Windows 11 wasn't available. The PE loader, keyboard and pointer
+  replays used simulated Win32 calls. This is not a Windows FPS rating or a
+  physical display/input test.
+
 CITY RHYTHM QA
 
 - Reviewed the city render, all 15 named venues, 63 storefronts, four rear

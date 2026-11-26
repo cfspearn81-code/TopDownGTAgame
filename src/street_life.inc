@@ -54,6 +54,36 @@ static int street_line_open(float x,float y,float tx,float ty,float radius){
   }
  return 1;
 }
+/* The same rotated chassis that blocks movement also blocks reach and
+ * impacts. Ignore only the car being boarded/exited or the target's own
+ * car; a different parked car or wreck is still solid. */
+static float street_car_fraction(float x,float y,float tx,float ty,float r,int ignore){
+ float dx=tx-x,dy=ty-y,first=1.f;
+ float xl=x<tx?x:tx,xh=x>tx?x:tx,yl=y<ty?y:ty,yh=y>ty?y:ty;
+ for(int i=0;i<nc;i++)if(i!=ignore&&(i||sv.owned)){
+  const Car*c=cars+i;float pad=18.f+r*2;
+  if(c->x<xl-pad||c->x>xh+pad||c->y<yl-pad||c->y>yh+pad)continue;
+  float co=cs(c->a),si=sn(c->a),ox=x-c->x,oy=y-c->y,t0=0,t1=first;
+  if(street_clip_axis(ox*co+oy*si,dx*co+dy*si,-STREET_HALF_L-r,STREET_HALF_L+r,&t0,&t1)&&
+     street_clip_axis(oy*co-ox*si,dy*co-dx*si,-STREET_HALF_W-r,STREET_HALF_W+r,&t0,&t1))first=t0;
+ }
+ return first;
+}
+static int street_reach_open(float x,float y,float tx,float ty,float r,int ignore){
+ return street_line_open(x,y,tx,ty,r)&&street_car_fraction(x,y,tx,ty,r,ignore)>=1.f;
+}
+/* A missed shot ends on the first solid pixel, never the far side of
+ * cover. Only firing a shot pays for the handful of wall probes. */
+static float street_tracer_fraction(float x,float y,float dx,float dy){
+ float limit=street_car_fraction(x,y,x+dx,y+dy,1,-1);
+ if(street_line_open(x,y,x+dx*limit,y+dy*limit,1))return limit;
+ float lo=0,hi=limit;
+ for(int i=0;i<9;i++){
+  float mid=(lo+hi)*.5f;
+  if(street_line_open(x,y,x+dx*mid,y+dy*mid,1))lo=mid;else hi=mid;
+ }
+ return lo;
+}
 static int street_on_camera(float x,float y){
  int left=camera_left(),top=camera_top();
  return x>=left-25&&x<=left+W+25&&y>=top-31&&y<=top+H+31;
@@ -101,6 +131,19 @@ static int street_move_car(int id,float dx,float dy){
  if(!street_car_clear(id,c,&next))return 0;
  *c=next;return 1;
 }
+/* Fast cars can move more than a small obstacle's width per tick.
+ * Check their travel in short pieces without changing the fixed clock. */
+static void street_drive_car(int id,float dx,float dy){
+ int steps=d2(dx,dy)>3.95f*3.95f?2:1;
+ dx/=steps;dy/=steps;
+ for(int i=0;i<steps;i++)if(!street_move_car(id,dx,dy)){
+  /* At a shallow angle tire grip can carry the car along the wall. */
+  int grazed=absf(dx)>2.5f*absf(dy)?street_move_car(id,dx,0):
+             absf(dy)>2.5f*absf(dx)?street_move_car(id,0,dy):0;
+  if(!grazed)break;
+  cars[id].s*=.995f;
+ }
+}
 static int street_turn_car(int id,float angle){
  Car*c=cars+id,next=*c;next.a=angle;
  float penetration=street_wall_depth(&next);
@@ -123,6 +166,21 @@ static int street_foot_car_clear(float x,float y,int ignore,float feet){
  }
  return 1;
 }
+/* Knockback and rival movement share this physical test. An actor displaced
+ * by a moving car can step back out but cannot move deeper into it. */
+static int street_step_past_cars(float x,float y,float nx,float ny,float feet){
+ for(int i=0;i<nc;i++)if(i||sv.owned){
+  const Car*c=cars+i;float after=street_foot_car_depth(c,nx,ny,feet);
+  if(after<=0)continue;
+  float before=street_foot_car_depth(c,x,y,feet);
+  if(after>before+.001f||(absf(after-before)<=.001f&&d2(nx-c->x,ny-c->y)<=d2(x-c->x,y-c->y)))return 0;
+ }
+ return 1;
+}
+static void street_actor_move(Ped*q,float dx,float dy,float feet){
+ if(!solid(q->x+dx,q->y,feet)&&street_step_past_cars(q->x,q->y,q->x+dx,q->y,feet))q->x+=dx;
+ if(!solid(q->x,q->y+dy,feet)&&street_step_past_cars(q->x,q->y,q->x,q->y+dy,feet))q->y+=dy;
+}
 /* Foot movement collides with every body, including wrecks, but people
  * loaded beside a parked car or displaced by a rear impact can step out. */
 static int street_foot_move_clear(float x,float y){
@@ -133,13 +191,7 @@ static int street_foot_move_clear(float x,float y){
   float after=d2(x-guard->x,y-guard->y);
   if(after<11*11&&after<d2(p.x-guard->x,p.y-guard->y))return 0;
  }
- for(int i=0;i<nc;i++)if(i||sv.owned){
-  const Car*c=cars+i;float after=street_foot_car_depth(c,x,y,7.f);
-  if(after<=0)continue;
-  float before=street_foot_car_depth(c,p.x,p.y,7.f);
-  if(after>before+.001f||(absf(after-before)<=.001f&&d2(x-c->x,y-c->y)<=d2(p.x-c->x,p.y-c->y)))return 0;
- }
- return 1;
+ return street_step_past_cars(p.x,p.y,x,y,7.f);
 }
 static void street_player_step(float dx,float dy){
  if(dx&&street_foot_move_clear(p.x+dx,p.y))p.x+=dx;
@@ -181,7 +233,7 @@ static int street_near_car(void){
   if(c->cond<=0||(i==0&&!sv.owned)||d>=38.f*38.f)continue;
   int slow=absf(c->s)<=STREET_BOARD_SPEED;
   if(slow<boardable||(slow==boardable&&d>=best))continue;
-  if(street_line_open(p.x,p.y,c->x,c->y,2)){best=d;choice=i;boardable=slow;}
+  if(street_reach_open(p.x,p.y,c->x,c->y,2,i)){best=d;choice=i;boardable=slow;}
  }
  return choice;
 }
@@ -204,7 +256,7 @@ static int street_exit_car(void){
  static const float candidates[][2]={{0,21},{0,-21},{-25,0},{-19,19},{-19,-19},{25,0},{19,19},{19,-19}};
  for(int i=0;i<LEN(candidates);i++){
   float u=candidates[i][0],v=candidates[i][1],x=c->x+u*co-v*si,y=c->y+u*si+v*co;
-  if(!street_foot_clear(x,y,p.car)||!street_line_open(c->x,c->y,x,y,3))continue;
+  if(!street_foot_clear(x,y,p.car)||!street_reach_open(c->x,c->y,x,y,3,p.car))continue;
   int safe=1;
   for(int j=0;j<nc;j++)if(j!=p.car&&absf(cars[j].s)>14.f){
    Car*d=cars+j;
@@ -405,11 +457,15 @@ static int street_can_start_leg(Ped*q,StreetWalk*w){
  w->crossX=q->x;w->crossY=q->y;return 1;
 }
 static void street_walk_step(Ped*q,StreetWalk*w,float dt,float speed){
+ speed*=FOOT_PACE;
  float dx=w->mx-q->x,dy=w->my-q->y,n=sq(d2(dx,dy));
  if(n<.001f)return;
  q->a=look(dx,dy);float step=speed*dt;if(step>n)step=n;
  float x=q->x+dx*(step/n),y=q->y+dy*(step/n);
- if(!solid(x,y,4)&&street_foot_car_clear(x,y,-1,3.f)){
+ /* A car can pivot across a retreating walker's safety margin.
+  * Let the walker back out without admitting any deeper overlap. */
+ if(!solid(x,y,4)&&(w->cross==2?street_step_past_cars(q->x,q->y,x,y,3.f):
+                                  street_foot_car_clear(x,y,-1,3.f))){
   q->x=x;q->y=y;q->s=speed;w->blocked=0;
  }else if(w->cross==1&&(w->blocked+=dt)>.40f){
   /* A car can turn toward a stripe after a civilian has started crossing.
@@ -443,6 +499,7 @@ static void street_tick_civilian(int i,float dt){
  street_walk_step(q,w,dt,speed);
 }
 static void street_spawn(void){
+ roadFX_reset();
  z(streetDrivers,sizeof streetDrivers);z(streetWalks,sizeof streetWalks);
  for(int j=0;j<LEN(streetJunctionOwner);j++)streetJunctionOwner[j]=-1;
  nc=3;

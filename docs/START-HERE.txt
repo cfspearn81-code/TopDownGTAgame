@@ -1,8 +1,8 @@
 DEAD CHANNEL / PORT VANTA
-City Rhythm for Windows 11 x64
+Easy Entry for Windows 11 x64
 
 1. Extract the entire ZIP to a normal folder and open DeadChannel.exe.
-   Look for "Dead Channel | City Rhythm" in the window title.
+   Look for "Dead Channel | Easy Entry" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -33,20 +33,28 @@ Your choices show on the save card and on the player in the game.
 
 CITY CONTROLS
 WASD or arrow keys: move, steer, accelerate and brake
-E: enter a building, interact, or get out of a vehicle
-Enter: get into a stopped or slow nearby car
+E: interact, get into a stopped or slow nearby car, or get out
+Job actions, doors and ATMs take priority. Stand clear of them to board.
+Enter: confirm menus or board a tram at its timetable
 X: punch. Space: fists or equipped weapon
 Shift: sprint / handbrake. T: accept another unlocked taxi fare
 M: map; left click sets a pin, right click clears it
 F1: field guide. F2: low FX. F5: save. Esc: pause / back
 The gold job marker leads to the assigned vehicle. F5 also saves with the
 atlas open.
+Each healthy car has a lower top speed and still outpaces walking.
+Brake before sharp turns.
 When driving, the camera leads into turns and reverses with the car. The
 dash above the radar shows the vehicle model, direction and speed. Hold E at speed to brake and
 exit when the car stops. Release E to keep driving. A blocked door requires
 a clear parking spot. Blue radar dots mark
 responding officers. Wait for CLEARING to disappear before a hot handoff.
-The thin teal bar below health shows your remaining armor.
+A bent purple arrow on the driving radar previews the next left or right
+turn; its distance counts down to that bend. The GPS total below the
+radar counts down to the route endpoint. Without a route it names the
+current district. The thin teal bar below health shows remaining armor.
+Cars block close-range attacks and shots. Brake/reverse lamps and brief
+handbrake tire marks show what your car is doing.
 Patrol officers walk the sidewalks and check traffic before using crosswalks,
 even during a pursuit. Watch for people already crossing.
 Business clocks run in the atlas and at the counter. Pause and the field
@@ -55,6 +63,10 @@ Close the window to save your live career. Title/creator don't create
 or write a career unless you choose Start Career.
 
 GETTING AROUND PORT VANTA
+Interiors are now built around each address's purpose. Press E at the
+existing service stations and exits as before, or at a storefront's
+visitor plaque for a bit of local history.
+
 On the atlas, point at a named venue or one of the small storefront door
 markers and click to pin its entrance. Space cycles named venues. Use Left
 and Right to browse shop doors and Enter to pin one. Select an owned business
@@ -67,7 +79,9 @@ Finish an active job and lose any pursuit before boarding.
 JOBS AND BUSINESSES
 Courier: hand over both parcels at their counters and return the signed
 manifest to Mara. The first shift pays $140 including the opening bonus,
-enough for the $125 Mote at Nightglass. Later manifests rotate the stops.
+enough for the $125 Mote at Nightglass. GPS marks Nightglass until you
+buy a car unless you pin another destination or accept a new job. Later
+manifests rotate the stops.
 Taxi riders board an owned or licensed car when you stop at the curb. Harbor Recovery requires restarting the stalled van
 with E, driving it to Dax's marked service bay, stopping and pressing E.
 Start the Glass Mile clock by crossing the line and finish in the same car.
@@ -83,9 +97,39 @@ the freight cache, pick up the consignment and bring it to Vera.
 Buy supplies at Ferry Market. Start batches at the grow-room or Cinder
 terminal. Sell stock at Kiosk 09. Sales of 15 or more units can cost three
 from that facility's unsecured inventory. Secure each warehouse at the
-property. At franchise staff desks, collect completed settlements after
-closing. Clear a Revenue case with the fine or three courier or recovery
-shifts. Rest inside your Breakwater safehouse to heal and clear pursuit.
+property. Hire the operator at the Lantern terminal to see the crew work
+through the batch in the back room. The rear shelf shows one box for
+1–19 Lantern units, two for 20–50, and three starting at 51. Its sign
+shows the actual inventory. Lantern harvests go to storage for you to
+sell at Kiosk 09. The retired distributor becomes an operator in older
+Lantern saves, and active harvests are kept even if storage temporarily
+exceeds 60. Cinder's distributor remains available.
+At franchise staff desks, collect completed
+settlements after the in-game clock reaches midnight. Clear a Revenue
+case with the fine or three unpaid courier or recovery shifts. The final
+service shift pays $0; regular shifts pay after that. Rest inside your
+Breakwater safehouse to heal and clear pursuit.
+
+REVENUE AND THE BANK
+Only actual dirty money spent on purchases counts, not clean cash or
+cash on hand. The top-left clock shows 24-hour game time. One active
+real minute advances the game by one hour, and one real second by one
+game minute. The dirty-spend total resets at midnight, every 24 active
+minutes. Exactly $500 within a game day is safe. The
+first successful purchase that takes the total above $500 in that game
+day completes, but Revenue then takes the remaining dirty money and
+unclaimed dirty settlements. Go to Revenue Annex to pay the fine or
+complete three unpaid courier/recovery shifts to clear the case. If it
+stays open, Revenue takes all clean and dirty cash on hand every five
+active gameplay minutes from when the case opens. Deposited ATM funds
+are never taken. You keep the remaining time when you save and leave.
+
+Find mint $ icons on the atlas for the Tide Market, East Freight and
+Lantern Ward ATMs. Walk to the front and press E. Up/Down selects
+deposit or withdrawal, Left/Right chooses the amount, Enter or E
+confirms, and Esc closes the terminal. Use clean cash only. The bank
+is shared between all three terminals and is safe during a Revenue
+seizure. Cash must be withdrawn first to spend it or pay a fine.
 
 YOUR EXISTING SAVES
 Use the same Windows account. The game still reads its existing saves

@@ -13,7 +13,7 @@ typedef struct{int l,t,r,b;}Rect;
 typedef struct {void *w;D msg;Q wp;Q lp;D time;int x,y;D unused;}Msg;
 static int frame, saved, volume, delivered, menuFrame, safeWrites;static jmp_buf jb;
 static Q ms;static unsigned checksum,previous;static const char *loadCareer,*saveCareer;static int readCareer,opening,pointerScenario,pointerStage,pointerPx,pointerPy,clearedPx,createStage,creates;
-static int deleteTest,deleteStage,deleteCalls;
+static int deleteTest,deleteStage,deleteCalls,atmTest;
 static unsigned fsz[252],offset;static unsigned char vdisk[252][1024],pending[1024];static unsigned psize;static D status;static unsigned beforePin,afterPin,afterClear;
 #define A __attribute__((ms_abi))
 typedef int64_t (A *HostProc)(void*,D,Q,int64_t);static HostProc winproc;
@@ -37,6 +37,9 @@ static Q A key(int k){
    if(bindings[i].key==k)return (tourMask&bindings[i].bit)?0x8000:0;
   return 0;
  }
+ if(atmTest)return ((k==13&&(frame==2||frame==7||frame==14))||
+  (k=='E'&&frame==4)||(k==0x28&&frame==10)||(k==0x25&&frame==12)||
+  (k==0x1b&&frame==16)||(k==0x74&&frame==20))?0x8000:0;
  if(deleteTest)return ((k==0x28&&frame==1)||(k==0x2e&&frame==3)||(k==13&&(frame==6||frame==20))||(k==0x74&&frame==62))?0x8000:0;
  if(pointerScenario)return ((k==13&&frame==1)||(k=='M'&&(frame==5||frame==50))||(k==0x74&&frame==66))?0x8000:0;
  if(loadCareer&&opening!=2){
@@ -88,10 +91,16 @@ static int pathslot(const S*p){
  if(*p=='c')return 0;if(*p=='o')return 1;
  assert(*p=='f');return 1+100*(p[6]-'0')+10*(p[7]-'0')+p[8]-'0';
 }
+/* Isolated stage must be carried unchanged through close and commit. */
+static S stageName[1024];
 static Q A openfile(const S*p,D access,D share,void*sec,D mode,D attr,void*t){
+ if(mode==1){
+  assert(access==0x40000000u&&!share&&!stageName[0]);int n=0;
+  do{assert(n<1024);stageName[n]=p[n];}while(p[n++]);
+  psize=0;return 400;
+ }
  int i=pathslot(p);assert(i>=0&&i<252);
- if(mode==2){psize=0;return 400;}
- assert(mode==3);offset=0;
+ assert(mode==3&&share==5);offset=0;
  if(fsz[i])return i+1;
  status=2;return UINT64_MAX;
 }
@@ -106,7 +115,8 @@ static int A writefile(void*h,const void*p,D n,D*g,void*over){
  memcpy(pending,p,n);psize=*g=n;saved++;return 1;
 }
 static int A replace(const S*a,const S*b,D f){
- int i=pathslot(b);assert(i==pathslot(a)&&a!=b&&(f&8)&&psize);
+ int i=pathslot(b);assert(a!=b&&(f&8)&&psize&&stageName[0]);
+ int k=0;do{assert(stageName[k]==a[k]);}while(a[k++]);stageName[0]=0;
  if(!(f&1)){assert(!fsz[i]);if(opening==2&&loadCareer)assert(i==2);creates++;}
  memcpy(vdisk[i],pending,psize);fsz[i]=psize;
  if(saveCareer){FILE*fp=fopen(saveCareer,"wb");assert(fp&&fwrite(pending,1,psize,fp)==psize);fclose(fp);}
@@ -118,6 +128,7 @@ static int A draw(void*dc,int x,int y,int w,int h,int sx,int sy,int sw,int sh,co
  else if(pointerScenario)assert(x==0&&y==29&&w==1300&&h==731);
  else assert(w==960&&h==540);
  frame++;
+ if(atmTest&&frame==6)assert(b[96*960+193]==0x8cece0u); /* ATM mint title strip */
  if(tourFrames){if(frame<tourFrames)next_tour_keys();return sh;}
  checksum=2166136261u;for(int i=0;i<960*540;i+=23)checksum=(checksum^b[i])*16777619u;
  if(previous!=checksum)volume++;previous=checksum;
@@ -135,12 +146,12 @@ typedef struct{char*n;void*p;}Bind;
 static const Bind bind[]={
  {"ExitProcess",die},{"GetTickCount64",ticks},{"GetEnvironmentVariableW",nil},{"GetAsyncKeyState",key},{"PeekMessageW",peek},
  {"GetClientRect",rect},{"CreateFileW",openfile},{"WriteFile",writefile},{"MoveFileExW",replace},{"DeleteFileW",removefile},{"StretchDIBits",draw},
- {"GetLastError",errorcode},{"PatBlt",ok},{"TrackMouseEvent",ok},{"GetModuleHandleW",ok},{"Sleep",nil},{"CreateDirectoryW",ok},{"ReadFile",readfile},{"CloseHandle",ok},{"RegisterClassExW",regcls},
+ {"GetCurrentProcessId",ok},{"GetLastError",errorcode},{"PatBlt",ok},{"TrackMouseEvent",ok},{"GetModuleHandleW",ok},{"Sleep",nil},{"CreateDirectoryW",ok},{"ReadFile",readfile},{"CloseHandle",ok},{"RegisterClassExW",regcls},
  {"CreateWindowExW",ok},{"DefWindowProcW",nil},{"ShowWindow",ok},{"TranslateMessage",ok},{"DispatchMessageW",dispatchMsg},
  {"GetDC",ok},{"ReleaseDC",ok},{"LoadCursorW",ok},{"PostQuitMessage",nil},{"SetProcessDPIAware",ok},{"GetForegroundWindow",ok}
 };
 static D d(const unsigned char*a,size_t p){D x;memcpy(&x,a+p,4);return x;}static S s(const unsigned char*a,size_t p){S x;memcpy(&x,a+p,2);return x;}static Q q(const unsigned char*a,size_t p){Q x;memcpy(&x,a+p,8);return x;}
-int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("DC_OPENING");opening=mode?atoi(mode):0;mode=getenv("DC_POINTER");pointerScenario=mode?atoi(mode):0;deleteTest=getenv("DC_DELETE")!=0;if(argc==3&&!strcmp(argv[2],"--tour")){
+int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("DC_OPENING");opening=mode?atoi(mode):0;mode=getenv("DC_POINTER");pointerScenario=mode?atoi(mode):0;deleteTest=getenv("DC_DELETE")!=0;atmTest=getenv("DC_ATM_TEST")!=0;if(argc==3&&!strcmp(argv[2],"--tour")){
  assert(scanf("%d %x",&tourFrames,&tourSaveHash)==2&&tourFrames>0);
  next_tour_keys();
  }else if(argc>=3&&strcmp(argv[2],"-"))loadCareer=argv[2];if(argc==4)saveCareer=argv[3];
@@ -160,10 +171,16 @@ int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("
   assert(creates==1&&actual==tourSaveHash&&!tourHold);
   return 0;
  }
+ if(atmTest){
+  assert(!creates&&safeWrites==3&&fsz[0]==304&&d(vdisk[0],4)==10);
+  assert(d(vdisk[0],8)==250&&d(vdisk[0],136)==900&&d(vdisk[0],288)==100&&d(vdisk[0],292)==0&&d(vdisk[0],296)==0);
+  puts("ATM PE entry point: E opened, deposited $100, withdrew $50, exited, saved.");
+  return 0;
+ }
  if(deleteTest){assert(deleteStage==2&&deleteCalls==1&&fsz[0]&&!fsz[2]&&!creates);puts("Native entrypoint: cancel, confirm, exact slot deleted, other slot still loads and saves.");return 0;}
  if(!loadCareer||opening==2){assert(creates==1&&createStage==6&&saved>=2);
    int slot=opening==2&&loadCareer?2:0;
-   assert(!memcmp(vdisk[slot]+fsz[slot]-24,"Vanta LocalQA:",14));
+   assert(fsz[slot]==304&&d(vdisk[slot],4)==10&&!memcmp(vdisk[slot]+268,"Vanta LocalQA:",14));
  }else assert(!creates);
  if(pointerScenario){assert(pointerStage==2&&beforePin!=afterPin&&afterPin!=afterClear&&pointerPy>pointerPx&&clearedPx==pointerPx);printf("Pointer clicks map correctly at %s render size.\n",pointerScenario==2?"1920x1080":"1300x790 letterboxed");}
  else assert(volume>5&&delivered);printf("Exact Windows x64 EXE: 75 frames via native entry, menu input, walking, frame output, and atomic save call verified against Win32 stubs.\n");

@@ -26,6 +26,10 @@ static int job_room(void){
  if(job.kind==JOB_SIGNAL||(job.kind==JOB_VAULT&&job.step==0))return jobBuildings[job.step];
  return -1;
 }
+enum{RESTITUTION_SHIFTS=3};
+static int job_is_service(int kind){
+ return sv.charges&&(kind==JOB_COURIER||kind==JOB_RECOVERY);
+}
 static int job_has_clock(void){
  return job.kind==JOB_TAXI||job.kind==JOB_HOT||(job.kind==JOB_SPRINT&&job.step>0);
 }
@@ -55,6 +59,21 @@ static void end_job(void){
  rivalsDeployed=0;
 }
 static void job_clock_tick(float dt){
+ /* A dispatched loaner can be wrecked before pickup or before crossing
+  * the start line. Never leave a gate or a passenger as an impossible GPS
+  * objective. Prefer the registered ride, then another usable licensed car. */
+ if((job.kind==JOB_TAXI||job.kind==JOB_SPRINT)&&job.step==0){
+  if(jobRide<0||cars[jobRide].cond<=0||!cars[jobRide].owner){
+   int best=-1;float closest=1.e10f;
+   for(int i=0;i<nc;i++)if(cars[i].owner&&cars[i].cond>0){
+    float d=d2(p.x-cars[i].x,p.y-cars[i].y);
+    if(d<closest||i==p.car){closest=d;best=i;if(i==p.car)break;}
+   }
+   jobRide=best;
+   if(best<0){end_job();tell("No drivable licensed car. Return to the contact for a new vehicle.");return;}
+   tell(best==p.car?"Your current ride is licensed. Continue the job.":"Replacement available. GPS marks your licensed car.");
+  }
+ }
  if(job_has_clock()&&(job.time-=dt)<=0){
   end_job();tell("Job expired. Return to the contact to retry.");
  }
@@ -68,7 +87,7 @@ static void beginJob(int kind){
  static const int totals[]={3,2,2,6,2,2,2,2};
  static const int pay[]={115,0,160,205,260,270,300,360};
  static const float time[]={160,0,165,95,180,155,165,170};
- Job next={kind,0,totals[kind],pay[kind],time[kind],{0},{0}};
+ Job next={kind,0,totals[kind],pay[kind],time[kind],{0},{0},job_is_service(kind)};
  int ride=-1,x=(int)p.x,y=(int)p.y;
  Car vehicle={.type=0,.owner=2,.cond=100};
 
@@ -153,17 +172,16 @@ static void beginJob(int kind){
 }
 static void advanceJob(void){
  if(job.kind<0||++job.step<job.total)return;
- int kind=job.kind;
+ int kind=job.kind,service=job_is_service(job.kind),unpaid=job.unpaid||service;
  int tip=kind==JOB_TAXI?taxi_tip_amount(job.price,taxi.crashes,taxi.damage,taxi.rough):0;
  int bonus=kind==JOB_COURIER&&sv.intro==2?25:0;
  char race[80];const char *result=jobNames[kind];
  if(kind<JOB_VAULT){
   sv.legal++;
   if(kind==JOB_TAXI)sv.taxiFares++;
-  if(sv.intro<3){sv.intro=3;result="First paycheck. Your first car is $125 at Nightglass.";}
-  else if(sv.intro==3)sv.intro=4;
-  if(sv.charges&&(kind==JOB_COURIER||kind==JOB_RECOVERY)&&++sv.restitution>=3){
-   sv.charges=0;sv.restitution=0;result="Restitution cleared.";
+  if(!unpaid){
+   if(sv.intro<3){sv.intro=3;result="First paycheck. Your first car is $125 at Nightglass.";}
+   else if(sv.intro==3)sv.intro=4;
   }
  }else sv.crime++;
  if(kind==JOB_SPRINT){
@@ -174,7 +192,21 @@ static void advanceJob(void){
   if(record)append(end," / session best.");else sprint_time(append(end," / best "),sprintBest);
   result=race;
  }
- gain(kind<JOB_VAULT,job.price+tip+bonus,result);
+ if(service){
+  /* Count the final shift against the case before clearing it. An unpaid
+   * shift must not spend the opening paycheck bonus or claim one was paid. */
+  if(++sv.restitution>=RESTITUTION_SHIFTS){
+   revenue_close_case();
+   tell("Restitution cleared. Final service shift paid $0. Future shifts pay again.");
+  }else{
+   char msg[96];char*q=number(append(msg,"Community service: "),sv.restitution);
+   q=number(append(q,"/"),RESTITUTION_SHIFTS);append(q," shifts complete. Shift paid $0.");
+   tell(msg);
+  }
+  noticeInk=GOLD;
+ }else if(unpaid){
+  tell("Unpaid shift completed. Your case is already closed. Shift paid $0.");noticeInk=GOLD;
+ }else gain(kind<JOB_VAULT,job.price+tip+bonus,result);
  end_job();request_save();
 }
 static int interior_job_drop(int venue){

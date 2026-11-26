@@ -10,7 +10,7 @@ typedef struct{U size,style;Proc proc;int cls,win;Handle module,icon,cursor,bg;c
 typedef struct{U size;int w,h;U16 planes,bits;U compression,bytes;int xp,yp;U colors,important;U rgb;} Bitmap;
 #define F(t,n,...) extern t (*__imp_##n)(__VA_ARGS__)
 F(void,ExitProcess,U);F(Handle,GetModuleHandleW,const U16*);F(void,Sleep,U);F(U64,GetTickCount64,void);
-F(U,GetLastError,void);F(U,GetEnvironmentVariableW,const U16*,U16*,U);F(int,CreateDirectoryW,const U16*,void*);
+F(U,GetLastError,void);F(U,GetCurrentProcessId,void);F(U,GetEnvironmentVariableW,const U16*,U16*,U);F(int,CreateDirectoryW,const U16*,void*);
 F(Handle,CreateFileW,const U16*,U,U,void*,U,U,Handle);F(int,ReadFile,Handle,void*,U,U*,void*);
 F(int,WriteFile,Handle,const void*,U,U*,void*);F(int,CloseHandle,Handle);F(int,MoveFileExW,const U16*,const U16*,U);F(int,DeleteFileW,const U16*);
 F(U16,RegisterClassExW,Class*);F(Handle,CreateWindowExW,U,const U16*,const U16*,U,int,int,int,int,Handle,Handle,Handle,void*);
@@ -21,20 +21,19 @@ F(Handle,LoadCursorW,Handle,const U16*);F(void,PostQuitMessage,int);F(int,SetPro
 F(int,TrackMouseEvent,void*);
 F(int,PatBlt,Handle,int,int,int,int,U);
 F(int,StretchDIBits,Handle,int,int,int,int,int,int,int,int,const void*,const Bitmap*,U,U);
-static U16 savePath[1024],tmpPath[1024];static unsigned directoryEnd;
+static U16 savePath[1024];static unsigned directoryEnd,stageSequence;
 static unsigned add(U16*d,unsigned pos,const U16*s){while(*s)d[pos++]=*s++;d[pos]=0;return pos;}
 static void make_fresh_path(int i){
- U16 n[16]=L"\\fresh-000.dat",t[16]=L"\\fresh-000.tmp";
- n[7]=t[7]='0'+i/100;n[8]=t[8]='0'+i/10%10;n[9]=t[9]='0'+i%10;
- add(savePath,directoryEnd,n);add(tmpPath,directoryEnd,t);
+ U16 n[16]=L"\\fresh-000.dat";
+ n[7]='0'+i/100;n[8]='0'+i/10%10;n[9]='0'+i%10;
+ add(savePath,directoryEnd,n);
 }
 void disk_slot(int slot){
  if(slot>=2){make_fresh_path(slot-1);return;}
  add(savePath,directoryEnd,slot?L"\\opening.dat":L"\\career.dat");
- add(tmpPath,directoryEnd,slot?L"\\opening.tmp":L"\\career.tmp");
 }
 int disk_present(void){
- Handle h=__imp_CreateFileW(savePath,0x80000000u,1,0,3,0x80,0);
+ Handle h=__imp_CreateFileW(savePath,0x80000000u,5,0,3,0x80,0);
  if(h!=(Handle)-1){__imp_CloseHandle(h);return 1;}
  U e=__imp_GetLastError();return e!=2&&e!=3; /* Never reuse unreadable or locked saves. */
 }
@@ -44,18 +43,44 @@ static void directories(void){
  if(!n||n>=900)n=__imp_GetEnvironmentVariableW(L"USERPROFILE",savePath,900);
  if(!n||n>=900){n=1;savePath[0]='.';}
  n=add(savePath,n,L"\\DeadChannel");__imp_CreateDirectoryW(savePath,0);
- for(U i=0;i<=n;i++)tmpPath[i]=savePath[i];
  directoryEnd=n;disk_slot(0);
 }
 int disk_read(void*d,unsigned n){
- Handle h=__imp_CreateFileW(savePath,0x80000000u,1,0,3,0x80,0);if(h==(Handle)-1)return 0;
+ Handle h=__imp_CreateFileW(savePath,0x80000000u,5,0,3,0x80,0);if(h==(Handle)-1)return 0;
  U got=0,extra=0;unsigned char byte;
  int r=__imp_ReadFile(h,d,n,&got,0)&&got==n&&__imp_ReadFile(h,&byte,1,&extra,0)&&!extra;
  __imp_CloseHandle(h);return r;
 }
+/* Read handles share DELETE so another copy scanning the catalog cannot
+ * prevent an atomic rename. A committed save is never modified in place. */
+static U put_hex8(U16 *p,U at,U n){
+ static const char hex[]="0123456789abcdef";
+ for(int shift=28;shift>=0;shift-=4)p[at++]=(U16)hex[(n>>shift)&15];
+ return at;
+}
 static int write_slot(const void*d,unsigned n,U flags){
- Handle h=__imp_CreateFileW(tmpPath,0x40000000u,0,0,2,0x80,0);if(h==(Handle)-1)return 0;
- U got=0;int r=__imp_WriteFile(h,d,n,&got,0);r=__imp_CloseHandle(h)&&r;return r&&got==n&&__imp_MoveFileExW(tmpPath,savePath,flags|8);
+ /* Reserve our own stage. A fixed slot.tmp lets a second process replace
+  * the bytes after our CloseHandle and before our MoveFileExW. Never reuse,
+  * truncate or erase an abandoned temp, including after PID recycling. */
+ /* Keep the basename shorter than even career.dat: a long Windows user
+  * profile which fit the old save must still fit the stage. */
+ U16 stage[1024];for(U i=0;i<directoryEnd;i++)stage[i]=savePath[i];
+ U at=add(stage,directoryEnd,L"\\~"),pid=__imp_GetCurrentProcessId();
+ for(int retry=0;retry<64;retry++){
+  stage[put_hex8(stage,at,pid+(++stageSequence)*0x9e3779b9u)]=0;
+  Handle h=__imp_CreateFileW(stage,0x40000000u,0,0,1,0x80,0); /* CREATE_NEW */
+  if(h==(Handle)-1){
+   U error=__imp_GetLastError();
+   if(error==80||error==183)continue;
+   return 0;
+  }
+  U got=0;int ok=__imp_WriteFile(h,d,n,&got,0)&&got==n;
+  if(!__imp_CloseHandle(h))ok=0;
+  if(ok&&__imp_MoveFileExW(stage,savePath,flags|8))return 1;
+  __imp_DeleteFileW(stage); /* Own stage only; the prior career is intact. */
+  return 0;
+ }
+ return 0;
 }
 int disk_write(const void*d,unsigned n){return write_slot(d,n,1);}
 int disk_create(const void*d,unsigned n){return write_slot(d,n,0);}
@@ -100,7 +125,7 @@ void entry(void){
  static const U16 cls[]=L"DeadChannelNative11";
  Class k={sizeof(Class),0x23,wnd,0,0,instance,0,__imp_LoadCursorW(0,(void*)32512),0,0,cls,0};
  if(!__imp_RegisterClassExW(&k)){__imp_ExitProcess(1);return;}
- Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | City Rhythm",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
+ Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Easy Entry",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
  if(!win){__imp_ExitProcess(2);return;}
  directories();set_session_seed((U)__imp_GetTickCount64());init_city();__imp_ShowWindow(win,1);
  U64 t=__imp_GetTickCount64(); unsigned acc=0;int wasFocused=1,lastW=0,lastH=0;

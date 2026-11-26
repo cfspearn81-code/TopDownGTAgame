@@ -2,7 +2,7 @@
    valid street/save coordinates even when an NPC opens its existing menu. */
 enum { INT_DESK,INT_RACK,INT_BED,INT_SOFA,INT_CRATES,INT_PLANT,INT_TRAY,INT_LAB,
        INT_CAR,INT_GUNCASE,INT_CLINIC,INT_DINER,INT_LOCKER,INT_CONSOLE,INT_REEL,
-       INT_FERNS,INT_GROWBED,INT_GLASS,INT_WALL,INT_BARS,INT_SETTLE,INT_SORTER,INT_COOLER,INT_TOOLS,INT_FEATURE };
+       INT_FERNS,INT_GROWBED,INT_GLASS,INT_WALL,INT_BARS,INT_SETTLE,INT_SORTER,INT_COOLER,INT_TOOLS,INT_FEATURE,INT_GROW_STOCK };
 typedef struct{int x,y,w,h,type;U tint;} InteriorProp;
 typedef struct{
  const char *banner,*line,*instruction,*counter,*door;
@@ -37,6 +37,12 @@ static const InteriorTheme int_staff[]={
 };
 static const char*int_staffDoor[]={"MAILROOM","RECEIVING","SERVICE OFFICE"};
 static int interior_left,interior_right,interior_subroom;
+enum{GROW_RACK_X=665,GROW_RACK_Y=150,
+ GROW_PICKUP_TICKS=16,GROW_CARRY_WALK_TICKS=48+80+64,GROW_PUTDOWN_TICKS=32,GROW_RETURN_WALK_TICKS=180};
+static const float GROW_PACK_SECONDS=(GROW_PICKUP_TICKS+GROW_CARRY_WALK_TICKS/FOOT_PACE+GROW_PUTDOWN_TICKS)/60.f;
+static const float GROW_RETURN_SECONDS=GROW_RETURN_WALK_TICKS/(60.f*FOOT_PACE);
+static int grow_seen_batches,grow_seen_stock,grow_stock_before_pack;
+static float grow_pack_left;
 enum{GROW_GATE_X=W/2,GROW_GATE_Y=153,CHIEF_X=247,CHIEF_Y=242,CUSTODY_X=709,CUSTODY_Y=305};
 static float interior_x,interior_y,interior_a,interior_cam_x,interior_cam_y;
 static InteriorProp interior_props[32];
@@ -145,7 +151,10 @@ static void int_layout(int k){
   int_prop(INT_CRATES,580,155,122,43,0xaf886d);int_prop(INT_LOCKER,646,228,60,48,0x718998);
   int_prop(INT_CRATES,593,321,146,49,0xaa8770);break;
  case 1: /* ground-level dance floor below a stepped stage and velvet booth */
-  int_counter(INT_DINER,548,222,163,40,a);int_prop(INT_SOFA,530,160,166,45,0x9e567d);
+  int_counter(INT_DINER,548,222,163,40,a);
+  /* Leave a standing pocket on the booth's center line. A tall sprite
+     projects north of its feet and must not extend over the couch. */
+  int_prop(INT_SOFA,530,160,82,45,0x9e567d);
   int_prop(INT_SOFA,198,308,127,38,0x7e5877);int_prop(INT_REEL,204,232,57,49,0xcc8dad);
   int_prop(INT_WALL,394,152,10,58,0x826382);int_prop(INT_SOFA,556,309,114,39,0x765079);break;
  case 2: /* two aisles flanking the grocer's central walk, staff door behind */
@@ -167,7 +176,7 @@ static void int_layout(int k){
    int_counter(INT_CONSOLE,418,186,124,46,0xa9a8d6);
    int_prop(INT_GROWBED,181,183,198,63,0x5d8082);int_prop(INT_GROWBED,581,183,198,63,0x728795);
    int_prop(INT_GROWBED,181,303,198,63,0x5f8585);int_prop(INT_GROWBED,581,303,198,63,0x79859a);
-   int_prop(INT_LOCKER,183,150,121,22,0x75889f);int_prop(INT_LOCKER,665,150,114,22,0x75889f);
+   int_prop(INT_LOCKER,183,150,121,22,0x75889f);int_prop(INT_GROW_STOCK,GROW_RACK_X,GROW_RACK_Y,114,22,0);
   }break;
  case 5:
   int_counter(INT_CONSOLE,354,209,125,42,a);int_prop(INT_LAB,190,157,100,79,0x9faed8);
@@ -258,6 +267,10 @@ static int int_at_chief(void){return d2(interior_x-CHIEF_X,interior_y-CHIEF_Y)<3
 static int int_at_custody(void){return d2(interior_x-CUSTODY_X,interior_y-CUSTODY_Y)<33*33;}
 static void int_switch_room(int k,int to){
  int_expire_fixture_notice();interior_subroom=to;int_layout(k);interior_cache_loc=-2;
+ if(k==4){
+  grow_seen_batches=sv.b[0].batches;grow_seen_stock=grow_stock_before_pack=warehouse_units(0);
+  grow_pack_left=0.f;
+ }
  interior_x=GROW_GATE_X;interior_y=to?393:169;
  interior_a=to?-1.570796f:1.570796f;walking=0;
  interior_cam_x=0;interior_cam_y=0;interior_fade=12;
@@ -274,6 +287,12 @@ static void interior_tick(U keys,U tap){
  if(interior_active_loc<0||interior_active_loc>=LEN(loc)){scene=1;menu=-1;return;}
  const float dt=1.f/60;
  if(interior_fade>0)interior_fade--;
+ if(lantern_terminal()&&menu!=PAUSE_MENU){
+  if(sv.b[0].batches!=grow_seen_batches){
+   grow_seen_batches=sv.b[0].batches;grow_stock_before_pack=grow_seen_stock;grow_pack_left=GROW_PACK_SECONDS+GROW_RETURN_SECONDS;
+  }else if(grow_pack_left>0.f)grow_pack_left=grow_pack_left>dt?grow_pack_left-dt:0.f;
+  grow_seen_stock=warehouse_units(0);
+ }
  if(tap&HELP){helpBack=3;scene=2;return;}
  if(tap&GFX)fastGfx=!fastGfx;
  if(tap&ESC){if(menu>=0){menu=-1;return;}active(PAUSE_MENU);makeMenu();return;}
@@ -285,8 +304,8 @@ static void interior_tick(U keys,U tap){
   return;
  }
  int x=!!(keys&RIGHT)-!!(keys&LEFT),y=!!(keys&DOWN)-!!(keys&UP);
- float v=(keys&BRAKE?3.55f:2.42f)*(x&&y?.707107f:1);
- walking=x||y;if(walking){footcycle=wrap(footcycle+.25f);interior_a=look(x,y);}
+ float v=(keys&BRAKE?NAMED_RUN_STEP:NAMED_WALK_STEP)*(x&&y?.707107f:1);
+ walking=x||y;if(walking){footcycle=wrap(footcycle+.25f*FOOT_PACE);interior_a=look(x,y);}
  if(!int_solid(interior_x+x*v,interior_y))interior_x+=x*v;
  if(!int_solid(interior_x,interior_y+y*v))interior_y+=y*v;
  interior_cam_x+=((interior_x-W/2)*.13f-interior_cam_x)*.11f;
@@ -467,6 +486,7 @@ static void int_draw_feature(const InteriorProp*f){
 
 static void int_draw_prop(const InteriorProp*f,int owner){
  int x=f->x,y=f->y,w=f->w,h=f->h;U c=f->tint;
+ if(f->type==INT_GROW_STOCK)return; /* Draw live so selling updates the stacked crates. */
  if(f->type==INT_FEATURE){int_draw_feature(f);return;}
  if(f->type==INT_CAR){int_car(f);return;}
  if(f->type==INT_GLASS){
@@ -610,18 +630,6 @@ static void int_draw_prop(const InteriorProp*f,int owner){
   rect(x+9,y+h-11,w-18,2,c);break;
  }
 }
-static void int_window(int x,int y,int w,int h,U a,int id){
- rect(x-3,y-3,w+8,h+8,0x13212e);box(x,y,w,h,0x283f57,0x667a82);
- for(int i=1;i<h-1;i++)rect(x+1,y+i,w-2,1,mix(0x172934,0x547287,i*7/h));
- for(int i=2;i<w-4;i+=7){
-  U seed=int_hash(i,id+31);int ht=5+(seed%max(5,h-12));
-  rect(x+i,y+h-ht-1,min(6,w-i-1),ht,0x233042);
-  for(int j=h-ht+1;j<h-1;j+=5)if((seed>>(j%17))&1)rect(x+i+1,y+j,2,2,mix(0xd5ab70,a,2));
- }
- for(int i=6;i<w-3;i+=11){int j=2+int_hash(i,id)%max(5,h-8);line(x+i,y+j,x+i-2,y+j+4,0x5f7e91);}
- for(int i=1;i<=2;i++)rect(x+i*w/3,y+1,2,h-2,0x263e4d);
- rect(x,y+h-1,w,2,mix(a,0x4c6b77,4));
-}
 static void int_floor_mark(int x,int y,int w,int h,U a){
  box(x,y,w,h,mix(a,0x25313e,5),mix(a,0x142a36,4));
  for(int i=3;i<h-2;i+=4)line(x+2,y+i,x+w-3,y+i,mix(a,0x172633,5));
@@ -685,72 +693,6 @@ static void int_facility_floor(int k,U a){
   for(int j=0;j<7;j++)rect(488,370+j*7,3,4,0x8b9eb4);
  }
 }
-/* Architecture and fittings set the visual vocabulary first; signage sits
-   on the relevant work surfaces instead of identifying identical cashiers. */
-static void int_venue_ground(int k,U a){
- if(interior_subroom)return;
- switch(k){
- case 0:
-  for(int j=0;j<6;j++){int x=194+j*23;line(x,277,x+10,283,0x89aca1);line(x+10,283,x,289,0x89aca1);}
-  for(int j=0;j<5;j++){rect(403+j*34,328,18,2,0x98b2a2);rect(403+j*34,335,18,2,0x687c77);}
-  int_floor_mark(574,306,184,70,0x7c6954);break;
- case 1: /* parquet around a luminous sunken dance floor */
-  int_floor_mark(196,148,217,65,0x826076);
-  for(int j=0;j<5;j++)for(int i=0;i<8;i++){
-   U hues[]={0x785477,0x9e6c7a,0x614f78,0x4d657b};
-   box(319+i*24,226+j*23,23,22,hues[(i+j*3+i*j)%4],0x4e425b);
-  }
-  for(int i=0;i<5;i++)rect(381,354+i*5,156,2,mix(0x8e728b,0x504657,i));break;
- case 2:
-  for(int i=0;i<5;i++){int x=184+i*34;tri(x,146,x+16,146,x+7,155,i%2?0x8cac83:0xd7c3a2);}
-  for(int j=0;j<3;j++)for(int i=0;i<6;i++){int x=201+i*24,y=282+j*4;rect(x,y,17,2,i%2?0x9e886d:0xb2a27b);}
-  int_floor_mark(536,197,190,74,0x797865);break;
- case 3:
-  for(int i=0;i<2;i++){int x=i?509:183,y=i?309:231,w=i?178:187,h=i?88:108;
-   box(x,y,w,h,0x405670,0x91bac4);box(x+4,y+4,w-8,h-8,0x4f6576,0x9fbdc7);}
-  break;
- case 4:
-  for(int x=432;x<=527;x+=23)for(int y=189;y<420;y+=24)box(x,y,19,21,0x87775f,0x6a664f);break;
- case 5:
-  for(int j=0;j<3;j++){int x=548+j*7;rect(x,150,3,188,j==1?0xbd977f:0x8b8d9b);rect(x,335,108,3,0x8b8d9b);}
-  for(int y=150;y<412;y+=13)rect(333,y,5,8,0xc2a67e);
-  int_floor_mark(593,149,183,112,0x726d86);break;
- case 6:
-  box(172,222,173,102,0x465466,0xb6b396);
-  for(int x=219;x<730;x+=33)rect(x,285,19,3,0xc5bc9f);
-  for(int x=0;x<11;x++)for(int y=0;y<3;y++)rect(423+x*10,357+y*6,10,6,(x+y)&1?0xbdc7bd:0x394d5b);
-  break;
- case 7:
-  int_floor_mark(348,214,280,63,0x78536d);
-  for(int x=354;x<609;x+=17)rect(x,282,9,3,0xc98da9);
-  for(int j=0;j<3;j++)rect(416,371+j*6,116,2,0x8b7787);break;
- case 8:
-  rect(319,260,288,4,0x90bbba);rect(514,260,4,156,0x90bbba);
-  rect(570,364,26,6,0xc9d3c7);rect(580,354,6,26,0xc9d3c7);
-  for(int y=170;y<352;y+=20){rect(162,y,7,10,0x9eb7b2);rect(311,y,4,11,0x819a9e);}break;
- case 9:
-  int_floor_mark(286,288,169,77,0x8d6c61);
-  for(int x=507;x<656;x+=18)for(int y=147;y<215;y+=14)rect(x,y,16,12,((x/18+y/14)&1)?0x796e64:0x59615e);
-  break;
- case 10:
-  box(175,215,197,108,0x2b3842,0x9e9a7b);
-  for(int i=0;i<20;i++){int x=177+i*10;line(x,318,x+5,322,0xd9b976);line(x,215,x+5,219,0xd9b976);}
-  for(int i=0;i<4;i++)rect(415+i*8,281,3,89,0x677777);break;
- case 11:
-  for(int j=0;j<3;j++){int x=346+j*45,y=300+j%2*38;disc(x,y,5,0x293442);disc(x,y-2,3,0xc4a875);
-   if(j<2)line(x,y-1,x+45,300+(j+1)%2*38-1,0xaf856e);}
-  int_floor_mark(366,382,227,44,0x737285);break;
- case 13:
-  int_floor_mark(260,294,124,71,0x866d73);
-  for(int i=0;i<5;i++)rect(397+i*33,394,18,2,0xbb997d);
-  break;
- case 14:
-  for(int x=183;x<344;x+=16)for(int y=211;y<230;y+=8)rect(x,y,9,2,0xa9a9a0);
-  for(int x=391;x<627;x+=23)rect(x,354,15,3,0xce9f7e);break;
- case 15:
-  for(int i=0;i<7;i++){rect(339,272+i*11,3,7,0x9aaec1);rect(612,272+i*11,3,7,0x9aaec1);}break;
- }
-}
 /* Paint walls and exterior after all floor props. Step faces have a height,
    cap and kickboard, so an L floor never reads as a rectangle of tinted rugs. */
 static void int_shell_edges(U wall,U a){
@@ -777,6 +719,8 @@ static void int_shell_edges(U wall,U a){
  l=sh->edge[3][0];r=sh->edge[3][1];rect(l,441,r-l,3,0x273b47);
 }
 
+#include "named_sets.inc"
+
 static void int_static(void){
  const int n=interior_active_loc,k=loc[n].kind;
  const int li=legal_index_for_kind(k);
@@ -785,7 +729,7 @@ static void int_static(void){
  interior_cache_loc=n;interior_cache_status=status;
  surface=interior_back;rw=W;rh=H;
  const InteriorTheme*t=interior_theme(k);
- U a=t->neon,wall=t->wall,floor=t->floor;
+ U a=t->neon,wall=t->wall;
  for(int y=0;y<H;y++)rect(0,y,W,1,mix(0x14202a,0x192a36,(y/74)%5));
  for(int y=89;y<480;y+=26){
   int zz=24*(y&1);for(int x=5-zz;x<W;x+=46){U c=0x1b303b;line(x,y,x+42,y,c);line(x,y,x,y+8,c);}
@@ -794,35 +738,14 @@ static void int_static(void){
  rect(l+11,112,ww+5,342,0x131b25);
  rect(l+7,109,ww+6,340,0x121a23);
  box(l,98,ww,348,0x25333f,0x829798);
- for(int y=145;y<433;y++){
-  int division=t->finish==0?11:t->finish==1?25:36;
-  for(int x=l+11;x<r-11;x++){
-   U noise=int_hash(x,y);
-   int x0=(x-l+(y/division)*43)%(t->finish==0?89:t->finish==1?39:74);
-   int shade=1+(noise>>29)*3/7+(y<161)+(x<l+27||x>r-27);
-   U c=mix(floor,0x202835,shade);
-   if(y%division==0||(t->finish!=2&&x0==0))c=mix(c,0x1b2932,2);
-   else if(t->finish==0&&(noise&63)<6)c=mix(c,0x866c60,2);
-   dot(x,y,c);
-  }
- }
- // Shallow wall profile: the ceiling vanishes, revealing the service floor.
- rect(l+5,101,ww-10,39,wall);rect(l+6,105,ww-12,2,mix(wall,0xb8bcb1,4));
- for(int i=l+11;i<r-12;i+=17)rect(i,135,1,6,mix(wall,0xb1b6b0,3));
- rect(l+8,139,ww-16,6,0x18252f);rect(l+10,144,ww-20,2,mix(a,0x263744,6));
- rect(l+2,106,8,334,wall);rect(r-10,106,8,334,mix(wall,0x17232c,4));
- for(int y=150;y<416;y+=26){rect(l+9,y,2,16,mix(wall,0x111d26,4));rect(r-12,y,2,16,mix(wall,0x111d26,4));}
- int nl=venue_limit(145,0),nr=venue_limit(145,1),nw=nr-nl;
- int span=min(216,nw/3),mid=(nl+nr)/2;
- int ww0=(nw-span)/2-27;
- if(ww0>23){int_window(nl+16,109,ww0,23,a,k+1);int_window(nr-16-ww0,109,ww0,23,a,k+10);}
- box(mid-span/2,106,span,28,mix(wall,0x142733,3),mix(wall,a,5));center(mid,109,t->door,a,0);
- // Pools of fixture light and cool window spill are painted into the floor, not the HUD.
- int_lamp(l+71,156,82,mix(a,0x345165,5),3);int_lamp(r-79,157,83,mix(a,0x345165,5),3);
- int_lamp(interior_desk_x,interior_desk_y-24,102,mix(a,0x577181,4),4);
- for(int i=0;i<4;i++){int x=l+31+i*19;tri(x,147,x+17,146,x+63,214,mix(floor,0x9ac4c2,2));}
- int_venue_ground(k,a);
+ /* Backdrop and furniture art are baked only when this room or its ownership changes. */
+ const NsFinish *finish=ns_finish+venue_shell_id;
+ for(int y=145;y<433;y++)for(int x=venue_limit(y,0);x<venue_limit(y,1);x++)
+  dot(x,y,ns_floor_pixel(x,y,finish));
+ ns_wall(venue_shell_id);
  int_facility_floor(k,a);
+ ns_ground(venue_shell_id);
+ ns_fixed_details(venue_shell_id);
  if(k==15){
   person(CHIEF_X,175,0x8593ad,0,1.570796f,1,1);
   person(418,162,0x75879f,0,1.570796f,1,2);
@@ -832,33 +755,12 @@ static void int_static(void){
   if(k!=13&&!interior_subroom&&f->x+f->w/2==interior_desk_x&&f->y+f->h+25==interior_desk_y){
     person(interior_desk_x,f->y-8,mix(a,0x55738a,3),0,1.570796f,0,k%5);
   }
-  int_draw_prop(f,k==4||k==5?status:-1);
+  if(!ns_setpiece(f,k)&&!ns_furniture(f,k))int_draw_prop(f,k==4||k==5?status:-1);
  }
- // Merchandising / navigation notes, fitted to the room rather than floating in the street.
- if(k==0&&!interior_subroom){center(264,281,"SORTING",a,0);center(670,371,"PARCELS",a,0);}
- if(li>=0&&interior_subroom){
-  if(li==0){center(274,259,"MANIFEST SORTER",a,0);center(694,207,"PARCEL ARCHIVE",a,0);center(699,323,"CLEARED SHIPMENTS",a,0);}
-  if(li==1){center(269,222,"CHILLED RECEIVING",a,0);center(685,212,"COLD STORAGE",a,0);center(695,362,"INCOMING STOCK",a,0);}
-  if(li==2){center(273,210,"TOOL BENCH",a,0);center(270,332,"FLEET SERVICE BAY",a,0);center(698,307,"PARTS INVENTORY",a,0);}
- }
- if(k==3){center(268,321,"DISPLAY A",a,0);center(596,388,"DISPLAY B",a,0);}
- if(k==5){box(338,391,139,25,0x162730,mix(wall,a,3));center(408,392,status?"FACILITY ACTIVE":"LAB AVAILABLE",status?a:MUTED,0);}
- if(k==4&&!interior_subroom){
-  center(282,237,"SHADE FERNS",a,0);center(301,325,"POTTED HOUSEPLANTS",a,0);center(699,203,"HANGING FERNS",a,0);
- }
- if(k==4&&interior_subroom){
-  for(int j=0;j<2;j++)for(int i=0;i<2;i++){char label[]="GROW BED A";label[9]+=(char)(j*2+i);center(280+i*400,j?279:246,label,a,0);}
- }
- if(k==15){
-  center(CHIEF_X,217,"CHIEF RIVAS",a,0);center(480,206,"INVESTIGATIONS",a,0);
-  center(675,213,"CELL A",GOLD,0);center(751,213,"CELL B",GOLD,0);
-  center(710,231,"CUSTODY / STAFF ONLY",MUTED,0);
-  center(244,393,"PUBLIC WAITING",a,0);
- }
- if(k==14)center(254,348,"EQUIPMENT",a,0);
- if(k==8)center(243,334,"RECOVERY WARD",a,0);
- if(k==13){rect(560,255,14,11,0xd1c19f);for(int j=0;j<3;j++)rect(562,258+j*2,8,1,0x928479);}
- if(!interior_subroom&&venue_feature[k].label){const Feature*f=venue_feature+k;center(f->x+f->w/2,f->y+f->h, f->label,a,0);}
+ /* Ambient signs are mounted on fixtures, not floating aisle text. Interaction
+    hotspots, route hints and the staffed service name are retained by interior_paint. */
+ if(k==5){box(338,391,139,25,0x243440,0x738696);center(408,392,status?"FACILITY ACTIVE":"LAB AVAILABLE",status?a:MUTED,0);}
+ if(k==15){center(CHIEF_X,216,"CHIEF RIVAS",PAPER,0);center(710,222,"CUSTODY",PAPER,0);}
  rect(l+3,432,ww-6,11,0x273844);rect(l+5,432,ww-10,2,0x6c848c);
  rect(W/2-37,426,74,17,0x192e37);rect(W/2-36,433,72,8,0x4c6571);
  for(int i=0;i<8;i++)rect(W/2-30+i*8,435,4,2,mix(a,0x596c76,3));
@@ -885,23 +787,17 @@ static void paint_active_menu(void){
  if(nopt)wrapped(left+25,yy,opt[sel].note,a,62);
  if(p.noticeT>0)wrapped(left+25,yy+43,notice,notice_color(),62);else textat(left+25,yy+43,"UP / DOWN    ENTER SELECT    ESC BACK",MUTED,0);
 }
-static void int_grow_live(int dx,int dy){
- const Business*b=&sv.b[0];int bed=0;
- if(b->timer>0){
-  int product=cl(b->product,0,1),count=cl(batch_units(product,b->tier),0,20);
-  float progress=growth_fraction(0);
-  float taper=progress*progress*(3.f-2.f*progress);
-  for(int j=0;j<interior_nprop;j++)if(interior_props[j].type==INT_GROWBED){
-   const InteriorProp*f=interior_props+j;
-   for(int i=0;i<5;i++){
-    int q=i*4+bed;if(q>=count)break;
-    int x=f->x+25+i*37-dx,y=f->y+f->h/2+3-dy;
-    int radius=3+(int)((15+(q%3)*2)*taper);
-    U c=product?(q%2?0xb9a9df:0xc7a7cd):(q%2?0x8fbc70:0xa5ce77);
-    int_fern(x,y,radius,c,int_hash(q,b->batches+17),progress<.26f);
-    if(progress>.77f){dot(x+radius/3,y-1,mix(c,PAPER,3));dot(x-radius/3,y+1,mix(c,PAPER,3));}
-   }
-   bed++;
+#include "grow_room_art.inc"
+
+static void int_grow_live(const GrowBatch*v,int dx,int dy){
+ const Business*b=&sv.b[0];
+ if(v->count){
+  float progress=growth_fraction(0),taper=progress*progress*(3.f-2.f*progress);
+  for(int q=0;q<v->count;q++){
+   int x=v->pot[q].x-dx,y=v->pot[q].y-dy,radius=3+(int)((15+(q%3)*2)*taper);
+   U c=v->product?(q%2?0xb9a9df:0xc7a7cd):(q%2?0x8fbc70:0xa5ce77);
+   int_fern(x,y,radius,c,int_hash(q,b->batches+17),progress<.26f);
+   if(progress>.77f){dot(x+radius/3,y-1,mix(c,PAPER,3));dot(x-radius/3,y+1,mix(c,PAPER,3));}
   }
  }
  char label[64];const int boardX=575-dx,boardY=389-dy;
@@ -960,7 +856,10 @@ static void interior_paint(void){
    U*q=pixels+j*W+i;*q=mix(*q,c,a0);
   }
  }
- if(k==4&&interior_subroom)int_grow_live(dx,dy);
+ if(k==4&&interior_subroom){
+  GrowBatch batch=grow_batch(sv.b);
+  int_grow_live(&batch,dx,dy);grow_storage_art(dx,dy);grow_operator_art(&batch,dx,dy);
+ }
  if(li>=0&&interior_subroom)int_staff_panel(li,dx,dy,a);
  mark(dock,doorY,6,int_at_door()?PAPER:a);
  center(dock,447-dy,interior_subroom?(k==4?"BACK TO STORE":"BACK TO PUBLIC COUNTER"):"EXIT TO STREET",a,0);
@@ -979,10 +878,17 @@ static void interior_paint(void){
   center(CUSTODY_X-dx,313-dy,"CUSTODY GATE",GOLD,0);
  }
  int deskX=interior_desk_x-dx,deskY=interior_desk_y-dy;
- mark(deskX,deskY,6,int_at_desk()?PAPER:a);center(deskX,deskY+15,t->counter,a,0);
+ mark(deskX,deskY,6,int_at_desk()?PAPER:a);
+ /* Use a small legible nameplate near the counter; reserve the rest of the room for the art. */
+ {int labelw=textw(t->counter,0);box(deskX-labelw/2-5,deskY+14,labelw+10,21,0x25343a,0x5e6c66);
+  center(deskX,deskY+15,t->counter,a,0);}
+ if(!interior_subroom&&int_feature_near(k)){
+  const Feature *f=venue_feature+k;int cx=f->x+f->w/2-dx,cy=f->y+f->h-dy,lw=textw(f->label,0);
+  box(cx-lw/2-4,cy,lw+8,19,0x27383e,0x68797a);center(cx,cy,f->label,a,0);
+ }
  person(x,y,0xc6d979,walking?(int)(sn(footcycle)*5):0,interior_a,4,3);
  rect(0,0,W,81,0x111e28);rect(0,78,W,1,0x42616d);
- textat(27,10,t->line,a,0);int big=textw(t->banner,1)<610;textat(26,29,t->banner,PAPER,big);
+ draw_day_clock(5);textat(DAY_BADGE_LABEL_X,10,t->line,a,0);int big=textw(t->banner,1)<610;textat(26,29,t->banner,PAPER,big);
  char v[84];
  rect(0,483,W,57,0x111e28);rect(0,483,W,1,0x456570);
  const int dropping=job.kind>=0&&job_venue()==n;

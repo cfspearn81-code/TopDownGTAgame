@@ -5,6 +5,19 @@
 static void press(U k){tick(k);tick(0);}
 static void walk(U k,int frames){for(int i=0;i<frames;i++)tick(k);tick(0);}
 static void move_to(int x,int y){p.x=x;p.y=y;if(p.car>=0){cars[p.car].x=x;cars[p.car].y=y;}tick(0);}
+/* Parking can overlap a doorway. Stand beside the car on the side
+ * without another interaction, just as the new E prompt requires. */
+static void approach_car(int id){
+ assert(p.car<0&&scene==1);
+ for(int r=22;r<=35;r+=3)for(int heading=0;heading<16;heading++){
+  float a=heading*.3926991f;
+  p.x=cars[id].x+cs(a)*r;p.y=cars[id].y+sn(a)*r;
+  if(!street_foot_clear(p.x,p.y,-1)||carNear()!=id)continue;
+  StreetUse u=street_use_target(placeNear(),id);
+  if(u.kind==STREET_USE_CAR){tick(0);return;}
+ }
+ assert(!"no car-side interaction available");
+}
 static void frame(const char*name){paint();FILE*f=fopen(name,"wb");assert(f);fprintf(f,"P6\n%d %d\n255\n",W,H);for(int j=0;j<W*H;j++){U v=pixels[j];fputc(v>>16,f);fputc(v>>8,f);fputc(v,f);}fclose(f);}
 static void visit(int i){assert(scene==1&&p.car<0);move_to(loc[i].x,loc[i].y);press(USE);assert(scene==3&&interior_active_loc==i);}
 static void counter(void){interior_x=interior_desk_x;interior_y=interior_desk_y;press(USE);}
@@ -138,7 +151,7 @@ static void city_rhythm_test(void){
  press(USE);assert(p.car==0&&!stoppingToExit);
  cars[0].s=125;walk(USE,90);assert(p.car==-1&&absf(cars[0].s)<5);
  nc=2;cars[1]=(Car){p.x+24,p.y,0,0,1,0,100};p.heat=0;
- press(USE);assert(p.car<0&&!cars[1].reported&&p.heat==0);
+ press(ENTER);assert(p.car<0&&!cars[1].reported&&p.heat==0);
  const Building*b=buildings+zone_idx[0];sv.x=b->x+b->w/2;sv.y=b->y-b->ht+2;
  spawnPlayer();assert(open_space(p.x,p.y)&&d2(p.x-sv.x,p.y-sv.y)<45*45);
  printf("Passed: %d tree trunks, roof edges, park paths, all storefront pins and approaches, trams, courier rotation, braking exits and old save positions.\n",trees);
@@ -146,30 +159,30 @@ static void city_rhythm_test(void){
 int main(void){
  init_city();assert(nb<=LEN(buildings));assert(scene==0&&sv.cash==0&&sv.gear==-1&&sv.owned==0&&job.kind<0);
  frame("build/title.ppm");press(ENTER);assert(scene==5);press(ENTER);assert(scene==3&&interior_active_loc==12);walk(0,20);frame("build/apartment.ppm");
- walk(DOWN,47);press(USE);assert(scene==1&&sv.intro==1);
+ walk(DOWN,59);press(USE);assert(scene==1&&sv.intro==1);
  paint();assert(navGoalKind==1&&navCount>=2);int distance=navDist;
  walk(LEFT,30);paint();assert(navDist<distance);
  move_to(loc[0].x,loc[0].y);assert(placeNear()==0);frame("build/free-roam.ppm");
  press(USE);assert(scene==3&&interior_active_loc==0&&menu<0);
- walk(UP,43);press(USE);assert(menu==0);frame("build/dispatch.ppm");press(ENTER);
+ walk(UP,54);press(USE);assert(menu==0);frame("build/dispatch.ppm");press(ENTER);
  assert(job.kind==0&&menu<0&&sv.intro==2);leave();dropoff(2);assert(job.step==1);dropoff(3);assert(job.step==2);dropoff(0);
  assert(job.kind<0&&sv.legal==1&&sv.intro==3&&sv.cash>=115&&sv.dirty==0);
  visit(13);walk(0,20);frame("build/armory.ppm");counter();assert(menu==14);
  press(ENTER);assert(sv.gear==0&&sv.cash>=20);leave();
  visit(5);counter();assert(menu==5);press(ENTER);assert(!sv.b[1].own);leave();
  sv.cash=140;visit(3);counter();press(ENTER);assert(sv.owned&1);leave();
- move_to(cars[0].x,cars[0].y);press(ENTER);assert(p.car==0);
+ approach_car(0);press(USE);assert(p.car==0);
  Car saved=cars[1];cars[1]=(Car){cars[0].x+33,cars[0].y,0,0,1,0,100};
  assert(!street_move_car(0,5,0));cars[0].s=94;walk(UP,3);assert(cars[0].cond<100&&cars[0].cond>0);
  cars[1]=saved;cars[0].s=0;assert(street_exit_car());
  sv.cash+=40;visit(3);counter();doOpt(35);assert(cars[0].cond==100);leave();
  int moving=-1;for(int i=2;i<nc;i++)if(streetDrivers[i].live){moving=i;break;}assert(moving>0);
- move_to(cars[moving].x,cars[moving].y);cars[moving].s=35;press(ENTER);
+ approach_car(moving);cars[moving].s=35;press(USE);
  assert(p.car==moving&&!streetDrivers[moving].live&&p.heat>=38);cars[moving].s=0;assert(street_exit_car());
  /* Parking and re-entering an already reported car is the same theft.
   * It still cannot take taxi dispatch calls. */
  float theftHeat=p.heat;
- press(ENTER);assert(p.car==moving&&p.heat==theftHeat&&!cars[moving].owner);
+ press(USE);assert(p.car==moving&&p.heat==theftHeat&&!cars[moving].owner);
  sv.taxiFares=1;press(TAXI_NEXT);assert(job.kind<0);sv.taxiFares=0;
  press(USE);assert(p.car<0);
  for(int i=0;i<LEN(loc);i++){
@@ -195,7 +208,7 @@ int main(void){
  press(MAP);assert(mapOn);pointer_input(610,334,1);assert(navHasManual);frame("build/map.ppm");
  pointer_input(610,334,2);assert(!navHasManual);pointer_input(500,330,0);press(ENTER);assert(navHasManual);press(ENTER);assert(!navHasManual);
  press(ESC);assert(!mapOn);pointer_input(610,334,1);assert(!navHasManual);
- visit(4);walk(UP,90);assert(int_at_grow_gate());press(USE);assert(!interior_subroom);leave();
+ visit(4);walk(UP,113);assert(int_at_grow_gate());press(USE);assert(!interior_subroom);leave();
  sv.cash=2999;visit(4);counter();press(ENTER);assert(!sv.b[0].own);
  sv.cash=7500;press(ENTER);assert(sv.b[0].own&&sv.cash==4500);leave();
  visit(2);counter();press(ENTER);assert(sv.units>=3);leave();
@@ -220,16 +233,16 @@ int main(void){
  assert(mapOn&&saveFlash>0&&sv.hash==savehash());
  walk(0,245);assert(sv.b[0].timer==0&&sv.b[0].batches==2);press(ESC);
  visit(4);assert(!interior_subroom);walk(0,20);frame("build/fern-shop.ppm");
- walk(UP,90);assert(int_at_grow_gate());press(USE);assert(scene==3&&interior_subroom);
+ walk(UP,113);assert(int_at_grow_gate());press(USE);assert(scene==3&&interior_subroom);
  start_batch(&sv.b[0],10.f);walk(0,25);frame("build/grow-young.ppm");walk(0,500);frame("build/grow-tall.ppm");
  assert(growth_fraction(0)>.80f);
- walk(DOWN,12);press(USE);assert(scene==3&&!interior_subroom);
+ walk(DOWN,15);press(USE);assert(scene==3&&!interior_subroom);
  leave();
  visit(14);walk(0,20);frame("build/precinct.ppm");counter();assert(menu==15);press(ESC);
  interior_x=CHIEF_X;interior_y=CHIEF_Y;assert(!int_solid(interior_x,interior_y));press(USE);assert(notice[0]=='C');
  interior_x=CUSTODY_X;interior_y=CUSTODY_Y;assert(!int_solid(interior_x,interior_y));press(USE);assert(notice[0]=='C');leave();
  /* Swept gates only score during a circuit and from the registered car. */
- p.heat=0;sv.owned=1;sv.charges=1;sv.restitution=1;beginJob(JOB_SPRINT);
+ p.heat=0;sv.owned=1;revenue_open_case();sv.restitution=1;beginJob(JOB_SPRINT);
  assert(job.step==0&&!job_has_clock());
  move_to(job.xs[0],job.ys[0]);assert(job.step==0);
  for(int i=1;i<nc-1;i++){cars[i].x=1900;cars[i].y=1900;streetDrivers[i].live=0;}
@@ -244,7 +257,7 @@ int main(void){
   assert(job.kind<0||job.step==gate+1);
  }
  assert(job.kind<0&&sv.cash==paid+205&&p.heat==0);
- assert(sv.charges&&sv.restitution==1);sv.charges=sv.restitution=0;
+ assert(sv.charges&&sv.restitution==1);revenue_close_case();
  p.car=-1;beginJob(1);assert(taxi.phase==TAXI_WAIT&&job.kind==1);
  p.car=0;cars[0]=(Car){job.xs[0],job.ys[0],0,100,0,1,100};p.x=cars[0].x;p.y=cars[0].y;
  taxi_tick(1.f/60);assert(taxi.phase==TAXI_WAIT&&job.step==0);
@@ -288,7 +301,7 @@ int main(void){
  walk(0,20);frame("build/rear-account.ppm");counter();assert(menu==19);
  press(ESC);interior_x=W/2;interior_y=418;press(USE);assert(scene==3&&!interior_subroom);leave();
  /* HUD: the health bar and the two balances must never share a row. */
- sv.cash=12345678;sv.dirty=23456789;sv.charges=1;sv.restitution=2;paint();
+ sv.cash=12345678;sv.dirty=23456789;revenue_open_case();sv.restitution=2;paint();
  int green=0,red=0,blue=0;
  for(int y=15;y<150;y++)for(int x=675;x<944;x++){
    U c=pixels[y*W+x];if(c==CASH_GREEN&&y<37)green++;if(c==CASH_RED&&y>=39&&y<64)red++;if(c==0x6ea7ee){assert(y>=70&&y<76);blue++;}
@@ -326,31 +339,31 @@ int main(void){
  request_save();assert(savehash()==sv.hash&&saveFlash>0);
 
  /* Recovery requires a roadside restart and a stopped handoff in the same van. */
- init_city();scene=1;sv.intro=4;sv.charges=1;sv.restitution=2;
+ init_city();scene=1;sv.intro=4;revenue_open_case();sv.restitution=2;
  visit(10);counter();press(ENTER);assert(job.kind==JOB_RECOVERY);leave();
  int van=jobRide;assert(van==nc-1&&cars[van].cond==0);
  paint();assert(navGoalKind==4&&navGoal.x==(int)cars[van].x);
  move_to(job.xs[0]-25,job.ys[0]);press(ENTER);assert(p.car<0&&job.step==0);
  press(USE);assert(job.step==1&&cars[van].cond==65);
- press(ENTER);assert(p.car==van);
+ press(USE);assert(p.car==van);
  move_to(job.xs[1],job.ys[1]);assert(job.step==1&&sv.cash==0);
  cars[van].s=20;press(USE);assert(job.step==1&&p.car==van&&sv.cash==0);
  cars[van].s=0;
- press(USE);assert(job.kind<0&&p.car<0&&sv.cash==160&&!sv.charges&&cars[van].cond==0);
+ press(USE);assert(job.kind<0&&p.car<0&&sv.cash==0&&!sv.charges&&!sv.restitution&&cars[van].cond==0&&!strcmp(notice,"Restitution cleared. Final service shift paid $0. Future shifts pay again."));
 
  /* Only keying the assigned Vectra can start the delivery leg. */
  init_city();scene=1;sv.intro=4;sv.owned=1;cars[0].cond=100;
  visit(1);counter();press(DOWN);press(ENTER);assert(job.kind==JOB_HOT);leave();
  int target=jobRide;
  paint();assert(navGoalKind==4&&navGoal.x==(int)cars[target].x);
- move_to(cars[1].x,cars[1].y+25);press(ENTER);
+ approach_car(1);press(USE);
  assert(p.car==1&&job.step==0);press(USE);assert(p.car<0);
- move_to(cars[target].x-25,cars[target].y);press(ENTER);
+ approach_car(target);press(USE);
  assert(job.step==1&&p.car==target&&job_vehicle_target()<0&&p.heat>=70);
  move_to(job.xs[1],job.ys[1]);press(USE);assert(job.step==1&&sv.dirty==0);
  p.heat=0;press(USE);assert(job.kind<0&&p.car<0&&sv.dirty==270);
  beginJob(JOB_HOT);target=jobRide;
- move_to(cars[target].x-25,cars[target].y);press(ENTER);assert(job.step==1);
+ approach_car(target);press(USE);assert(job.step==1);
  cars[target].cond=0;cars[target].s=30.f;tick(0);
  assert(job.kind<0&&p.car<0&&cars[target].s==0&&street_foot_clear(p.x,p.y,-1));
  p.car=0;cars[0].s=50.f;p.hit=0.f;p.hp=1;health(10);

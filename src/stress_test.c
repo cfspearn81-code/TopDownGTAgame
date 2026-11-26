@@ -11,7 +11,7 @@ static void assert_state(void){
  assert(scene>=0&&scene<=5&&nc>=1&&nc<=LEN(cars)&&nb<=LEN(buildings));assert(p.hp>=0&&p.hp<=100);
  assert(p.car>=-1&&p.car<nc&&p.x>=35&&p.x<=ROOM-36&&p.y>=35&&p.y<=ROOM-36);
  assert(isfinite(p.heat)&&p.heat>=0&&p.heat<=300);
- assert(sv.cash>=0&&sv.dirty>=0&&sv.units>=0&&sv.armor>=0&&sv.armor<=90);
+ assert(valid_sweep_save()&&sv.bank>=0&&sv.cash>=0&&sv.dirty>=0&&sv.units>=0&&sv.armor>=0&&sv.armor<=90);
  if(job.kind>=0){assert(job.kind<LEN(jobNames)&&job.total>0&&job.total<=6&&job.step>=0&&job.step<job.total&&isfinite(job.time));}
  for(int i=0;i<2;i++)assert(isfinite(sv.b[i].timer)&&sv.b[i].timer>=0&&sv.b[i].timer<=120);
  for(int i=0;i<nc;i++)assert(isfinite(cars[i].x)&&isfinite(cars[i].y)&&isfinite(cars[i].s)&&cars[i].cond>=0&&cars[i].cond<=100);

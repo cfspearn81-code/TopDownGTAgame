@@ -1,3 +1,94 @@
+EASY ENTRY
+
+- Press E to get into or out of cars. Enter still confirms menu choices
+  and boards trams; it no longer boards cars. Job actions, doors and
+  ATMs use E as before and keep priority.
+- Includes the full Lantern Fix update. No save-format change.
+
+MIDNIGHT CLOCK: LANTERN FIX
+
+- The Lantern operator tends only pots that are part of the current
+  batch. The animations no longer target empty, locked pots.
+- Removed the Lantern distributor. Existing hires become operators and
+  new harvests go to storage. Cinder's distributor is unchanged.
+- Players and NPCs are smaller on the map and move more slowly on
+  foot. Vehicle speeds are unchanged from Speed Tune.
+- Keeps the rest of Midnight Clock. No save-format change.
+
+MIDNIGHT CLOCK: SPEED TUNE
+
+- Each full-health car now tops out at the same forward speed it had at
+  10 condition in Midnight Clock. Damage still slows it down.
+- The 24-minute clock, Ivo's clear booth and Lantern's working operator
+  are all included. No save-format change.
+
+MIDNIGHT CLOCK
+
+- A new top-left clock shows the 24-minute game day as 00:00 to 23:59.
+  Dirty spending resets at midnight. The five-minute seizure countdown
+  stays separate.
+- Ivo Slate stands clear of the couch at Vault 39.
+- Lantern's hired operator tends batches in the back room and handles
+  boxes. The visible stockpile changes as stored inventory changes.
+
+REVENUE DEADLINE
+
+- An open Revenue case seizes all clean and dirty cash carried on hand
+  every five minutes of active play. Money deposited at an ATM is safe.
+- The first $500-rule seizure still affects dirty funds only. The repeat
+  timer starts when the case opens and stops once the fine is paid or
+  community service is complete. It survives saving and reopening.
+
+REVENUE & BANKING
+
+- The first time successful dirty spending exceeds $500 in an in-game
+  day, Revenue seizes leftover dirty cash and unclaimed dirty settlements.
+  Exactly $500 and high balances are safe; only dirty checkout portions
+  count. The day is eight active minutes.
+- Deposit or withdraw clean cash at three map-pinnable ATMs. The shared
+  bank balance remains safe from seizure.
+- A centered, gently shaking Assets Seized warning directs players to
+  Revenue Annex. Low FX removes shaking without removing the warning.
+- Older careers migrate to Rev8. Faster cars and custom rooms carry forward.
+
+FAST LANE
+
+- Cars accelerate more quickly and all five healthy models outrun the
+  sprint. Damage still slows cars down. Reverse is deliberately slower,
+  steering is firmer at speed, and collision checks use shorter steps.
+- Courier and recovery assignments used as Revenue community service pay
+  $0. Completing three clears the case and later regular work pays again.
+  A shift marked unpaid stays unpaid even if the fine is paid mid-shift.
+- Carries forward the Inside Port Vanta interiors and all career files.
+
+INSIDE PORT VANTA
+
+- Rebuilt interiors for 78 enterable buildings and four rear rooms with
+  layouts and props chosen for the business or home. The cinema has
+  seating and projection, the aquarium has banks of lit tanks, and the
+  tram halls have a proper platform and track. Police HQ, the showroom,
+  clinic, and apartment have their own furniture and architectural cues.
+- Ordinary street addresses have distinct set dressing and a visitor
+  plaque. Press E near the plaque for a short local detail; it is optional
+  and separate from the service station and exit.
+- Career files, counters, contracts, tram fare and building exits carry
+  forward. This is the full offline Windows game, not an add-on patch.
+
+CITY POLISH
+
+- Parked cars and wrecks now block attacks and prevent boarding straight
+  through intervening vehicle bodies. Shot tracers stop on contact.
+- Cars have brake/reverse lights and short-lived handbrake marks. Restoring
+  a save made in a vehicle puts the player on clear nearby footing.
+- The first paycheck routes to Nightglass. A lost licensed job car gets a
+  playable backup or a clear failure rather than a stuck checkpoint. Repeat
+  taxi fares track the correct ride. Active audits freeze dirty spending.
+- The driving radar previews the next turn; free roam names the district.
+  Long notices, help text and storefront headings fit their panels.
+- Simultaneous writes use separate staging files, and new careers never
+  replace a slot another running copy has just created. Rev7 is unchanged.
+  For one existing career played in two copies, the last successful save wins.
+
 CITY RHYTHM
 
 - Trunks block people and cars. Park plantings leave the paths clear.
