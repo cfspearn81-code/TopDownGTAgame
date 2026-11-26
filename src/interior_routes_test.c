@@ -318,6 +318,9 @@ int main(int argc,char**argv){
   if(buildings[i].w<=0||buildings[i].h<=0)continue;
   if(zone_is_building(i)){ck(zone_idx[zone_id[i]-1]==i,"named building entrance mapping invalid");continue;}
   ck(ordinaryDoorY[i]>0,"physical building lacks a street entrance");
+  /* The direct club has a dedicated native path in scripts/qa/base_club_walk.c.
+     This archived interior gallery remains the original 63 shop floorplans. */
+  if(i==ncFrontId)continue;
 #ifdef DC_STREET_ADDRESS_PLAQUES
   ck(wiPlaque[i]&&*wiPlaque[i]&&wiAddress[i].feature&&*wiAddress[i].feature,"address missing a custom plaque or installation title");
   for(int j=0;j<i;j++)if(ordinaryDoorY[j]){

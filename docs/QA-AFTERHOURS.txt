@@ -1,0 +1,52 @@
+PORT VANTA AFTERHOURS | RELEASE VERIFICATION
+
+Baseline upstream: dc3f2e6f6ca6ac50586c95994e76afce0f69fecb (Port Vanta Sessions).
+This document distinguishes native Linux automated play from a physical PC.
+
+NATIVE LINUX X86-64
+- The native ELF has SHA-256
+  1d43c77878eb2cf68850bf9b576dc07278d11f7fe871348c820887f9dd1ed23a.
+  Direct dynamic dependencies: libSDL2-2.0.so.0 and libc.so.6.
+  Highest GLIBC symbol requirement: GLIBC_2.34.
+- Stock 3,664-frame courier and taxi tour matches the original explicit
+  save digest a6727845. Linux mouse, 1300×790 letterbox, atlas, focus,
+  text/Backspace, save slot deletion and clean quit checks passed.
+- Disposable Rev2–10 careers migrated with the original wallet, timers,
+  audit state, ledger and checksums intact. Rev10 stays 304 bytes until
+  extended features need saving. Rev11 round-trips the new per-career
+  state in 1,044 bytes and does not mutate a different legacy or corrupt
+  slot. The hidden prior-format backup preserves its original bytes.
+- Native SDL P/F7 rebind and station selection survived a process restart.
+  The packaged ELF was exercised with virtual SDL display/audio rather
+  than physical-monitor or hardware-audio testing.
+
+CROSS-FEATURE PLAYTEST
+- On a funded disposable career, keyboard controls leased the loft,
+  queued a matching field-grade Halo Moss set, transferred three packs,
+  accepted the right Signal order, bought the garage and fitted street
+  tune to a registered Mote. With actual driving/braking in rain at
+  night, the player delivered two packs, reserved an arcade till token,
+  collected box-office proceeds, installed prism mirrors and reloaded
+  all those outcomes. The fixture starts near entrances/a clear road;
+  this is not a blind from-zero-money journey across the full city.
+- Sanitizer checks passed the cross-feature playtest and the world/
+  storage regression. Separate controls tests cover club purchase,
+  staffing, DJ, matching VIP orders, premium stock, repeat settlements
+  and collect-once; garage preview, salvage and three race classes;
+  all Signal apps, grades, repeat payouts and rebinding; and aquarium,
+  private shelves, rest, cart, cosmetic mount and soda fade.
+- The Seawall centerline was checked against the original collision hull.
+  World checks verified rain/fog, actual wet braking/grip and walking,
+  day/night framebuffer differences, and a time-limited clear sky.
+- Real keyboard corner and independent camera tests verified pullback,
+  modest frame rotation, coast/brake recovery, and unchanged motion
+  when Low FX disables the world transform. Wallet, driving dash, radar
+  and offscreen objective markers remain readable in screen space.
+- No third-party music is streamed. Synthesis is original; hardware
+  playback depends on SDL2 reporting a working audio output.
+
+Known limits: local x86-64 package, not a Linux distribution or physical
+desktop certification; the engine remains top-down and the existing
+map boundaries stay in place. New routes/conditions use that city. Game
+economies, marked credits, races and collectibles are fictional. Scan
+and comparison do not certify every possible imported career or locale.

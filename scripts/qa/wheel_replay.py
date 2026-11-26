@@ -4,8 +4,8 @@ import os,struct,subprocess as sp,tempfile
 from itertools import groupby
 from pathlib import Path
 r=Path(__file__).resolve().parents[2]
-wheel=524288
-patch=1048576
+wheel=16777216
+patch=33554432
 def run(args,**kw):
  try:return sp.run(args,check=True,timeout=100,**kw)
  except sp.CalledProcessError as e:

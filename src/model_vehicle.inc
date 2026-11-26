@@ -74,7 +74,7 @@ static void model_car_bake(void){
 static int model_car_fixed(float value){
  return (int)(value*MODEL_CAR_UNIT+(value>=0?.5f:-.5f));
 }
-static void carbody(Car*c,int x,int y){
+static void model_car_stock(Car*c,int x,int y){
  float ca=cs(c->a),sa=sn(c->a),ac=absf(ca),as=absf(sa);
  int hx=(int)(17*ac+10*as)+1,hy=(int)(17*as+10*ac)+1;
  if(x+hx+3<clipLeft||x-hx>=clipRight||y+hy+5<clipTop||y-hy-18>=clipBottom)return;

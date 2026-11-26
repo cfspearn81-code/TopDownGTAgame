@@ -1,0 +1,87 @@
+DEAD CHANNEL  /  PORT VANTA OUTER LOOP
+
+START ON LINUX
+Extract this archive, open a terminal in the extracted folder, and run:
+  ./Dead-Channel/DeadChannel
+If the terminal is already inside Dead-Channel, run ./DeadChannel.
+You need an x86-64 Linux computer (glibc 2.34+) and SDL2 runtime providing
+libSDL2-2.0.so.0. No Wine, installer, account or network is needed for play.
+Optional YouTube Music opens separately only if you confirm.
+
+SAVE SAFETY
+Use your existing save folder, normally ~/.local/share/DeadChannel or
+$XDG_DATA_HOME/DeadChannel if XDG_DATA_HOME is set to an absolute path.
+Close any older Dead Channel build and back up that folder before trying
+the new release. Rev2-10 and Afterhours Rev11 are all readable. Initial
+upgrades keep a one-time hidden byte-for-byte prior-format backup beside
+the source slot. An older edition only sees a safe legacy intersection
+for a career saved out on the new road. Current-version features should
+be played and resumed on Outer Loop. Only one local instance can write
+to the active folder.
+
+FIND THE NEW ROADS
+M opens the original atlas; F8 shows the complete Outer Loop atlas.
+Once you're on the new roads the atlas opens on the larger view. Click
+any landmark diamond or road to pin it. Purple directions respect the
+highway closure and route around the Belt Workshops loop. You can drive
+directly into the new area without a cutscene or interactive portal:
+  GLASS BLUFF: follow the eastbound original road at y=512.
+  FREIGHT PARKWAY: follow the wide eastbound road at y=1024.
+  HARBOR PIER: follow the eastbound road at y=1792; then curve south.
+  SALT REACH and WINDMILL CURVE: continue along the southbound streets
+  at x=1792 or x=1024, across the old Seawall Road.
+Original addresses and compass directions are unchanged. Freight
+Parkway is shut 06:00–07:59 and 16:00–17:59 game time. Follow the
+workshop detour if you hit the amber barricades.
+
+DRIVE AND BUILD
+E boards/exits. C switches between the usual overhead camera and a
+saved, optional behind-car 3D chase view. F2 reduces world effects and
+returns to overhead without erasing your chosen chase preference.
+The chase follows behind with lag through bends and pulls away under
+acceleration. Braking in rain really takes longer; reflectors and the
+map remain useful when fog limits visibility. Daytime freight traffic
+uses the same real roads and detour. Nighttime meet venues rotate.
+Use the Nightglass Motors desk and choose Afterhours / Motor Works.
+See MOTOR-WORKS.txt for your deed, preview controls, meets, rivals,
+races, prizes, speakers and the parts-call intake.
+
+THE AFTERIMAGE
+In this newer Base Village edition, Signal > Night Wire pins The
+Afterimage’s direct E entrance, due west of Apartment 4. The older
+Shadow Stage foyer remains an alternate entrance. Walk left for the office, right for
+three interactive VIP booths, or up for the floor, bar and stage. The
+owner can set covers, choose a record, book performers, employ staff,
+stock drinks and upgrade the interior. Check the ledger for actual
+turnout, income and costs. All three VIP booths also offer a separate
+optional, fully clothed private cabaret booking ($25 with confirmation);
+Escape or an on-screen button ends the scene. See THE-AFTERIMAGE.txt.
+
+PHONE, ENTERPRISE AND AUDIO
+P opens Signal. Change it to F7 in Settings. Inbox has real local
+requests; Quest log tracks originals and grade-specific batches. Night
+Wire posts active events, meet sites, closures, short-term popups and
+Night Signal Van clues. Lantern Glow Loft and the graded satchel are
+shared across stocking, jobs and VIP. See SIGNAL-PHONE.txt.
+Radio has three original offline district stations. The car stereo can
+play them in the cabin; installed sub racks change the sound, and a
+parked upgraded car plays a softer mix nearby. The separate YouTube
+Music row opens the official site in your browser only after explicit
+confirmation. Browser audio is not captured or remixed through the game.
+
+AQUARIUM, PENTHOUSE, CONSUMABLES AND PULSE KIT
+Enter at an aquarium reception to start Glass Relay. Restore the
+linked exhibits, reopen the blocked wing, then walk through the
+promenade and view the finished galleries.
+At Apartment 4 or owned Breakwater, Enter opens the loft. Lease and
+renovate the Glass Crown penthouse after acquiring Breakwater. Keep
+exact strain/grade lots in the locker, mount your current Pulse
+loadout in the display and rest or wait out a storm. Refreshments
+offer distinct fictional audiovisual and movement effects, combinations,
+tolerance and gentle fade; use the on-screen menu at the residence.
+Night Signal Van rotates across four surveyed lanes and underpasses
+between 19:00 and 04:59. Pin the current stop in Signal. E opens
+its catalogue on foot. An Armory license unlocks the arcade Pulse
+frames, color/style attachments and specialized charge cells. L
+reloads the selected cell on foot; the HUD displays active charge
+and reserve. See GLASS-RELAY-AND-LOFT.txt for controls and items.

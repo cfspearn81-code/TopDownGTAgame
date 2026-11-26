@@ -24,8 +24,22 @@ F(int,PatBlt,Handle,int,int,int,int,U);
 F(int,StretchDIBits,Handle,int,int,int,int,int,int,int,int,const void*,const Bitmap*,U,U);
 F(Handle,LoadLibraryExW,const U16*,Handle,U);
 F(void*,GetProcAddress,Handle,const char*);
-static void radio_audio(int track){
- if(!track)return;
+static int phone_browse(void){
+ typedef Handle (*Open)(Handle,const U16*,const U16*,const U16*,const U16*,int);
+ static Open f;static int loaded;
+ if(!loaded){
+  loaded=1;Handle shell=__imp_LoadLibraryExW(L"shell32.dll",0,0x800);
+  if(shell)f=(Open)__imp_GetProcAddress(shell,"ShellExecuteW");
+ }
+ return f&&(U64)f(0,L"open",L"https://music.youtube.com/",0,0,1)>32;
+}
+static void radio_audio(int oneShot,int station,U64 now){
+ static int active;static U64 transientUntil;
+ int track=oneShot?oneShot:station;
+ if(!track&&!active)return;
+ if(!oneShot&&(transientUntil>now||track==active))return;
+ if(oneShot)transientUntil=now+3500;
+ active=track;
  typedef int (*PlayFn)(const void*,Handle,U);
  static int resolved;static PlayFn play;
  if(!resolved){
@@ -33,7 +47,11 @@ static void radio_audio(int track){
   Handle lib=__imp_LoadLibraryExW(L"winmm.dll",0,0x800);
   if(lib)play=(PlayFn)__imp_GetProcAddress(lib,"PlaySoundW");
  }
- if(play){const RadioWave *w=rm_record(track);if(w)play(w,0,7); /* SND_MEMORY | ASYNC | NODEFAULT */}
+ if(play){
+  if(!track){play(0,0,0);return;}
+  const RadioWave *w=rm_record(track);
+  if(w)play(w,0,oneShot?7:15); /* memory | async | nodefault | optional loop */
+ }
 }
 static U16 savePath[1024];static unsigned directoryEnd,stageSequence;
 static unsigned add(U16*d,unsigned pos,const U16*s){while(*s)d[pos++]=*s++;d[pos]=0;return pos;}
@@ -146,7 +164,7 @@ static int key(int v){return (__imp_GetAsyncKeyState(v)&0x8000)!=0;}
 static U input(void){U r=0;
  if(key('W')||key(0x26))r|=UP;if(key('S')||key(0x28))r|=DOWN;if(key('A')||key(0x25))r|=LEFT;if(key('D')||key(0x27))r|=RIGHT;
  if(key('E'))r|=USE;if(key(0x20))r|=FIRE;if(key(0x10))r|=BRAKE;if(key(0x1b))r|=ESC;if(key('M'))r|=MAP;
- if(key(0x2e))r|=DELETE_SLOT;if(key(0x74))r|=SAVE;if(key(0x75))r|=ACTIVITIES;if(key(0x0d))r|=ENTER;if(key(0x70))r|=HELP;if(key(0x71))r|=GFX;if(key(0x72))r|=SLOT;if(key(0x73))r|=NEW_SLOT;if(key('X'))r|=PUNCH;if(key('T'))r|=TAXI_NEXT;if(key(0x09))r|=WHEEL;if(key('V'))r|=USE_PATCH;return r;
+ if(key(0x2e))r|=DELETE_SLOT;if(key(0x74))r|=SAVE;if(key(0x75))r|=ACTIVITIES;if(key(0x76))r|=PHONE_ALT;if(key('P'))r|=PHONE;if(key('C'))r|=CAMERA;if(key('L'))r|=LOADOUT;if(key(0x77))r|=ATLAS_WORLD;if(key(0x0d))r|=ENTER;if(key(0x70))r|=HELP;if(key(0x71))r|=GFX;if(key(0x72))r|=SLOT;if(key(0x73))r|=NEW_SLOT;if(key('X'))r|=PUNCH;if(key('T'))r|=TAXI_NEXT;if(key(0x09))r|=WHEEL;if(key('V'))r|=USE_PATCH;return r;
 }
 static Bitmap dib={40,W,-H,1,32,0,0,0,0,0,0,0};
 void entry(void){
@@ -154,7 +172,7 @@ void entry(void){
  static const U16 cls[]=L"DeadChannelNative11";
  Class k={sizeof(Class),0x23,wnd,0,0,instance,0,__imp_LoadCursorW(0,(void*)32512),0,0,cls,0};
  if(!__imp_RegisterClassExW(&k)){__imp_ExitProcess(1);return;}
- Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Conversation Hold Hotfix",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
+ Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Port Vanta Crossroads",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
  if(!win){__imp_ExitProcess(2);return;}
  directories();set_session_seed((U)__imp_GetTickCount64());init_city();__imp_ShowWindow(win,1);
  U64 t=__imp_GetTickCount64(); unsigned acc=0;int wasFocused=1,lastW=0,lastH=0;U focusBlocked=0;
@@ -166,7 +184,7 @@ void entry(void){
   while(acc>=1000){if(focus){U down=input();focusBlocked&=down;tick(down&~focusBlocked);}acc-=1000;update=1;}
   if((update&&focus)||redraw){redraw=0;Rect r;if(__imp_GetClientRect(win,&r)&&r.r>0&&r.b>0){
    View v=framebuffer(r);int sw=v.w,sh=v.h;
-   if(sw>0&&sh>0){radio_audio(take_radio_record());paint();Handle dc=__imp_GetDC(win);
+   if(sw>0&&sh>0){if(take_phone_link())phone_link_result(phone_browse());radio_audio(take_radio_record(),night_music_track(),now);paint();Handle dc=__imp_GetDC(win);
     if(dc){
       if(barsDirty||r.r!=lastW||r.b!=lastH){letterbox_bars(dc,r,v);barsDirty=0;}
       __imp_StretchDIBits(dc,v.x,v.y,sw,sh,0,0,W,H,pixels,&dib,0,0x00cc0020);__imp_ReleaseDC(win,dc);

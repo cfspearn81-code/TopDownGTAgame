@@ -1,3 +1,91 @@
+# Dead Channel | Port Vanta Crossroads
+
+Integrated from published main `6e45643551538dcfcde018035619352c17ba0729`
+and the previously tested Base Village / Outer Loop gameplay line.
+
+- One source tree builds the native SDL2 ELF and Win64 PE. Linux executes
+  directly; Windows entry and renderer checks here use Linux with simulated
+  Win32, not a physical Windows or Wine installation.
+- Keep Vault 39 and The Afterimage separate, and preserve E priorities.
+  Tab/V are independent of Signal P/F7; F8 atlas, C chase and L reload
+  are unchanged. Upstream keeps its street NPC hold, compact pistol
+  pose and letterbox-only Windows fills.
+- Compact Rev11 (304 bytes) for upstream med patches and expanded Rev11
+  (1,044 bytes) are distinguished by precise length. Both retain their
+  checksum format. Raw byte 267 holds the validated meds count in both;
+  word 63 in the expanded garage block marks the first combined write.
+  Expanded world coordinates remain in the old words with a legacy
+  curb anchor in the prefix. See docs/CROSSROADS.txt.
+- Run the tests in docs/CROSSROADS.txt before updating either download.
+  `scripts/package-crossroads.py` appends both fixed filenames and
+  checksums under downloads/ without replacing historic builds.
+
+---
+
+# Dead Channel | Base Village handoff
+
+Local Linux update from the exact previously delivered Outer Loop
+archive, SHA-256 6190500b792213c54ba1d71d602c51e1fada33c077b565749d10392a33375802.
+No upstream repo writes were made. Existing controls, conditions and
+save snapshots are in [Base Village](docs/BASE-VILLAGE.txt) and
+[release QA](docs/QA-BASE-VILLAGE.txt).
+
+---
+
+Prior Outer Loop notes follow.
+
+# Dead Channel | Port Vanta Outer Loop handoff
+
+This complete feature build follows the verified Afterhours Linux
+archive (SHA-256 e2c55a43c38e23812c55619efbdeb169628157169b342942fadb6919d82be845)
+and its original upstream base dc3f2e6. Local archive only.
+
+- The old city RNG/tile layout is fixed at BASE_ROOM=2048 with a 3072
+  world stride. Outer ribbons, collision, lights and graph routing
+  live in outer_city.inc, outer_navigation.inc, outer_life.inc.
+  Gateways link the world with no scene switch.
+- A saved extension location is encoded at world[6..7]; bit 31 in
+  the raw world[6] tags the Outer Loop family. Rev11 stays 1044 bytes
+  and the old prefix contains a valid original-city fallback position
+  when the exact position lies outside. Linux keeps a one-time
+  predecessor backup for both classic and old Afterhours files.
+  All prior save formats remain readable; empty extensions retain
+  byte-compatible Rev10.
+- The optional real chase transform does not change physics. Input C
+  is remembered; F2 keeps the old overhead fallback. P/F7 for Signal;
+  L for loaded Pulse tools; F8 for the larger atlas.
+- The only network-capable intent delegates to the desktop browser
+  for the exact official YouTube Music URL, only after confirmation.
+  There is no in-game YouTube network traffic or audio extraction.
+- [Feature matrix](docs/COMPLETION-REVIEW.txt) and [QA](docs/QA-OUTER-LOOP.txt)
+  list behavior tested and deployment limits.
+
+---
+
+Prior Afterhours notes follow.
+
+# Dead Channel | Port Vanta Afterhours handoff
+
+Local Linux x86-64 update based on Port Vanta Sessions
+(`dc3f2e6f6ca6ac50586c95994e76afce0f69fecb`). No GitHub publication.
+
+- Shared new modules sit in `src/night_*.inc`, included by `src/game.c`.
+- Legacy Rev2–10 saves still load. Rev11 extends the legacy 304-byte
+  prefix to one 1,044-byte checksummed write. Linux preserves the previous-format
+  source as a hidden checksum-named backup before that first write. The appended 736 bytes are
+  isolated into club, garage, phone and world chunks. Empty extension
+  state keeps the legacy Rev10 encoder. Read/scan keeps extension data
+  private to the selected career. Real saves never enter the QA suites.
+- The Linux executable serializes live sessions per save directory and
+  reports quit-save errors. Do not open an older build with the same
+  directory at the same time.
+- Native input, render, audio and save details are in the platform source;
+  [Afterhours QA](docs/QA-AFTERHOURS.txt) records checks actually run.
+
+---
+
+Historical Port Vanta Sessions handoff follows.
+
 # Dead Channel | Project handoff
 
 ## Current release: Conversation Hold Hotfix

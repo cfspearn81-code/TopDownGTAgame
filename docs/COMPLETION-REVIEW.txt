@@ -1,0 +1,93 @@
+OUTER LOOP | FEATURE-BY-FEATURE RELEASE REVIEW
+
+This is one integrated update of the original native game, not a new
+installer or a new engine. Default play is still top-down. All
+economies, supplies, apparatus and weapons below are game mechanics.
+
+1 | The Afterimage is enterable from its existing street address, with
+a stage, animated dancers and patrons, three separately playable
+booths, original music, staff/security and office. Buy the venue;
+set covers, acts, staff, drinks and visible decor; music, reputation,
+cleanliness, service and incidents alter each 45-second settlement.
+The ledger breaks out drinks, door, staffing, side income and
+grade-A stock. Marked-credit conversion and exact typed booth
+orders consume their own inputs; normal scenes and portraits
+are rendered non-explicitly. An optional, fully clothed VIP lap-dance
+vignette is available through a separate paid, confirmed request at
+each booth and can be ended early.
+
+2 | Five modeled car silhouettes have new bodywork, taillights,
+paint/material finish. Motor Works sells one deed, holds distinct
+mods for each registered model, previews charge/handling and the
+360-degree build orbit without committing, and exposes zoom. C is
+an actual behind-car software perspective with visible side/rear,
+chase lag in turns and pullback/ease-in. The original overhead view
+and lower-FX path are still available. Original-playing stereo levels
+distinguish cabin/bass and outside sound; installed trunk subs are visible.
+A timed Parts Call invites the player to bring a specific fictional NPC
+vehicle to the garage intake, then choose the abstract salvage activity
+or register the car. A Wrecker Yard alternate is also allowed.
+
+3 | Signal opens on P by default, can be rebound to F7 and saves the
+choice per career. Quest log accepts, tracks and resumes real requests.
+Night Wire announces open/closed or timed market, show, meet/race,
+van and closure events rather than only static lore. The external
+music row requires confirmation and targets https://music.youtube.com/
+only. No supported audio-only stereo embed was verified; Google's
+YouTube player docs rule out separating/audio-only background stereo
+playback. The browser path is external, while three distinct original
+in-game stations run offline.
+
+4 | Customers order exact fictional strains and grades. The purchasable
+Lantern Glow Loft ties typed lots to a timed cabinet with simulated
+lighting, hydro and ventilation upgrades and a power budget. Finishing,
+shelf/satchel, typed prices, staged handoff and VIP use the same grade.
+Separate area heat sees repeated/valuable trades and pursuit sightings.
+Higher pressure produces rival interruptions or police tails in-game;
+leave the area, wait/rest, switch car style/tag or buy a fictional SIM
+token through Signal. These are timed game multipliers/unlocks, not
+a realistic growing, production or concealment method.
+
+5 | Signed rotating night meets offer inspection, judged
+presentation, time trials and point-to-point/gated races across city,
+parkway, hills and harbor. Cash and spare-title classes use only game
+property. The player retains the driven car. Winners can put a rare
+prebuilt rival edition in their collection.
+
+6 | A fictional strain is consumed from the exact satchel lot, with
+a stylized smoking animation. A separate $5 virtual cocktail and
+fictional soda options apply different brief effects and synthesized
+cues. Combinations add their own tint/raster effects; tolerance cuts
+repeated duration, and the movement/color effect eases away.
+
+7 | The Armory license now also lets the player buy/equip arcade
+Pulse frames with stylized optics, suppressor-style/energy handling
+and extended capacity options. Distinct game damage/range/cadence
+and charge-cell variants replace simulation of real ballistics.
+Loaded/reserve ammo is visible on the HUD; the catalogue shows the
+equipped frame, mods and cell. An actual signed roadside Night Signal
+Van moves between four after-dark positions, while the older daytime
+store only sells cosmetic finishes. Signal pins the live street stop.
+
+8 | The real drivable city footprint extends from the untouched
+2048x2048 original into a 3072x3072 combined map. Wider parkway and
+harbor lanes, tight industrial corners, continuous hill curves and
+south bridges connect via physical terrain and surveyed navigation.
+No scripted teleport connects the areas. Nighttime lights and
+windows, rain, fog, wet street reflections, traffic reroutes,
+club queues and roadside meetups have actual time-based triggers.
+Handling, braking and walking adjust to wetness. Day/night, rain
+and wetness transition independently.
+
+9 | Glass Relay now includes animated species/art and four connected
+gallery tasks: spot the wrasse, restore lighting, release the ray
+and reopen Shoal Walk. The completed wing has a walkable promenade
+with direct viewpoints. The deed-gated Glass Crown adds a purchasable
+penthouse beyond the existing residences. Exact strain/grade locker,
+mounted customization snapshot and rest/weather skip are accessible
+and saved.
+
+QA | Inspect QA-OUTER-LOOP.txt for commands, native smoke results,
+headless inputs, physical route limitations and save migration.
+Only the native Linux archive is distributed here; no upstream
+repository was modified.

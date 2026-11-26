@@ -95,6 +95,7 @@ static void dispatch_reset(void){
 static void dispatch_tick(float dt){
  static const float speeds[]={63.f,86.f,110.f,124.f};
  const int wanted=(p.heat>15.f)+(p.heat>80.f)+(p.heat>150.f);
+ int wasSeen=dispatchSaw;
  dispatchSaw=0;dispatchCooldown-=dt;dispatchStrike-=dt;dispatchSightAge+=dt;
  if(wanted){
   if(!dispatchCase||dispatchQuiet>0.f){dispatchCase=1;dispatchWait=.82f;dispatchLevel=0;dispatchReported=dispatchLost=0;dispatchSightAge=99.f;dispatchCall=(DispatchPoint){p.x,p.y};}
@@ -136,6 +137,7 @@ static void dispatch_tick(float dt){
   }
  }
  if(dispatchSaw&&p.quiet<1.3f)p.quiet=1.3f;
+ if(dispatchSaw&&!wasSeen&&night_phone_heat_at((int)p.x,(int)p.y)>0)night_phone_heat_add((int)p.x,(int)p.y,4);
  if(dispatchReported&&!dispatchLost&&p.heat<=0&&dispatchQuiet<.06f){dispatchLost=1;tell("DISPATCH: no contact. Units returning to posts.");}
  for(int i=0;i<DISPATCH_UNITS;i++){
   DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;

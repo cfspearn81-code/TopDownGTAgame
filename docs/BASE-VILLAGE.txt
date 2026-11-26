@@ -1,0 +1,57 @@
+DEAD CHANNEL / BASE VILLAGE
+
+LINUX LAUNCH
+Extract the archive, then from the extracted directory run:
+  ./Dead-Channel/DeadChannel
+If you're already in Dead-Channel, run ./DeadChannel. It is native x86-64
+Linux for glibc 2.34+ with the SDL2 runtime (libSDL2-2.0.so.0); no Wine
+or installer. The title bar reads Dead Channel | Base Village on that edition and
+Dead Channel | Port Vanta Crossroads on the cumulative edition.
+
+THE AFTERIMAGE IN BASE VILLAGE
+At Apartment 4, walk to the teal exit and press E. Outside, hold A or
+Left straight along the sidewalk until the pink Afterimage marquee.
+Press E at its entrance: it takes you directly to the club. Admission
+is free and you do not have to start the courier job. You can also
+pin the entrance in the atlas (M) or from Signal > Night Wire.
+The old Shadow Stage is still a separate address. E visits its foyer;
+Enter there opens the same club and preserves your business state.
+
+TRAP HOUSE / BELL LANE
+Use Signal (P, or F7 if rebound) > Night Wire > Trap House to pin the
+signed side entrance southwest of Apartment 4. On foot, press Enter
+at the Trap House sign. Bell Lane Tailors has its own E entrance and
+still works separately. Buy the property for $480 clean cash. Build
+up to two tiers each of steel racks, storm shutters and dispatch
+relays. Store and retrieve exact stock grades; the relay unlocks rush
+commissions and improves payouts. Commission timers advance while
+exploring, and the property, upgrades and inventory save with the
+career. This is separate from Lantern Grow Loft.
+
+CLASSIC STREET LAMPS
+The rectangular lavender, amber and teal fixtures use the original
+Career Files style and lamp positions (source commit bd5d4e61).
+The newer Outer Loop roads use matching lamps, including the chase
+view. Night, wet-road reflections and fog are still active.
+
+VEHICLE HEALTH
+A full car can take 50% more collision damage before it is wrecked.
+The dashboard still reads 0–100 (showing partial points when needed).
+Nightglass service restores 100. Existing cars keep their condition;
+trips, steering and controls are unchanged.
+
+SAVE SAFETY
+Existing careers remain in ~/.local/share/DeadChannel or
+$XDG_DATA_HOME/DeadChannel (with an absolute XDG directory). Close
+older instances before launching. The layout stays Rev10 (304 bytes)
+or Rev11 (1,044 bytes) and prior slots remain readable. Existing
+pre-Outer-Loop and pre-Afterhours automatic backup rules are unchanged.
+Back up your files yourself before loading a saved Base Village career
+in an older game. New house upgrades belong in this edition.
+
+FEATURE GUIDES
+START-HERE.txt for the original keys; OUTER-LOOP.txt for the full road
+network and C chase camera; THE-AFTERIMAGE.txt for the club; MOTOR-WORKS.txt
+for upgrades and circuits; SIGNAL-PHONE.txt for the handset, and
+TRAP-HOUSE.txt for purchase, costs and controls. Read
+QA-BASE-VILLAGE.txt for checks run and limitations.

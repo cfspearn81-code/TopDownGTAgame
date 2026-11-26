@@ -11,9 +11,11 @@ enum{NAV_MAP_X=256,NAV_MAP_Y=50,NAV_MAP_SIZE=448,NAV_ATM_BASE=LEN(loc)+LEN(build
 typedef struct{int x,y;} NavPoint;
 typedef struct{int x,y,w,h,wx,wy,span;} NavView;
 typedef struct{NavPoint a,via;int axis,walk,bent;} NavAnchor;
-static NavPoint navCursor,navManual,navGoal,navOrigin,navCurb,navNodes[8];
+static NavPoint navCursor,navManual,navGoal,navOrigin,navCurb,navNodes[80];
 static int navHasManual,navGoalKind,navCount,navDist,navSelected=-1,navReady,navManualLoc=-1,navVenue=-1,navLeg,navSlot=-1,navHover,navKeyboard,navPointerX=-999,navPointerY=-999;
 static float navNext;
+static int outerAtlas;
+static int nav_span(void){return outerAtlas||outer_is_new(p.x,p.y)?ROOM:BASE_ROOM;}
 static int nav_abs(int x){return x<0?-x:x;}
 static int nav_dist(NavPoint a,NavPoint b){return nav_abs(a.x-b.x)+nav_abs(a.y-b.y);}
 static int nav_same(NavPoint a,NavPoint b){return a.x==b.x&&a.y==b.y;}
@@ -50,7 +52,7 @@ static int nav_anchors(NavPoint point,NavAnchor out[6]){
  return n;
 }
 static int nav_append(NavPoint route[8],int n,NavPoint q){if(!n||!nav_same(route[n-1],q))route[n++]=q;return n;}
-static void nav_solve(NavPoint from,NavPoint to){
+static void nav_solve_base(NavPoint from,NavPoint to){
  NavAnchor a[6],b[6];int na=nav_anchors(from,a),nb=nav_anchors(to,b),best=32000;
  navCount=0;navDist=0;
  // A clear approach along the same bit of street needs no artificial detour.
@@ -70,24 +72,30 @@ static void nav_solve(NavPoint from,NavPoint to){
   if(cost<best){best=cost;navDist=d;navCount=n;for(int k=0;k<n;k++)navNodes[k]=q[k];}
  }
 }
+#include "outer_navigation.inc"
 /* Nav state is session-only. A selected stop from one career must not
    leak into another career when the player changes slots. */
 static void nav_slot(void){
  if(navSlot==sideSlot)return;
- navSlot=sideSlot;navReady=navHasManual=navGoalKind=navCount=navLeg=0;
+ navSlot=sideSlot;outerAtlas=0;navReady=navHasManual=navGoalKind=navCount=navLeg=0;
  navSelected=navManualLoc=navVenue=-1;navHover=navKeyboard=0;
 }
 /* Named counters use the address-book index. Storefront pins carry the
  * physical building index after that range. */
 static int nav_atm(int id){return id>=NAV_ATM_BASE&&id<NAV_ATM_BASE+LEN(bankAtms)?id-NAV_ATM_BASE:-1;}
 #define NAV_OWN_CAR (NAV_ATM_BASE+LEN(bankAtms))
+#define NAV_OUT_BASE (NAV_OWN_CAR+1)
+#define NAV_TRAP (NAV_OUT_BASE+LEN(outerStops))
+static int nav_out_stop(int id){return id>=NAV_OUT_BASE&&id<NAV_OUT_BASE+LEN(outerStops)?id-NAV_OUT_BASE:-1;}
 static NavPoint nav_door(int i){
+ if(i==NAV_TRAP)return (NavPoint){NT_DOOR_X,NT_DOOR_Y};
+ int outer=nav_out_stop(i);if(outer>=0)return nav_outer_point(outerStops[outer].node);
  if(i==NAV_OWN_CAR)return(NavPoint){(int)cars[0].x,(int)cars[0].y};
  int k=nav_atm(i);if(k>=0)return (NavPoint){bankAtms[k].x,bankAtms[k].y+ATM_FRONT};
  if(i<LEN(loc))return (NavPoint){loc[i].x,loc[i].y};
  int shop=i-LEN(loc);return (NavPoint){ordinaryDoorX[shop],ordinaryDoorY[shop]};
 }
-static const char*nav_name(int i){if(i==NAV_OWN_CAR)return "YOUR REGISTERED CAR";int k=nav_atm(i);return k>=0?bankAtms[k].label:i<LEN(loc)?loc[i].label:walkin_name(i-LEN(loc));}
+static const char*nav_name(int i){if(i==NAV_TRAP)return "TRAP HOUSE / BELL LANE";int outer=nav_out_stop(i);if(outer>=0)return outerStops[outer].label;if(i==NAV_OWN_CAR)return "YOUR REGISTERED CAR";int k=nav_atm(i);return k>=0?bankAtms[k].label:i<LEN(loc)?loc[i].label:walkin_name(i-LEN(loc));}
 static NavPoint nav_job_goal(void){
  int ride=job_vehicle_target();
  if(ride>=0)return (NavPoint){(int)cars[ride].x,(int)cars[ride].y};
@@ -110,6 +118,8 @@ static int nav_objective(NavPoint *to,int *venue){
   return job_vehicle_target()>=0?4:2;
  }
  if(vdActive>=0){if(vdGoalX<0)return 0;*to=(NavPoint){vdGoalX,vdGoalY};return 5;}
+ if(night_phone_route(&to->x,&to->y))return 6;
+ if(ng_route_goal(&to->x,&to->y))return 7;
  int intro=nav_intro_venue();
  if(intro>=0){*venue=intro;*to=nav_door(intro);return 1;}
  return 0;
@@ -145,6 +155,7 @@ static void nav_update(void){
 static NavPoint nav_pin(void){
  if(navSelected>=0)return nav_door(navSelected);
  int x=nav_road(navCursor.x),y=nav_road(navCursor.y);
+ if(outer_is_new(navCursor.x,navCursor.y)&&outer_nearest(navCursor.x,navCursor.y,&x,&y,240)>=0)return(NavPoint){x,y};
  return nav_abs(x-navCursor.x)<=nav_abs(y-navCursor.y)?(NavPoint){x,navCursor.y}:(NavPoint){navCursor.x,y};
 }
 static void navigation_follow_job(void){navHasManual=0;navManualLoc=-1;navGoalKind=0;}
@@ -156,6 +167,7 @@ static void nav_set(void){
 }
 static void navigation_input(U tap){
  nav_slot();
+ if(tap&ATLAS_WORLD){outerAtlas=!outerAtlas;navHover=navKeyboard=0;navSelected=-1;return;}
  if(!navReady||(tap&MAP)){
   navReady=1;navHover=navKeyboard=0;navSelected=-1;navPointerX=navPointerY=-999;
  }
@@ -167,8 +179,12 @@ static void navigation_input(U tap){
  if(tap&FIRE){
   int k=nav_atm(navSelected);
   int n=k>=0?LEN(loc)+k:(navSelected<LEN(loc)?navSelected:-1);
-  n=(n+1)%(LEN(loc)+LEN(bankAtms));
-  navKeyboard=navHover=1;navSelected=n<LEN(loc)?n:NAV_ATM_BASE+n-LEN(loc);navCursor=nav_door(navSelected);
+  int outer=nav_out_stop(navSelected),base=LEN(loc)+LEN(bankAtms);
+  if(outer>=0)n=base+outer;
+  int count=base+(nav_span()==ROOM?LEN(outerStops):0);
+  if(navSelected==NAV_TRAP)n=count;
+  n=(n+1)%(count+1);
+  navKeyboard=navHover=1;navSelected=n<LEN(loc)?n:n<base?NAV_ATM_BASE+n-LEN(loc):n==count?NAV_TRAP:NAV_OUT_BASE+n-base;navCursor=nav_door(navSelected);
  }
  if(tap&(LEFT|RIGHT)){
   int dir=tap&RIGHT?1:-1;
@@ -184,28 +200,39 @@ static void navigation_pointer(int sx,int sy,U clicks){
  if(!clicks&&sx==navPointerX&&sy==navPointerY)return;
  navPointerX=sx;navPointerY=sy;navKeyboard=0;navHover=0;navSelected=-1;
  if(sx<NAV_MAP_X||sy<NAV_MAP_Y||sx>=NAV_MAP_X+NAV_MAP_SIZE||sy>=NAV_MAP_Y+NAV_MAP_SIZE)return;
- navCursor=(NavPoint){(sx-NAV_MAP_X)*ROOM/NAV_MAP_SIZE,(sy-NAV_MAP_Y)*ROOM/NAV_MAP_SIZE};
- if(navCursor.x<39||navCursor.y<39||navCursor.x>2008||navCursor.y>2008)return;
+ int span=nav_span();
+ navCursor=(NavPoint){(sx-NAV_MAP_X)*span/NAV_MAP_SIZE,(sy-NAV_MAP_Y)*span/NAV_MAP_SIZE};
+ if(navCursor.x<39||navCursor.y<39||navCursor.x>span-40||navCursor.y>span-40)return;
  navHover=1;
  int closest=11*11;
  for(int i=0;i<LEN(loc);i++){
-  int dx=sx-NAV_MAP_X-loc[i].x*NAV_MAP_SIZE/ROOM,dy=sy-NAV_MAP_Y-loc[i].y*NAV_MAP_SIZE/ROOM,d=dx*dx+dy*dy;
+  int dx=sx-NAV_MAP_X-loc[i].x*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-loc[i].y*NAV_MAP_SIZE/span,d=dx*dx+dy*dy;
   if(d<closest){navSelected=i;closest=d;}
  }
  for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){
   NavPoint door=nav_door(LEN(loc)+i);
-  int dx=sx-NAV_MAP_X-door.x*NAV_MAP_SIZE/ROOM,dy=sy-NAV_MAP_Y-door.y*NAV_MAP_SIZE/ROOM;
+  int dx=sx-NAV_MAP_X-door.x*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-door.y*NAV_MAP_SIZE/span;
   int d=dx*dx+dy*dy;
   if(d<closest&&d<=7*7){navSelected=LEN(loc)+i;closest=d;}
  }
  for(int i=0;i<LEN(bankAtms);i++){
   NavPoint a=nav_door(NAV_ATM_BASE+i);
-  int dx=sx-NAV_MAP_X-a.x*NAV_MAP_SIZE/ROOM,dy=sy-NAV_MAP_Y-a.y*NAV_MAP_SIZE/ROOM;
+  int dx=sx-NAV_MAP_X-a.x*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-a.y*NAV_MAP_SIZE/span;
   int d=dx*dx+dy*dy;if(d<closest&&d<=9*9){navSelected=NAV_ATM_BASE+i;closest=d;}
  }
  if(sv.owned&&p.car!=0){
-  NavPoint a=nav_door(NAV_OWN_CAR);int dx=sx-NAV_MAP_X-a.x*NAV_MAP_SIZE/ROOM,dy=sy-NAV_MAP_Y-a.y*NAV_MAP_SIZE/ROOM,d=dx*dx+dy*dy;
+  NavPoint a=nav_door(NAV_OWN_CAR);int dx=sx-NAV_MAP_X-a.x*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-a.y*NAV_MAP_SIZE/span,d=dx*dx+dy*dy;
   if(d<=8*8&&d<=closest)navSelected=NAV_OWN_CAR;
+ }
+ if(span==ROOM)for(int i=0;i<LEN(outerStops);i++){
+  NavPoint n=nav_outer_point(outerStops[i].node);
+  int dx=sx-NAV_MAP_X-n.x*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-n.y*NAV_MAP_SIZE/span,d=dx*dx+dy*dy;
+  if(d<closest&&d<=9*9){closest=d;navSelected=NAV_OUT_BASE+i;}
+ }
+ {int dx=sx-NAV_MAP_X-NT_DOOR_X*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-NT_DOOR_Y*NAV_MAP_SIZE/span;
+  int d=dx*dx+dy*dy;if(d<=6*6&&d<closest){closest=d;navSelected=NAV_TRAP;}}
+ if(outer_is_new(navCursor.x,navCursor.y)&&navSelected<0){
+  int x,y;if(outer_nearest(navCursor.x,navCursor.y,&x,&y,240)<0){navHover=0;return;}
  }
  if(clicks&1)nav_set();
 }
@@ -224,6 +251,7 @@ static U nav_district(int x,int y){
  if(y>1160)return x<900?0x263c36:0x31404a;
  return x<850?0x413736:x<1400?0x343a48:0x363b3e;
 }
+static void nav_seg(const NavView*,int,int,int,int,U);
 static void nav_terrain(const NavView*v,int large){
  rect(v->x,v->y,v->w,v->h,NAV_SEA);
  for(int j=0;j<v->h;j+=large?11:9){int a=v->y+j;nav_rect(v,v->x+(j%3)*5,a,v->w,1,0x182d40);}
@@ -253,6 +281,20 @@ static void nav_terrain(const NavView*v,int large){
   nav_land(v,a-16,39,32,1970,NAV_GRID);nav_land(v,39,a-16,1970,32,NAV_GRID);
   if(large)for(int z=102;z<1990;z+=33){
    if(z%256>38&&z%256<213){nav_land(v,a-2,z,4,12,0x97a3aa);nav_land(v,z,a-2,12,4,0x97a3aa);}
+  }
+ }
+ if(v->span==ROOM||v->wx+v->span>BASE_ROOM-36||v->wy+v->span>BASE_ROOM-36){
+  for(int i=0;i<LEN(outerRoads);i++){
+   const OuterRoad*r=outerRoads+i;NavPoint a=nav_outer_point(r->a),b=nav_outer_point(r->b);
+   U c=r->kind==OUT_HWY?0x9a866c:r->kind==OUT_DOCK?0x628c93:r->kind==OUT_HILL?0x84758a:0x7b8190;
+   int x=nav_x(v,a.x),y=nav_y(v,a.y),ux=nav_x(v,b.x),uy=nav_y(v,b.y);
+   int width=large?2:1;
+   for(int o=-width;o<=width;o++)nav_seg(v,x+o,y,ux+o,uy,c);
+   for(int o=-width;o<=width;o++)nav_seg(v,x,y+o,ux,uy+o,c);
+  }
+  for(int i=0;i<LEN(outerStops);i++){
+   NavPoint n=nav_outer_point(outerStops[i].node);int x=nav_x(v,n.x),y=nav_y(v,n.y);
+   if(x>=v->x+7&&x<=v->x+v->w-7&&y>=v->y+7&&y<=v->y+v->h-7){diamond(x,y,large?6:3,outerStops[i].tint);dot(x,y,PAPER);}
   }
  }
 }
@@ -376,6 +418,11 @@ static void nav_atm_icon(int x,int y,int large){
  box(x-7,y-7,15,15,NAV_INK,ATM_MINT);
  center(x,y-10,"$",ATM_MINT,0);
 }
+static void nav_club_icon(int x,int y,int large){
+ U glow=0xff9ed0;int r=large?8:4;
+ disc(x,y,r+1,0x251d30);diamond(x,y,r,glow);
+ line(x-2,y,x+2,y,glow);line(x,y-2,x,y+2,glow);dot(x,y,PAPER);
+}
 static void nav_overlay(const NavView*v,int large,const NavReadout*r){
  nav_terrain(v,large);
  if(large){
@@ -393,15 +440,36 @@ static void nav_overlay(const NavView*v,int large,const NavReadout*r){
   NavPoint a=nav_door(NAV_ATM_BASE+i);int x=nav_x(v,a.x),y=nav_y(v,a.y);
   if(nav_inside(v,x,y,large?8:4))nav_atm_icon(x,y,large);
  }
+ if(ncFrontId>=0){
+  int x=nav_x(v,ordinaryDoorX[ncFrontId]),y=nav_y(v,ordinaryDoorY[ncFrontId]);
+  if(nav_inside(v,x,y,large?10:5)){
+   nav_club_icon(x,y,large);
+   if(large&&x+105<v->x+v->w&&y+42<v->y+v->h)
+    textat(x+11,y+21,"STRIP CLUB",0xffadc9,0);
+  }
+ }
  if(sv.owned&&p.car!=0){
   int x=nav_x(v,(int)cars[0].x),y=nav_y(v,(int)cars[0].y);
   if(nav_inside(v,x,y,large?9:5)){box(x-6,y-3,13,7,0x16232c,0xa3f78f);rect(x-3,y-6,7,3,0xa3f78f);dot(x-3,y+4,PAPER);dot(x+3,y+4,PAPER);}
  }
+ if(large){
+  int x0=nav_x(v,60),x1=nav_x(v,1988),y=nav_y(v,1999);
+  if(nav_inside(v,x0,y,0)&&nav_inside(v,x1,y,0)){
+   line(x0,y,x1,y,0x427c82);
+   textat(x0+8,y-15,"SEAWALL ROAD",0x9dc6c6,0);
+  }
+ }
+ {int x=nav_x(v,NT_DOOR_X),y=nav_y(v,NT_DOOR_Y);if(nav_inside(v,x,y,large?8:5)){
+   U c=night_trap_owned()?0x8ae2bd:0xffbf7d;
+   box(x-3,y-2,7,6,NAV_INK,c);line(x-4,y-2,x,y-6,c);line(x,y-6,x+4,y-2,c);dot(x,y+2,c);
+ }}
  NavPoint objective={0,0};
  int realGoal=0;U color=LIME;
  if(job.kind>=0&&job.step>=0&&job.step<job.total){
   realGoal=1;objective=nav_job_goal();color=job_vehicle_target()>=0?GOLD:job.kind<4?TEAL:PINK;
  }else if(vdActive>=0){realGoal=vdGoalX>=0;objective=(NavPoint){vdGoalX,vdGoalY};color=TEAL;
+ }else if(night_phone_route(&objective.x,&objective.y)){realGoal=1;color=0xff9adb;
+ }else if(ng_route_goal(&objective.x,&objective.y)){realGoal=1;color=GOLD;
  }else{int intro=nav_intro_venue();if(intro>=0){realGoal=1;objective=nav_door(intro);}}
  if(realGoal){int x=nav_x(v,objective.x),y=nav_y(v,objective.y);
   if(nav_inside(v,x,y,large?12:8)){diamond(x,y,large?11:7,color);dot(x,y,color);}
@@ -486,17 +554,17 @@ static void minimap(void){
   box(x-4,y-4,w+8,h+30,NAV_INK,NAV_RIM);
   const NavView v={x,y,w,h,(int)p.x-span/2,(int)p.y-span*h/(2*w),span};
   nav_overlay(&v,0,&r);if(p.car>=0&&!atCurb)nav_bend_badge(&v,&r);box(x+5,y+4,22,21,NAV_INK,NAV_RIM);center(x+16,y+4,"N",PAPER,0);
-  if(navGoalKind){char*q=append(s,navGoalKind==3?"PIN ":navGoalKind==4?"RIDE ":navGoalKind==1?"CAREER ":navGoalKind==5?"LISTING ":"JOB ");
+  if(navGoalKind){char*q=append(s,navGoalKind==3?"PIN ":navGoalKind==4?"RIDE ":navGoalKind==1?"CAREER ":navGoalKind==5?"LISTING ":navGoalKind==6?"DELIVERY ":navGoalKind==7?"AFTERHOURS ":"JOB ");
    if(atCurb)append(q,"/ WALK");else if(navCount>=2)append(number(q,d)," m");else append(q,nav_dist(here,navGoal)<30?"HERE":"NO ROAD");
    textat(x+4,y+h+1,s,NAV_VIOLET,0);}
   else textat(x+4,y+h+1,district((int)p.x,(int)p.y),MUTED,0);
   textat(x+w-30,y+h+1,"[M]",PAPER,0);return;
  }
  rect(0,0,W,H,0x0d1420);box(10,10,W-20,H-20,0x111b29,NAV_RIM);
- const NavView v={NAV_MAP_X,NAV_MAP_Y,NAV_MAP_SIZE,NAV_MAP_SIZE,0,0,ROOM};
+ const NavView v={NAV_MAP_X,NAV_MAP_Y,NAV_MAP_SIZE,NAV_MAP_SIZE,0,0,nav_span()};
  box(v.x-6,v.y-6,v.w+12,v.h+12,NAV_INK,NAV_RIM);nav_overlay(&v,1,&r);
  draw_day_clock(16);
- textat(29,42,"PORT",PAPER,1);textat(29,72,"VANTA",PAPER,1);textat(31,105,"STREET ATLAS  /  09",NAV_VIOLET,0);
+ textat(29,42,"PORT",PAPER,1);textat(29,72,"VANTA",PAPER,1);textat(31,105,v.span==ROOM?"OUTER LOOP ATLAS":"STREET ATLAS  /  09",NAV_VIOLET,0);
  textat(31,129,"WAYPOINT",PAPER,0);rect(30,154,194,1,NAV_RIM);
  textat(31,158,"CLICK / ENTER   SET PIN",MUTED,0);textat(31,180,"RIGHT CLICK   CLEAR",MUTED,0);
  textat(31,202,"< / >   SHOP DOORS",MUTED,0);textat(31,224,"SPACE   VENUES / ATMS",MUTED,0);
@@ -515,15 +583,18 @@ static void minimap(void){
  if(navSelected>=0){
   char status[128];int atm=nav_atm(navSelected),shop=navSelected-LEN(loc);
   NavPoint a=nav_door(navSelected);nav_wrap(rx,83,rw0,nav_name(navSelected),PAPER,2);
-  textat(rx,123,district(a.x,a.y),GOLD,0);
+  textat(rx,123,shop==ncFrontId&&ncFrontId>=0?"BASE VILLAGE":district(a.x,a.y),GOLD,0);
   if(shop>=0&&shop<nb&&tram_hall(shop)){
    int to=tram_destination(shop);char*q=append(status,"To ");append(q,walkin_name(to));nav_wrap(rx,145,rw0,status,PAPER,2);
    nav_wrap(rx,186,rw0,to==69?"Lantern Ward / West seawall":"East Freight / Wrecker Yard",MUTED,2);
    nav_wrap(rx,227,rw0,"Fare: $5 clean cash on hand",GOLD,1);
    nav_wrap(rx,249,rw0,tram_block()?tram_block():"Open: board at timetable.",tram_block()?PINK:TEAL,2);
   }else{
-   const char*note=navSelected==NAV_OWN_CAR?"Current registered vehicle. Enter pins its live location.":
-     atm>=0?"Clean cash: deposit or withdraw at this kiosk.":navSelected<LEN(loc)?nav_venue_note(navSelected,status):"Storefront entrance. Enter pins this door.";
+   int outer=nav_out_stop(navSelected);
+   const char*note=navSelected==NAV_TRAP?(night_trap_owned()?"Owned. Manage construction, graded storage and neighborhood repair bookings.":"For sale: $480 clean. Press Enter at the signed Bell Lane side door."):
+     outer>=0?outerStops[outer].detail:navSelected==NAV_OWN_CAR?"Current registered vehicle. Enter pins its live location.":
+     atm>=0?"Clean cash: deposit or withdraw at this kiosk.":navSelected<LEN(loc)?nav_venue_note(navSelected,status):
+     shop==ncFrontId?"Tide Flats: straight west of Apartment 4. Direct E entry; no prerequisites.":"Storefront entrance. Enter pins this door.";
    nav_wrap(rx,149,rw0,note,MUTED,5);
   }
  }else{
@@ -531,7 +602,7 @@ static void minimap(void){
   nav_wrap(rx,119,rw0,navHover?"Click to pin the highlighted road.":"Point at a door. Press T to inspect both tram stops and your registered car.",MUTED,6);
  }
  textat(rx,297,"PURPLE LINE",NAV_VIOLET,0);rect(rx,321,rw0,1,NAV_RIM);
- const char *owner=navGoalKind==3?"Personal pin":navGoalKind==4?"Job vehicle":navGoalKind==2?"Active job":navGoalKind==5?"City listing":navGoalKind==1?"Career objective":"None";
+ const char *owner=navGoalKind==3?"Personal pin":navGoalKind==4?"Job vehicle":navGoalKind==2?"Active job":navGoalKind==5?"City listing":navGoalKind==6?"Phone delivery":navGoalKind==7?"Afterhours event":navGoalKind==1?"Career objective":"None";
  char guide[160];char*q=append(guide,owner);
  if(navGoalKind){q=append(q," / ");append(q,atCurb?"park and walk":navCount>=2?"road guidance":"no road route");}
  nav_wrap(rx,325,rw0,guide,PAPER,2);
@@ -547,6 +618,7 @@ static void minimap(void){
  }
  if(sv.charges){revenue_time(append(s,"REVENUE SWEEP "));textat(rx,465,s,PINK,0);}
  else if(saveFlash)textat(rx,465,saveFlash>0?"SAVED":"SAVE ERROR",saveFlash>0?TEAL:PINK,0);
+ textat(rx,487,"F8 / CITY + OUTER LOOP",TEAL,0);
  textat(267,505,"CITY / REVENUE LIVE     |     JOB CLOCK PAUSED",GOLD,0);
 }
 #undef NAV_INK

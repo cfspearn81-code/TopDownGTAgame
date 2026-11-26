@@ -1,0 +1,84 @@
+DEAD CHANNEL  /  PORT VANTA AFTERHOURS
+
+START ON LINUX
+Extract the archive. From Dead-Channel, run ./DeadChannel. It is a native
+x86-64 Linux executable, not Wine. It needs glibc 2.34+ plus the SDL2
+runtime (libSDL2-2.0.so.0). The game works offline and audio is optional.
+The window title reads "Dead Channel | Port Vanta Afterhours".
+
+BEFORE OPENING AN EXISTING CAREER
+Close any other Dead Channel window. For an easy downgrade, back up your
+career.dat, opening.dat, and fresh-NNN.dat before playing this build.
+Linux saves are in $XDG_DATA_HOME/DeadChannel when XDG_DATA_HOME is an
+absolute path, otherwise ~/.local/share/DeadChannel. The older Windows
+folder is %LOCALAPPDATA%/DeadChannel.
+
+Afterhours still reads Rev2–10 and writes the same 304-byte Rev10 file when
+no Afterhours progress needs saving. A career with Afterhours progress gets
+one atomically written 1,044-byte Rev11 file. Linux keeps the previous
+record in a hidden .pre-afterhours-*.bak file next to the saves. An older executable
+cannot open that newer file. To go back, close both games and restore your
+separate backup, not the newer file. Linux permits only one Afterhours
+window per save folder. Don't run an older and newer build at once.
+
+PORT VANTA AT NIGHT
+M opens the atlas. The Seawall Road is the new marked coastal connector
+across the south edge; join it at the ends of the north-south streets.
+The revised lanes also mark Glass Ridge and East Freight Express. The
+underlying city grid remains recognizable. The weather cycles automatically:
+rain reduces grip and braking and slows running on foot, while wet roads
+reflect lights for a while after the rain has gone. Fog reduces visibility.
+F2 selects Low FX for a steady north-up driving view and simpler weather.
+
+THE AFTERIMAGE
+Use the atlas or Signal > Night Wire to locate The Afterimage. Press E
+at its street door, then Enter in the foyer. On the main floor, walk
+left to the office, right to the VIP lounge, or up to the DJ desk,
+bar, stage or door staff; press E at the highlighted station. At the
+office ledger you can buy the club ($480), change the cover, book
+entertainment, hire door staff, restock drinks, upgrade the decor, and
+collect takings. Sets settle every 45 seconds of active play. Service,
+music, cleanliness and security affect each set; eligible signature
+prints stocked at the VIP cabinet can add a bonus. Marked game credits
+can be exchanged into a pending in-game till token at the ledger.
+See THE-AFTERIMAGE.txt for the full room and staff guide.
+
+MOTOR WORKS AND NIGHT DRIVING
+At Nightglass Motors, open the main service desk and choose Afterhours /
+Motor Works. The deed costs $420; build previews can be viewed before
+purchasing. The build bay has paint, rims, body kits, tune, handling
+and speaker options for each owned body. Use arrows and Space to orbit
+and preview; the on-screen key strip shows room-specific controls. The
+top-down camera leans and follows turns, pulls back when accelerating,
+and settles when braking; F2 selects the simpler north-up view.
+At night, head to Switchyard Social (pin it in Signal > Night Wire).
+Stop and press Enter at the meet. Book a ghost run or a fictional
+credit/title class with optional in-game stakes. At the garage, the
+parts call is a timed arcade collection with keep-or-salvage choices.
+See MOTOR-WORKS.txt for routes and garage controls.
+
+SIGNAL PHONE AND LANTERN EDITIONS
+P opens Signal, or rebind to F7 under Settings. For a no-property start,
+accept Mara's request in Inbox. Signal uses fictional glow-print designs
+and grades through the cabinet, binding, stockroom, satchel and delivery.
+Buy Lantern Grow Loft in Glasshouse (existing owners keep it), and
+bind/pick up each matching edition at the loft. See SIGNAL-PHONE.txt.
+The stock city jobs, original properties, and F6 City Listings are still
+available. You can use your own pins without deleting the phone objective.
+
+GLASS RELAY AND PRIVATE LOFT
+Press Enter after entering Apartment 4 (or your owned Breakwater home)
+for the optional loft. T switches the locker between bulk stock and
+exact Signal editions. Store labeled stock, show collected
+cosmetic Pulse finishes, rest to skip hours or wait out bad weather, and
+try two fictional sodas with fading visual and movement effects.
+Press Enter inside any ordinary aquarium address to start Glass Relay.
+Bays, water and live fish change as its restoration tasks progress.
+The rotating Signal Cart is a cosmetic vendor. The loft lists its stop.
+See GLASS-RELAY-AND-LOFT.txt for its controls and aquarium addresses.
+
+MUSIC
+The in-game radio and club stage use original offline synthesizer loops.
+For YouTube Music use its official external web player at
+https://music.youtube.com/. It is not embedded, captured or routed through
+the game stereo; the offline synth stations are independent of it.

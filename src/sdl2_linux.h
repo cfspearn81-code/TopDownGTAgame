@@ -33,10 +33,10 @@ enum {
  SDL_WINDOWEVENT_EXPOSED=3,SDL_WINDOWEVENT_RESIZED=5,SDL_WINDOWEVENT_SIZE_CHANGED=6,
  SDL_WINDOWEVENT_RESTORED=9,SDL_WINDOWEVENT_LEAVE=11,SDL_WINDOWEVENT_FOCUS_GAINED=12,
  SDL_WINDOWEVENT_FOCUS_LOST=13,SDL_WINDOWEVENT_CLOSE=14,SDL_BUTTON_LEFT=1,SDL_BUTTON_RIGHT=3,
- SDL_SCANCODE_A=4,SDL_SCANCODE_D=7,SDL_SCANCODE_E=8,SDL_SCANCODE_M=16,SDL_SCANCODE_S=22,
+ SDL_SCANCODE_A=4,SDL_SCANCODE_C=6,SDL_SCANCODE_D=7,SDL_SCANCODE_E=8,SDL_SCANCODE_L=15,SDL_SCANCODE_M=16,SDL_SCANCODE_P=19,SDL_SCANCODE_S=22,
  SDL_SCANCODE_T=23,SDL_SCANCODE_V=25,SDL_SCANCODE_W=26,SDL_SCANCODE_X=27,SDL_SCANCODE_RETURN=40,
  SDL_SCANCODE_ESCAPE=41,SDL_SCANCODE_BACKSPACE=42,SDL_SCANCODE_TAB=43,SDL_SCANCODE_SPACE=44,
- SDL_SCANCODE_F1=58,SDL_SCANCODE_F2=59,SDL_SCANCODE_F3=60,SDL_SCANCODE_F4=61,SDL_SCANCODE_F5=62,SDL_SCANCODE_F6=63,
+ SDL_SCANCODE_F1=58,SDL_SCANCODE_F2=59,SDL_SCANCODE_F3=60,SDL_SCANCODE_F4=61,SDL_SCANCODE_F5=62,SDL_SCANCODE_F6=63,SDL_SCANCODE_F7=64,SDL_SCANCODE_F8=65,
  SDL_SCANCODE_DELETE=76,SDL_SCANCODE_RIGHT=79,SDL_SCANCODE_LEFT=80,SDL_SCANCODE_DOWN=81,
  SDL_SCANCODE_UP=82,SDL_SCANCODE_KP_ENTER=88,SDL_SCANCODE_LSHIFT=225,SDL_SCANCODE_RSHIFT=229,
  SDL_NUM_SCANCODES=512
@@ -51,10 +51,12 @@ void SDL_QuitSubSystem(Uint32 flags);
 SDL_AudioDeviceID SDL_OpenAudioDevice(const char*,int,const SDL_AudioSpec*,SDL_AudioSpec*,int);
 int SDL_QueueAudio(SDL_AudioDeviceID,const void*,Uint32);
 void SDL_ClearQueuedAudio(SDL_AudioDeviceID);
+Uint32 SDL_GetQueuedAudioSize(SDL_AudioDeviceID);
 void SDL_PauseAudioDevice(SDL_AudioDeviceID,int);
 void SDL_CloseAudioDevice(SDL_AudioDeviceID);
 int SDL_Init(Uint32 flags);
 void SDL_Quit(void);
+int SDL_OpenURL(const char*);
 const char *SDL_GetError(void);
 SDL_Window *SDL_CreateWindow(const char *title,int x,int y,int w,int h,Uint32 flags);
 SDL_Renderer *SDL_CreateRenderer(SDL_Window *window,int index,Uint32 flags);
@@ -80,5 +82,10 @@ Uint64 SDL_GetPerformanceCounter(void);
 Uint64 SDL_GetPerformanceFrequency(void);
 void SDL_Delay(Uint32 ms);
 int SDL_ShowSimpleMessageBox(Uint32 flags,const char *title,const char *message,SDL_Window *window);
+enum {SDL_MESSAGEBOX_WARNING=0x20,SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT=1,SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT=2};
+typedef struct {Uint32 flags;int buttonid;const char *text;} SDL_MessageBoxButtonData;
+typedef struct {Uint32 flags;SDL_Window *window;const char *title,*message;int numbuttons;
+ const SDL_MessageBoxButtonData *buttons;const void *colorScheme;} SDL_MessageBoxData;
+int SDL_ShowMessageBox(const SDL_MessageBoxData*,int*);
 #endif
 #endif

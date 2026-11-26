@@ -8,8 +8,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+/* On unsupported older SDL installations only the external link is absent. */
+extern int SDL_OpenURL(const char*) __attribute__((weak));
 
-static const char title[]="Dead Channel | Conversation Hold Hotfix";
+static const char title[]="Dead Channel | Port Vanta Crossroads";
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *surface_tex;
@@ -25,9 +27,23 @@ static const U binding[SDL_NUM_SCANCODES]={
  [SDL_SCANCODE_LSHIFT]=BRAKE,[SDL_SCANCODE_RSHIFT]=BRAKE,[SDL_SCANCODE_ESCAPE]=ESC,
  [SDL_SCANCODE_M]=MAP,[SDL_SCANCODE_F5]=SAVE,[SDL_SCANCODE_F6]=ACTIVITIES,[SDL_SCANCODE_RETURN]=ENTER,[SDL_SCANCODE_KP_ENTER]=ENTER,
  [SDL_SCANCODE_F1]=HELP,[SDL_SCANCODE_F2]=GFX,[SDL_SCANCODE_F3]=SLOT,[SDL_SCANCODE_F4]=NEW_SLOT,
- [SDL_SCANCODE_T]=TAXI_NEXT,[SDL_SCANCODE_TAB]=WHEEL,[SDL_SCANCODE_V]=USE_PATCH,[SDL_SCANCODE_DELETE]=DELETE_SLOT
+ [SDL_SCANCODE_T]=TAXI_NEXT,[SDL_SCANCODE_DELETE]=DELETE_SLOT,[SDL_SCANCODE_P]=PHONE,[SDL_SCANCODE_F7]=PHONE_ALT,
+ [SDL_SCANCODE_C]=CAMERA,[SDL_SCANCODE_L]=LOADOUT,[SDL_SCANCODE_F8]=ATLAS_WORLD,[SDL_SCANCODE_TAB]=WHEEL,[SDL_SCANCODE_V]=USE_PATCH
 };
 static void stop(int sig){(void)sig;stop_signal=1;}
+static void close_try(void){
+ if(exit_save_ok()){running=0;return;}
+ static const SDL_MessageBoxButtonData buttons[]={
+  {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT|SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT,0,"Keep playing"},
+  {0,1,"Quit without saving"}
+ };
+ const SDL_MessageBoxData dialog={SDL_MESSAGEBOX_WARNING,window,"Save failed",
+  "Your last save is intact, but the latest progress could not be written. Close again to retry.",
+  2,buttons,NULL};
+ int choice=0;
+ if(SDL_ShowMessageBox(&dialog,&choice)==0&&choice==1)running=0;
+ else fprintf(stderr,"Dead Channel: save failed; the game is still open.\n");
+}
 
 static SDL_Rect viewport(int w,int h){
  SDL_Rect v={0,0,w,h};
@@ -57,10 +73,10 @@ static U keys(void){
 }
 static void event(const SDL_Event *e){
  switch(e->type){
- case SDL_QUIT:running=0;break;
+ case SDL_QUIT:close_try();break;
  case SDL_WINDOWEVENT:
   switch(e->window.event){
-   case SDL_WINDOWEVENT_CLOSE:running=0;break;
+   case SDL_WINDOWEVENT_CLOSE:close_try();break;
    case SDL_WINDOWEVENT_FOCUS_LOST:focused=0;clear_keys();pointer_input(-1,-1,0);redraw=1;break;
    case SDL_WINDOWEVENT_FOCUS_GAINED:focused=1;redraw=1;break;
    case SDL_WINDOWEVENT_LEAVE:pointer_input(-1,-1,0);redraw=1;break;
@@ -104,20 +120,29 @@ static void event(const SDL_Event *e){
 }
 /* The video host works even when the audio subsystem or device is absent. */
 static SDL_AudioDeviceID radioDev;
-static void radio_audio(int track){
- if(!track)return;
+static int radioActive,radioOneShot,radioUnavailable;
+static void radio_audio(int oneShot,int station){
+ int track=oneShot?oneShot:station;
+ if(!radioDev&&!track)return;
+ if(radioUnavailable)return;
  if(!radioDev){
   SDL_AudioSpec want={.freq=RM_RATE,.format=AUDIO_S16LSB,.channels=1,.samples=512};
-  if(SDL_InitSubSystem(SDL_INIT_AUDIO)<0)return;
+  if(SDL_InitSubSystem(SDL_INIT_AUDIO)<0){radioUnavailable=1;return;}
   radioDev=SDL_OpenAudioDevice(NULL,0,&want,NULL,0);
-  if(!radioDev){SDL_QuitSubSystem(SDL_INIT_AUDIO);return;}
+  if(!radioDev){SDL_QuitSubSystem(SDL_INIT_AUDIO);radioUnavailable=1;return;}
  }
+ if(oneShot)radioOneShot=1;
+ else if(radioOneShot&&SDL_GetQueuedAudioSize(radioDev))return;
+ else radioOneShot=0;
+ if(!track){if(radioActive)SDL_ClearQueuedAudio(radioDev);radioActive=0;return;}
+ if(oneShot||track!=radioActive){SDL_ClearQueuedAudio(radioDev);radioActive=track;}
+ else if(SDL_GetQueuedAudioSize(radioDev)>RM_RATE/5)return;
  const RadioWave *w=rm_record(track);if(!w)return;
- SDL_ClearQueuedAudio(radioDev);
  if(!SDL_QueueAudio(radioDev,w->pcm,w->dataBytes))SDL_PauseAudioDevice(radioDev,0);
 }
 static int display(void){
- radio_audio(take_radio_record());
+ if(take_phone_link())phone_link_result(SDL_OpenURL&&SDL_OpenURL("https://music.youtube.com/")==0);
+ radio_audio(take_radio_record(),night_music_track());
  int w,h;
  if(SDL_GetRendererOutputSize(renderer,&w,&h)!=0)return 0;
  SDL_Rect v=viewport(w,h);
@@ -146,6 +171,9 @@ int main(void){
  surface_tex=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB888,SDL_TEXTUREACCESS_STREAMING,W,H);
  if(!surface_tex){report("Cannot create framebuffer",SDL_GetError());goto done;}
  if(!linux_disk_init()){report("Cannot open the DeadChannel data directory",strerror(errno));goto done;}
+ if(!linux_disk_lock()){
+  report("Could not acquire the career lock",errno==EWOULDBLOCK?"Another Afterhours window already has these saves open.":strerror(errno));goto done;
+ }
 
  struct sigaction action={.sa_handler=stop};
  sigemptyset(&action.sa_mask);sigaction(SIGINT,&action,NULL);sigaction(SIGTERM,&action,NULL);
@@ -174,7 +202,7 @@ int main(void){
   }else SDL_Delay(focused?1:12);
  }
 done:
- if(started){request_save();SDL_StopTextInput();}
+ if(started){if(running&&!exit_save_ok())status=report("Could not save on exit","Previous save kept.");SDL_StopTextInput();}
  if(radioDev)SDL_CloseAudioDevice(radioDev);
  linux_disk_shutdown();
  if(surface_tex)SDL_DestroyTexture(surface_tex);

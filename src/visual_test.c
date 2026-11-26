@@ -22,7 +22,7 @@ static void test_cards(void){
  assert(!touched(DAY_BADGE_X,16,DAY_BADGE_X+DAY_BADGE_W,16+DAY_BADGE_H,base));
  for(int col=0;col<2;col++){
   const GuideBinding*g=col?guideCareer:guideStreet;int keyw=col?113:141;
-  int n=col?LEN(guideCareer):LEN(guideStreet),step=n>8?23:26;
+  int n=col?LEN(guideCareer):LEN(guideStreet),step=guide_step(n);
   assert(183+(n-1)*step+21<395); /* all rows finish above the legend */
   for(int i=0;i<n;i++){
    assert(7+textw(g[i].key,0)+5<=keyw);
@@ -54,7 +54,12 @@ static void atlas_sweep(void){
   navSelected=i;navHover=navKeyboard=1;navManual=nav_door(i);navManualLoc=i;navHasManual=1;
   for(int car=-1;car<=0;car++){p.car=car;paint();renders++;}
   if(i>=LEN(loc)){
-   int b=i-LEN(loc),big,tracking;const char*name=walkin_name(b);
+   int b=i-LEN(loc);
+   if(b==ncFrontId){
+    p.car=-1;walkin_open(b);assert(scene==NIGHT_CLUB_SCENE);paint();
+    walkins++;scene=1;mapOn=1;continue;
+   }
+   int big,tracking;const char*name=walkin_name(b);
    assert(22+wi_title_width(name,&big,&tracking)<=W-291-12);
    assert(big); /* All current storefront headings retain display type. */
    walkin_open(b);paint();walkins++;scene=1;mapOn=1;
@@ -62,8 +67,8 @@ static void atlas_sweep(void){
    open_interior(i);paint();scene=1;mapOn=1;
   }
  }
- assert(renders==156&&walkins==63);
- printf("Rendered 78 interiors and %d on-foot/driving atlas venue states.\n",renders);
+ assert(renders==156+2*(ncFrontId>=0)&&walkins==63+(ncFrontId>=0));
+ printf("Rendered %d interiors and %d on-foot/driving atlas venue states.\n",15+walkins,renders);
 }
 static void clock_surfaces(void){
  init_city();sv.intro=4;sv.dayClock=1439.f;
@@ -144,5 +149,5 @@ static void guide_and_borders(void){
 }
 int main(void){
  test_cards();turns();atlas_sweep();clock_surfaces();smaller_world_figures();guide_and_borders();
- puts("Passed: full-width notifications and objective text, field-guide columns, bend direction / countdown / arrival, small clock renders and all 78 atlas entries.");
+ puts("Passed: full-width notifications and objective text, field-guide columns, bend direction / countdown / arrival, small clock renders and all atlas entries.");
 }

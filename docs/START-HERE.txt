@@ -1,11 +1,11 @@
 DEAD CHANNEL / PORT VANTA
-Conversation Hold Hotfix for Windows 11 x64 and Linux x86-64
+Port Vanta Crossroads for Windows 11 x64 and Linux x86-64
 
 1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
    Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
    from the extracted Dead-Channel directory. If your extractor did not
    preserve execute permission, run chmod +x DeadChannel first.
-   Look for "Dead Channel | Conversation Hold Hotfix" in the window title.
+   Look for "Dead Channel | Port Vanta Crossroads" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -17,6 +17,17 @@ Close the older game, extract this build to a new folder and run the new
 executable. The saved careers are stored separately; no transfer, reset
 or new career is required. The weapon wheel still intentionally dims the
 background while Tab is held.
+
+BASE VILLAGE AND OUTER LOOP
+At Apartment 4, leave through the teal E door and walk straight left to
+the pink Afterimage marquee. E enters directly, even with $0 before the
+first job. This is a different club from Vault 39. At Bell Lane, Enter
+on foot at the signed side door to preview or buy the Trap House. Signal
+(P or F7) has both pins in Night Wire. The full property, upgrade and
+storage controls are in TRAP-HOUSE.txt and BASE-VILLAGE.txt.
+On a car, C switches to the optional behind-car view. M opens the atlas
+and F8 shows the complete road network. L loads reserve cells for the
+selected fictional Pulse frame on foot. See OUTER-LOOP.txt.
 
 PEOPLE IN PORT VANTA
 Walk close to someone and press E. Up/Down picks Say Hello, Say Nothing,
@@ -83,12 +94,14 @@ Windows: %LOCALAPPDATA%/DeadChannel.
 Linux: $XDG_DATA_HOME/DeadChannel when XDG_DATA_HOME is absolute;
        otherwise ~/.local/share/DeadChannel.
 Both use the same career.dat, opening.dat and fresh-NNN.dat slots, with
-the same historical Rev2-9 import and Rev10 format when no patches are
-stocked. A career with a stocked patch uses Rev11 (also 304 bytes). Only
-this edition and later compatible builds can open those stocked files.
-Using your last patch saves the career in compatible Rev10 again. The package does
-not migrate folders or sync devices. Close both copies and back up
-existing saves before copying the specific slots you want to transfer.
+historical Rev2–10 imports and both Rev11 layouts. A 304-byte save
+stores compact med-patch careers. A 1,044-byte save retains the expanded
+city systems and can also carry med patches. This edition reads both
+older kinds and the combined kind. Downgrading a career that now uses
+both is not supported. Linux saves a hidden original when migrating the
+relevant older format. Before moving a career onto either platform or
+using an older release, close both copies and back up the save folder.
+No cloud sync or automatic cross-platform transfer.
 The Linux save folder must be writable and support normal POSIX file
 links and atomic renames. The game saves a live career on normal close.
 
@@ -217,10 +230,11 @@ is shared between all three terminals and is safe during a Revenue
 seizure. Cash must be withdrawn first to spend it or pay a fine.
 
 YOUR EXISTING SAVES
-Use the same Windows account. The game still reads its existing saves
-under %LOCALAPPDATA%\DeadChannel (career.dat, opening.dat and fresh-*.dat).
-It does not write over another career when creating a character. Once
-saved in this version, a save is upgraded to the new format; back up the
-folder first if you also want to run an older executable with those saves.
-Active jobs and pursuits reset when changing careers or reopening the
-game. There is no installer, browser, network requirement or audio.
+Linux loads from the same XDG data location described above. Existing
+Rev2-10 saves are readable. A save only changes to Rev11 once an
+Afterhours feature has persistent progress. Linux keeps a hidden backup
+of the prior-format file on the first such write. For restoring an older
+version, also copy your existing saves to a separate folder beforehand.
+Close other copies before opening the game. Active pursuits and most
+live driving events reset on reopening or switching careers. This build
+is offline, with optional original in-game music and no installer.

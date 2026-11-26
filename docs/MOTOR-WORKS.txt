@@ -1,0 +1,54 @@
+DEAD CHANNEL / MOTOR WORKS
+A local city guide for the Switchyard update
+
+THE ROAD CAMERA
+Arrow keys or WASD drive. Shift is the brake. The city stays north-up at rest.
+The chase view eases into a turn after the car; forward lead shortens in tight
+corners. The lens widens smoothly while accelerating, settles when cruising
+and closes in again as you stop. The atlas and HUD never bank. F2 Low FX gives
+a stable, unzoomed view with the ordinary forward lead. Existing stock handling
+and collision envelopes are preserved unless you install a performance upgrade.
+
+THE GARAGE
+Nightglass Motors > desk > AFTERHOURS / MOTOR WORKS. Preview any of the five
+model lines free. The $420 deed opens storage, fitment and recovery bookings.
+Buy the actual vehicle at the original Nightglass desk. On the work order,
+select a model with Left / Right; Deploy Stored Car places it at a clear curb.
+In Build Bay, Up / Down picks Paint, Wheels, Aero, Power, Handling or Audio.
+Left / Right previews. Enter installs only that part, for the displayed price.
+Hold Shift + Left / Right for a full orbit. Hold Shift + Up / Down for zoom.
+Each model keeps its own fitted parts. Esc backs out without buying a preview.
+Original radio stations receive bass in the upgraded cabin and muffled sound by
+the parked car. Dual racks project farther outside than single racks.
+
+SWITCHYARD SOCIAL
+Each night from 19:00 to before 05:00, East Freight / (1280,768). Pin it at the
+garage or on the phone. Stop in the ring, then Enter. Browse three guest builds,
+show your own modified car once per game day, or enter a point-to-point run.
+A rival's non-colliding pace projection traces the route. Stop at start for
+three seconds, then drive the gold gates in order. Three shapes, three times:
+Copper Relay 39s; Seawall Run 46s; Glass After Dark 49s. Best times persist.
+Free exhibition is available day or night at the garage; beating pace pays $42
+and unlocks Signal edition paint. At a night meet, the credit class takes $75
+clean entry, pays $185 for a win. Optional title class shows the exact spare car
+at risk and requires a separate confirmation, default Back. Winning returns it
+and awards a rival-spec car if a slot is missing. Losing, abandoning or closing
+the game forfeits a committed entry. Your driven car is never the title stake.
+All credits and title stakes are strictly fictional; no online or real stakes.
+
+PARTS CALLS
+Choose Parts call at the garage. Bring the marked game NPC car to the
+Nightglass Motor Works intake at (1024,800) within 150 active seconds.
+The signed Wrecker Yard ring (1792,1024) is an alternate intake.
+Enter while stopped. Trade it for $42 marked credits and three $20 workshop
+discounts (up to 20 saved), or pay the displayed registration fee and keep it
+in your collection. You cannot register a duplicate model. Missing the deadline
+costs no entry fee. Ordinary city jobs and listings take precedence over events.
+
+VEHICLE CONDITION
+Cars take one third less damage per collision than in Outer Loop, for 50%
+more total durability. The dashboard remains 0–100 and shows fractional
+condition when needed. Impact knockback, steering and taxi quality still
+use the same rules. Nightglass service restores the full 100 condition.
+Existing saves keep the condition they already had; any new fractional
+wear is tracked independently for each owned model.

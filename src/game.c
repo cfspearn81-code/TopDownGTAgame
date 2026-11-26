@@ -14,7 +14,8 @@
 #define LIME 0xdaff7a
 #define PINK 0xff7b9c
 #define GOLD 0xffcf77
-#define ROOM 2048
+#define BASE_ROOM 2048
+#define ROOM 3072
 #define NSTATE 18
 #define LEN(a) ((int)(sizeof(a)/sizeof(*(a))))
 U pixels[W*H];
@@ -63,6 +64,10 @@ static void setup_scenery(void);
 static void atm_place(void);
 static void bank_ui_reset(void);
 static int ordinaryDoorX[LEN(buildings)],ordinaryDoorY[LEN(buildings)];
+enum { NIGHT_CLUB_LEGACY=66 };
+static int ncFrontId=-1;
+static int night_club_listing(void){return ncFrontId>=0?ncFrontId:NIGHT_CLUB_LEGACY;}
+static void night_club_front_lot(void);
 static void setup_ordinary_doors(void);
 static int zone_is_building(int i);
 static const char *walkin_name(int i);
@@ -102,8 +107,8 @@ static const Place originalLoc[]={
 {1280,512,"VANTA POLICE HQ","Desk Officer","Headquarters and patrol dispatch.",0x8aabff,15}
 };
 static Place loc[LEN(originalLoc)];
-static const char* district(int x,int y){if(y<545)return "GLASS MILE";if(y>1160)return x<900?"LANTERN WARD":"BREAKWATER";return x<850?"TIDE MARKET":x<1400?"NIGHTGLASS":"EAST FREIGHT";}
-static const char*venue_address(int b){return district(ordinaryDoorX[b],ordinaryDoorY[b]);}
+static const char* district(int x,int y){if(x>=BASE_ROOM-36||y>=BASE_ROOM-36){return y<820?"GLASS BLUFF":y<1130?"FREIGHT PARKWAY":y<1570?"BELT WORKSHOPS":x>=2180?"HARBOR PIER":"SALT REACH";}if(y<545)return "GLASS MILE";if(y>1160)return x<900?"LANTERN WARD":"BREAKWATER";return x<850?"TIDE MARKET":x<1400?"NIGHTGLASS":"EAST FREIGHT";}
+static const char*venue_address(int b){return b==ncFrontId?"BASE VILLAGE":district(ordinaryDoorX[b],ordinaryDoorY[b]);}
 /* Forward caps use each model's former 10/100-condition speed at full
  * health. Keep throttle response and low-speed control unchanged. */
 /* Human locomotion follows one pace, across named/ordinary interiors,
@@ -123,7 +128,9 @@ static const CarSpec specs[]={
  {"NIGHTJAR",970,373.f*.55f,90,315,2.7f,0xdf648f},
  {"COURIER 4",480,286.f*.55f,69,230,2.55f,0xbbd377},
 };
-typedef struct{float x,y,a,s;int type,owner,cond,reported;}Car;
+typedef struct{float x,y,a,s;int type,owner,cond,reported,wear;}Car;
+static int outer_vehicle_clear(const Car*,const Car*);
+static void outer_life_reset(void),outer_life_tick(float),outer_life_paint(void);
 typedef struct{float x,y,a,s;int hp,role,next;float life,cool;}Ped;
 /* Two temporary customer slots can follow the unchanged stock actor count.
  * Ordinary jobs still get their stock final slot when no listing is active. */
@@ -150,6 +157,50 @@ enum{SAVE_REV=10,SAVE_REV_PATCHES=11,MAX_MED_PATCHES=99,DAY_SECONDS=24*60,LEGACY
 _Static_assert(sizeof(Save)==304&&__builtin_offsetof(Save,medPatches)==267&&__builtin_offsetof(Save,bank)==288&&__builtin_offsetof(Save,dirtySpent)==292&&__builtin_offsetof(Save,sweepTicks)==296&&__builtin_offsetof(Save,hash)==300,"Unexpected on-disk save layout");
 #define LEGACY6_SIZE (__builtin_offsetof(Save,playedTicks)+4)
 static Save sv;
+typedef struct { U club[32],garage[64],phone[64],world[24]; } NightSave;
+typedef struct { Save base; NightSave night; U hash; } Save11;
+enum { NIGHT_SAVE_REV=11, NIGHT_CLUB_SCENE=7, NIGHT_GARAGE_SCENE=8, NIGHT_PHONE_SCENE=9,
+       NIGHT_VENUES_SCENE=10,NIGHT_TRAP_SCENE=11 };
+enum {NT_DOOR_X=174,NT_DOOR_Y=944};
+enum { NIGHT_CLEAR, NIGHT_FOG, NIGHT_RAIN };
+_Static_assert(sizeof(NightSave)==736 && sizeof(Save11)==1044 && __builtin_offsetof(Save11,night.world[6])==968,"Unexpected Night District save layout");
+static NightSave nv;
+#include "vehicle_condition.inc"
+static U night_hash(const void *bytes,unsigned n){
+ const unsigned char *p=bytes;U h=2166136261u;
+ while(n--)h=(h^*p++)*16777619u;
+ return h;
+}
+static int night_club_open(int),night_garage_open(int),night_venues_open(int);
+static int ng_power(const Car*),ng_grip(const Car*),ng_route_goal(int*,int*);
+static void ch_motion(float,float),ch_project(int*,int*),ch_badge(void),ng_schedule_tick(void);
+static int ch_draw(void),ch_pref(void),chProjected;
+static void night_club_tick(U,U),night_garage_tick(U,U),night_phone_tick(U,U),night_venues_tick(U,U);
+static void night_club_paint(void),night_garage_paint(void),night_phone_paint(void),night_venues_paint(void);
+static void night_phone_open(void),night_phone_world_tick(float);
+static int night_phone_toggle(U),night_phone_action(U);
+static void night_world_reset(void),night_world_tick(float),night_world_bake(void),night_world_street_fx(void),night_world_hud(void);
+static float night_world_brake(void),night_world_grip(void),night_world_foot(void);
+static int night_world_is_night(void),night_world_weather(void);
+static int night_club_track(void),night_phone_radio(void),night_garage_audio(void);
+static void night_club_business_tick(void),ng_reset(void),night_garage_street(U),ng_world(void),ng_gate_overlay(void);
+static void night_club_pointer(int,int,U),night_phone_pointer(int,int,U);
+static int night_phone_premium(int),night_phone_route(int*,int*),night_phone_heat_at(int,int);
+static void night_phone_heat_add(int,int,int);
+static int night_phone_lane_stop(float,float,float,float,int),night_phone_take_link(void),night_phone_signature(int,int);
+static void night_phone_link_result(int),night_phone_road_paint(void),night_phone_contact_paint(void),night_phone_rest(int);
+static int night_club_queue(void),night_club_signature_demand(int),night_club_listing(void);
+static int night_trap_owned(void),night_trap_entry(U);
+static void night_trap_tick(U,U),night_trap_paint(void),night_trap_world_tick(float),night_trap_street_paint(void),night_trap_hint(void);
+static int night_venue_apply_pulse(int*,int*,float*,U*),night_venue_vendor_stop(void);
+static void nvk_stats(int*,int*,float*,U*);
+static void night_venue_reload(U);
+static int night_venue_vendor_pos(int*,int*),night_venue_vendor_entry(U);
+static int night_garage_meet_site(int*,int*);
+static int night_venues_entry(U),night_club_entry(U);
+static void night_venues_hint(void),night_venues_world_tick(void),night_venues_fx(void);
+static float night_venues_walk_factor(void);
+static void night_rest_clock(unsigned,int);
 enum{DAY_BADGE_X=16,DAY_BADGE_W=104,DAY_BADGE_H=24,DAY_BADGE_LABEL_X=131};
 /* One real minute is one city hour and one real second is a city minute. */
 static void day_clock_label(char label[6]){
@@ -214,22 +265,59 @@ static const struct {const char*name;U outfit;int face;} riders[]={
 typedef struct{float x,y,a,heat,quiet,hit,shot,secs,noticeT,trail;int car,hp,dead,seen;} Player;
 static Player p;
 static float trailX,trailY,trailEndX,trailEndY;
+static U trailInk=GOLD;
 enum{PAUSE_MENU=12};
 static int scene=0,menu=-1,sel=0,mapOn=0,wason=0,cx,cy,deadAnim,saveFlash,fastGfx,sideSlot;static float crashFlash;
 static float anim,footcycle,punchFlash,pedHit[LEN(peds)],shelterT;static int walking;
 static float cameraLeadX,cameraLeadY;
+static float ngCamAngle,ngCamRoll,ngCamZoom,ngCamSpeed,ngCamBurst;
+static int ngCamRide=-1;
+static void ng_cam_reset(void){ngCamAngle=ngCamRoll=ngCamZoom=ngCamSpeed=ngCamBurst=0;ngCamRide=-1;cameraLeadX=cameraLeadY=0;}
 static void update_camera_lead(void){
- float vx=0,vy=0;
- if(p.car>=0){
-  const Car *car=&cars[p.car];
-  vx=cs(car->a)*car->s*.48f;
-  vy=sn(car->a)*car->s*.34f;
-  /* Don't throw the player too far out of frame at the new top speeds. */
-  if(vx>108)vx=108;if(vx<-108)vx=-108;
-  if(vy>76)vy=76;if(vy<-76)vy=-76;
+ float vx=0,vy=0,zoom=0,roll=0;
+ if(p.car>=0&&p.car<nc){
+  const Car*c=cars+p.car;float speed=absf(c->s);
+  if(ngCamRide!=p.car){ngCamAngle=c->a;ngCamSpeed=speed;ngCamBurst=0;}
+  /* A short angular spring shows the side/rear through the apex, then
+   * homes to north-up; the atlas, controls and physics never rotate. */
+  float err=wrap(c->a-ngCamAngle);
+  ngCamAngle=wrap(ngCamAngle+err*.10f);
+  float bend=absf(err);if(bend>1)bend=1;
+  float lead=c->s*(1.f-.40f*bend);
+  vx=cs(ngCamAngle)*lead*.48f;vy=sn(ngCamAngle)*lead*.34f;
+  if(vx>108)vx=108;if(vx<-108)vx=-108;if(vy>76)vy=76;if(vy<-76)vy=-76;
+  if(c->s>=0&&speed>15&&speed>ngCamSpeed+.60f)ngCamBurst+=(1-ngCamBurst)*.06f;else ngCamBurst*=.958f;
+  ngCamSpeed=speed;ch_motion(speed,err);
+  float f=speed/205.f;if(f>1)f=1;
+  if(!fastGfx){
+   roll=err*(c->s>=0?1.f:-1.f)*.08f*f;
+   if(roll>.037f)roll=.037f;if(roll<-.037f)roll=-.037f;
+   zoom=.145f-.067f*f-.042f*ngCamBurst+.018f*bend;
+  }
  }
- cameraLeadX+=(vx-cameraLeadX)*.055f;
- cameraLeadY+=(vy-cameraLeadY)*.055f;
+ ngCamRide=p.car;ngCamRoll+=(roll-ngCamRoll)*.14f;ngCamZoom+=(zoom-ngCamZoom)*.07f;
+ cameraLeadX+=(vx-cameraLeadX)*.055f;cameraLeadY+=(vy-cameraLeadY)*.055f;
+}
+static float ng_cam_scale(void){
+ float zoom=1+ngCamZoom,minz=1.f+absf(ngCamRoll)*1.85f;
+ return zoom>minz?zoom:minz;
+}
+static void ng_cam_point(int*x,int*y){
+ if(chProjected){ch_project(x,y);return;}
+ if((ngCamZoom<.001f&&absf(ngCamRoll)<.001f)||fastGfx)return;
+ float u=*x-W/2,v=*y-H/2,co=cs(ngCamRoll),si=sn(ngCamRoll),zoom=ng_cam_scale();
+ *x=W/2+(int)((u*co+v*si)*zoom);*y=H/2+(int)((v*co-u*si)*zoom);
+}
+static void ng_cam_compose(void){
+ if((ngCamZoom<.001f&&absf(ngCamRoll)<.001f)||fastGfx)return;
+ static U out[W*H];
+ float zoom=ng_cam_scale();
+ int a=(int)(65536.f*cs(ngCamRoll)/zoom),b=(int)(65536.f*sn(ngCamRoll)/zoom);
+ for(int y=0;y<H;y++){
+  int u=(W/2<<16)-(W/2)*a-(y-H/2)*b,v=(H/2<<16)-(W/2)*b+(y-H/2)*a;
+  for(int x=0;x<W;x++,u+=a,v+=b)out[y*W+x]=pixels[cl(v>>16,0,H-1)*W+cl(u>>16,0,W-1)];
+ }
+ for(int i=0;i<W*H;i++)pixels[i]=out[i];
 }
 static int camera_left(void){return cl((int)(p.x+cameraLeadX)-W/2,0,ROOM-W);}
 static int camera_top(void){return cl((int)(p.y+cameraLeadY)-H/2,0,ROOM-H);}
@@ -271,8 +359,10 @@ static StreetBounds building_bounds(const Building*b){
  int x=b->x,y=max(blockY+42,b->y-b->ht);
  return (StreetBounds){x,y,min(blockX+214,x+b->w+b->ht/2+1)-x,b->y+b->h+1-y};
 }
+#include "outer_city.inc"
 static int solid(float x,float y,float r){
  if(x<35||x>ROOM-36||y<35||y>ROOM-36)return 1;
+ if(outer_is_new(x,y))return !outer_area(x,y,r);
  const BlockScenery*block=&scenery[((int)y/256)*8+(int)x/256];
  for(int i=0;i<block->count;i++){
   const StreetBounds*b=block->walls+i;
@@ -283,14 +373,14 @@ static int solid(float x,float y,float r){
 static int open_space(float x,float y){return !solid(x,y,10);}
 static void particle(float x,float y,int n,U c){while(n--){Particle*q=fx+(fn++%LEN(fx));q->x=x;q->y=y;q->vx=(int)(rnd()%151)-75;q->vy=(int)(rnd()%151)-75;q->t=.2f+(rnd()%36)*.01f;q->c=c;}}
 static void setupCity(void){
- rng=0x873f24c7u;nb=0;z(lot,sizeof lot);cp(loc,originalLoc,sizeof loc);for(int y=0;y<ROOM;y++)for(int x=0;x<ROOM;x++){int xx=x%256,yy=y%256,n=(int)(rnd()%12);U c;if(xx<29||xx>=227||yy<29||yy>=227){c=RGB(24+n,34+n,43+n);if((xx==0&&yy>40&&yy<219&&yy%35<17)||(yy==0&&xx>40&&xx<219&&xx%35<17))c=0x90845a;}else if(xx<42||xx>214||yy<42||yy>214)c=RGB(48+n,55+n,60+n);else c=RGB(32+n,44+n,47+n);if(x>1390&&y>1110)c=mix(c,0x264044,2);else if(y<550)c=mix(c,0x4a4258,2);else if(x<850)c=mix(c,0x54433e,2);if(x<25||y<25||x>ROOM-26||y>ROOM-26)c=RGB(11+n/2,31+n,40+n);city[y*ROOM+x]=c;}
+ rng=0x873f24c7u;nb=0;z(lot,sizeof lot);cp(loc,originalLoc,sizeof loc);for(int y=0;y<BASE_ROOM;y++)for(int x=0;x<BASE_ROOM;x++){int xx=x%256,yy=y%256,n=(int)(rnd()%12);U c;if(xx<29||xx>=227||yy<29||yy>=227){c=RGB(24+n,34+n,43+n);if((xx==0&&yy>40&&yy<219&&yy%35<17)||(yy==0&&xx>40&&xx<219&&xx%35<17))c=0x90845a;}else if(xx<42||xx>214||yy<42||yy>214)c=RGB(48+n,55+n,60+n);else c=RGB(32+n,44+n,47+n);if(x>1390&&y>1110)c=mix(c,0x264044,2);else if(y<550)c=mix(c,0x4a4258,2);else if(x<850)c=mix(c,0x54433e,2);if(x<25||y<25||x>BASE_ROOM-26||y>BASE_ROOM-26)c=RGB(11+n/2,31+n,40+n);city[y*ROOM+x]=c;}
  for(int iy=0;iy<8;iy++)for(int ix=0;ix<8;ix++){
   int tx=ix*256,ty=iy*256,kind=(int)(rnd()%8);
   if(kind==0||kind==2){ground(tx+47,ty+47,161,161,0x273b35);for(int j=0;j<22;j++){int px=tx+52+rnd()%149,py=ty+52+rnd()%149;ground(px,py,5,5,(j%2)?0x3e5848:0x344d3c);}ground(tx+48,ty+123,162,7,0x566260);ground(tx+123,ty+48,7,160,0x566260);continue;}
   int n=1+(kind%3!=0);for(int k=0;k<n;k++){lot[iy*8+ix][k+1]=nb;lot[iy*8+ix][0]=n;Building*b=buildings+nb++;b->x=tx+53+k*88+rnd()%9;b->y=ty+70+rnd()%29;b->w=min(n==1?130:68,tx+200-b->x);b->h=min(65+(int)(rnd()%43),ty+210-b->y);b->ht=9+rnd()%22;static const U roofs[]={0x485b66,0x52606d,0x584867,0x596157,0x6a555c,0x4c6263};b->roof=roofs[rnd()%LEN(roofs)];b->wall=mix(b->roof,DARK,4);ground(b->x-4,b->y-4,b->w+17,b->h+16,0x1a262d);}
  }
  for(int i=1;i<8;i++)for(int j=1;j<8;j++){int x=i*256,y=j*256;for(int k=-21;k<22;k+=6){ground(x+k,y-38,3,8,0x8a9988);ground(x+k,y+31,3,8,0x8a9988);ground(x-38,y+k,8,3,0x8a9988);ground(x+31,y+k,8,3,0x8a9988);}ground(x-29,y-29,5,5,0x669686);ground(x+25,y+25,5,5,0x669686);}
- zone_venues();setup_ordinary_doors();setup_scenery();atm_place();
+ zone_venues();night_club_front_lot();setup_ordinary_doors();setup_scenery();atm_place();
 }
 #include "road_fx.inc"
 #include "street_life.inc"
@@ -375,14 +465,20 @@ extern int disk_present(void);
 extern int disk_delete(void);
 extern int disk_create(const void*,unsigned);
 #endif
+#ifdef DC_LINUX_NATIVE
+extern int linux_disk_backup_upgrade(int);
+#endif
 #endif
 static void starter_save(void){
- z(&sv,sizeof sv);sv.magic=0x44433131;sv.rev=SAVE_REV;sv.hp=100;sv.gear=-1;sv.look=defaultLook;
+ z(&nv,sizeof nv);z(&sv,sizeof sv);sv.magic=0x44433131;sv.rev=SAVE_REV;sv.hp=100;sv.gear=-1;sv.look=defaultLook;
  sv.x=loc[12].x;sv.y=loc[12].y;sv.vehicleCond=100;for(int i=0;i<LEN(specs);i++)sv.carCond[i]=100;sv.b[1].product=2;
 }
 static int name_ok(const char*n){for(int i=0;i<20;i++){if(!n[i])return 1;if(n[i]<32||n[i]>126)return 0;}return 0;}
-static int valid_profile_save(void){
- int patch_ok=sv.rev==SAVE_REV_PATCHES?sv.medPatches>0&&sv.medPatches<=MAX_MED_PATCHES:!sv.medPatches;
+static int valid_profile_save(int extended){
+ /* Upstream uses the 304-byte Rev11 only when patches are stocked.
+    The 1044-byte Base Village extension also has Rev11; it accepts empty
+    and stocked patch counts without changing either disk layout. */
+ int patch_ok=extended?sv.medPatches<=MAX_MED_PATCHES:sv.rev==SAVE_REV_PATCHES?sv.medPatches>0&&sv.medPatches<=MAX_MED_PATCHES:!sv.medPatches;
  return sv.intro<=4&&look_valid(&sv.look)&&sv.legacyClock<=1&&patch_ok&&name_ok(sv.name);
 }
 static int valid_banking_save(void){
@@ -391,17 +487,52 @@ static int valid_banking_save(void){
 static int valid_sweep_save(void){
  return sv.charges?sv.sweepTicks>0&&sv.sweepTicks<=REVENUE_SWEEP_TICKS:sv.sweepTicks==0;
 }
+enum{NW_SAVE_X=6,NW_SAVE_Y=7,NW_SAVE_SCALE=64,HYBRID_SAVE_MARK=63};
+static void save_outer_position(void){
+ nv.world[NW_SAVE_X]=nv.world[NW_SAVE_Y]=0;
+ if(outer_is_new(p.x,p.y)&&outer_area(p.x,p.y,3)){
+  nv.world[NW_SAVE_X]=(U)(p.x*NW_SAVE_SCALE+.5f);
+  nv.world[NW_SAVE_Y]=(U)(p.y*NW_SAVE_SCALE+.5f);
+ }
+}
+static void restore_outer_position(void){
+ nv.world[NW_SAVE_X]&=0x7fffffffu;
+ if(!nv.world[NW_SAVE_X]&&!nv.world[NW_SAVE_Y])return;
+ float x=(float)nv.world[NW_SAVE_X]/NW_SAVE_SCALE,y=(float)nv.world[NW_SAVE_Y]/NW_SAVE_SCALE;
+ if(outer_is_new(x,y)&&outer_area(x,y,3)){sv.x=x;sv.y=y;}
+ else nv.world[NW_SAVE_X]=nv.world[NW_SAVE_Y]=0;
+}
+/* Old Afterhours builds can still read the compatible 304-byte prefix
+ * with a safe original-city location; only the new build sees outer terrain. */
+static void outer_safe_anchor(Save*s){
+ static const int gates[][2]={{1792,512},{1792,1024},{1792,1792},{1024,1792}};
+ float best=1.e20f;int pick=0;
+ for(int i=0;i<LEN(gates);i++){
+  float d=d2(p.x-gates[i][0],p.y-gates[i][1]);
+  if(d<best){best=d;pick=i;}
+ }
+ s->x=(float)gates[pick][0];s->y=(float)gates[pick][1];
+}
 void load_save(void){
- wason=0;z(&sv,sizeof sv);
+ wason=0;z(&sv,sizeof sv);z(&nv,sizeof nv);
 #ifndef DC_TEST
- if(disk_read(&sv,sizeof sv)&&sv.magic==0x44433131&&sv.hash==savehash()&&valid_save_core()&&valid_profile_save()&&valid_banking_save()&&valid_sweep_save()){
+ Save11 withNight;
+ if(disk_read(&withNight,sizeof withNight)&&withNight.base.rev==NIGHT_SAVE_REV&&
+    withNight.base.magic==0x44433131&&withNight.base.hash==night_hash(&withNight.base,sizeof(Save)-4)&&withNight.hash==night_hash(&withNight,sizeof withNight-4)){
+  cp(&sv,&withNight.base,sizeof sv);
+  if(valid_save_core()&&valid_profile_save(1)&&valid_banking_save()&&valid_sweep_save()&&valid_ledger_save(DAY_SECONDS)){
+   cp(&nv,&withNight.night,sizeof nv);restore_outer_position();accept_loaded_save();return;
+  }
+  z(&sv,sizeof sv);
+ }
+ if(disk_read(&sv,sizeof sv)&&sv.magic==0x44433131&&sv.hash==savehash()&&valid_save_core()&&valid_profile_save(0)&&valid_banking_save()&&valid_sweep_save()){
   if((sv.rev==SAVE_REV||sv.rev==SAVE_REV_PATCHES)&&valid_ledger_save(DAY_SECONDS)){accept_loaded_save();return;}
   if(sv.rev==9&&valid_ledger_save(LEGACY_DAY_SECONDS)){
    migrate_day_clock();accept_loaded_save();return;
   }
  }
- if(disk_read(&sv,LEGACY8_SIZE)&&sv.magic==0x44433131&&sv.rev==8&&(U)sv.sweepTicks==hashbytes(LEGACY8_SIZE-4)&&valid_save_core()&&valid_ledger_save(LEGACY_DAY_SECONDS)&&valid_profile_save()&&valid_banking_save()){seal_loaded(1);return;}
- if(disk_read(&sv,LEGACY7_SIZE)&&sv.magic==0x44433131&&sv.rev==7&&(U)sv.bank==hashbytes(LEGACY7_SIZE-4)&&valid_save_core()&&valid_ledger_save(LEGACY_DAY_SECONDS)&&valid_profile_save()){seal_loaded(0);return;}
+ if(disk_read(&sv,LEGACY8_SIZE)&&sv.magic==0x44433131&&sv.rev==8&&(U)sv.sweepTicks==hashbytes(LEGACY8_SIZE-4)&&valid_save_core()&&valid_ledger_save(LEGACY_DAY_SECONDS)&&valid_profile_save(0)&&valid_banking_save()){seal_loaded(1);return;}
+ if(disk_read(&sv,LEGACY7_SIZE)&&sv.magic==0x44433131&&sv.rev==7&&(U)sv.bank==hashbytes(LEGACY7_SIZE-4)&&valid_save_core()&&valid_ledger_save(LEGACY_DAY_SECONDS)&&valid_profile_save(0)){seal_loaded(0);return;}
  if(disk_read(&sv,LEGACY6_SIZE)&&sv.magic==0x44433131&&sv.rev==6&&sv.playedTicks==hashbytes(LEGACY6_SIZE-4)&&valid_save_core()&&valid_ledger_save(LEGACY_DAY_SECONDS)&&sv.intro<=4){legacy_profile();seal_loaded(0);return;}
  if(disk_read(&sv,LEGACY6_SIZE-52)&&sv.magic==0x44433131&&sv.rev==5&&(U)sv.legit[0].owned==hashbytes(LEGACY6_SIZE-56)&&valid_save_core()&&sv.intro<=4){migrate_economy();return;}
  if(disk_read(&sv,LEGACY6_SIZE-56)&&sv.magic==0x44433131&&sv.rev==4&&sv.taxiFares==hashbytes(LEGACY6_SIZE-60)&&valid_save_core()&&sv.intro<=4){sv.taxiFares=0;migrate_economy();return;}
@@ -410,9 +541,22 @@ void load_save(void){
 #endif
  starter_save();
 }
-void request_save(void){if(scene==0||scene==5||p.dead)return;sv.x=p.x;sv.y=p.y;sv.hp=p.hp;stamp_save();
+void request_save(void){if(scene==0||scene==5||p.dead)return;sv.x=p.x;sv.y=p.y;sv.hp=p.hp;stamp_save();save_outer_position();
 #ifndef DC_TEST
- saveFlash=disk_write(&sv,sizeof sv)?200:-200;
+ int changed=0;const unsigned char *p=(const unsigned char*)&nv;
+ for(unsigned i=0;i<sizeof nv;i++)if(p[i]){changed=1;break;}
+ if(changed){
+  if(sv.medPatches)nv.garage[HYBRID_SAVE_MARK]|=0x80000000u;
+  Save11 blob;cp(&blob.base,&sv,sizeof sv);cp(&blob.night,&nv,sizeof nv);
+  blob.base.rev=NIGHT_SAVE_REV;if(outer_is_new(blob.base.x,blob.base.y))outer_safe_anchor(&blob.base);
+  blob.night.world[NW_SAVE_X]|=0x80000000u;
+  blob.base.hash=night_hash(&blob.base,sizeof(Save)-4);
+  blob.hash=night_hash(&blob,sizeof blob-4);
+#ifdef DC_LINUX_NATIVE
+  if(!linux_disk_backup_upgrade(sv.medPatches)){saveFlash=-200;return;}
+#endif
+  saveFlash=disk_write(&blob,sizeof blob)?200:-200;
+ }else saveFlash=disk_write(&sv,sizeof sv)?200:-200;
 #else
  saveFlash=200;
 #endif
@@ -427,7 +571,7 @@ static void spawnPlayer(void){
  npc_reset();pulse_guard_reset();
  wheelFists=wheelOpen=wheelFeedback=0;wheelSuppressed=0;
  stoppingToExit=0;
- cameraLeadX=cameraLeadY=0;
+ ng_cam_reset();
  p=(Player){0};p.x=sv.x;p.y=sv.y;
  if(!street_foot_clear(p.x,p.y,-1)){
    /* A saved driver resumes on foot; clear parked vehicles as well as
@@ -441,9 +585,16 @@ static void spawnPlayer(void){
    if(!found){p.x=street_curb(sv.x,1);p.y=street_curb(sv.y,1);}
 
  }
- p.hp=cl(sv.hp,15,100);p.car=-1;cars[0].type=sv.selection;cars[0].cond=sv.owned?cl(sv.carCond[sv.selection],0,100):0;
+ p.hp=cl(sv.hp,15,100);p.car=-1;cars[0].type=sv.selection;vehicle_set_health(cars,sv.owned?vehicle_saved_hp(sv.selection):0);
+ if(sv.owned&&outer_is_new(p.x,p.y)){
+  Car nearRide=cars[0];int rx=(int)p.x,ry=(int)p.y;
+  int lane=outer_nearest(p.x,p.y,&rx,&ry,80);
+  if(lane>=0){const OuterRoad*r=outerRoads+lane;
+   nearRide.a=look(outerNodes[r->b].x-outerNodes[r->a].x,outerNodes[r->b].y-outerNodes[r->a].y);}
+  if(street_find_car_space(0,&nearRide,p.x,p.y,0,33))street_stage_car(0,nearRide);
+ }
 }
-void init_city(void){vd_reset();revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};setupCity();bake_scenery();spawnCars();load_save();spawnPlayer();scene=0;menu=-1;mapOn=0;shelterT=0;job.kind=jobRide=-1;lastCar=near=by=-1;lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;profiles_init();}
+void init_city(void){vd_reset();night_world_reset();outer_life_reset();ng_reset();revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};setupCity();bake_scenery();spawnCars();load_save();spawnPlayer();scene=0;menu=-1;mapOn=0;shelterT=0;job.kind=jobRide=-1;lastCar=near=by=-1;lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;profiles_init();}
 static void heat(float n){p.heat+=n;if(p.heat>300)p.heat=300;p.quiet=8.0f;}
 static void health(int n){
  if(p.hit>0)return;
@@ -790,12 +941,12 @@ static void makeMenu(void){
  case 3:for(d=0;d<LEN(specs);d++){if(sv.owned&(1<<d))add(specs[d].name,"Owned: deploy from your garage.",30+d);else priced(specs[d].name,specs[d].price,"Buy outright and deploy immediately.",30+d);}{
   int ride=service_ride();
   if(ride<0)add("NO VEHICLE IN SERVICE RANGE","Park a car at Nightglass or own a garage ride.",0);
-  else if(cars[ride].cond==100)add("VEHICLE ALREADY SERVICED","The eligible car is at full condition.",0);
+  else if(vehicle_hp(cars+ride)==VEHICLE_CONDITION_MAX)add("VEHICLE ALREADY SERVICED","The eligible car is at full condition.",0);
   else{
    char *label=append(strings[nopt],"SERVICE ");label=append(label,specs[cars[ride].type].name);append(label,"  $32");
    add(strings[nopt],ride?"Repair the vehicle parked at Nightglass.":"Repair your selected garage vehicle.",35);
   }
- }break;
+ }add("AFTERHOURS / MOTOR WORKS","Browse the custom garage, inspect builds or join a night run.",184);break;
  case 4:case 5:{int i=m-4;Business*b=sv.b+i;
  if(!b->own){priced("BUY PROPERTY",facilityPrice[i],i?"Unlocks the synthetic product line.":"Unlocks two fictional grow products.",40+i);break;}
  if(b->timer<=0){
@@ -856,6 +1007,7 @@ static void makeMenu(void){
 }
 static void doOpt(int a){
  if(a==N_ACT_OPEN){if(npc_open_context())menu=-1;return;}
+ if(a==184){night_garage_open(-1);return;}
  if(a==CAB_RANK_ACTION){cab_rank_counter();return;}
  if(legal_opt(a,&menu))return;
  if(a>=10&&a<=17){beginJob(a-10);return;}
@@ -864,8 +1016,8 @@ static void doOpt(int a){
    tell("Finish or abandon the sprint before changing the registered car.");return;
   }
   int i=a-30,newCar=!(sv.owned&(1<<i));
-  int cond=newCar?100:cl(sv.carCond[i],0,100);
-  Car next={p.x,p.y,0,0,i,1,cond};
+  Car next={.x=p.x,.y=p.y,.type=i,.owner=1};
+  vehicle_set_health(&next,newCar?VEHICLE_CONDITION_MAX:vehicle_saved_hp(i));
   if(!street_find_car_space(0,&next,p.x,p.y,0,94)&&
      !street_find_car_space(0,&next,p.x,p.y,0,0)){
    tell("No clear curb space. Try the garage again.");return;
@@ -873,8 +1025,8 @@ static void doOpt(int a){
   if(newCar&&!canDirtyPurchase(specs[i].price))return;
   if(newCar&&sv.intro==3)sv.intro=4;
   street_stage_car(0,next);
-  sv.owned|=1<<i;sv.selection=i;sv.vehicleCond=sv.carCond[i]=cond;lastCar=0;p.car=-1;
-  tell(cond?"Ride ready by the curb.":"Wreck at the curb; use Service at the desk.");menu=-1;finish_purchase();request_save();return;
+  sv.owned|=1<<i;sv.selection=i;sv.vehicleCond=next.cond;vehicle_store_health(i,&next);lastCar=0;p.car=-1;
+  tell(next.cond?"Ride ready by the curb.":"Wreck at the curb; use Service at the desk.");menu=-1;finish_purchase();request_save();return;
  }
  switch(a){
  case 20:if(canDirtyPurchase(45)){sv.units+=3;tell("Three supply credits added.");}break;
@@ -892,10 +1044,10 @@ static void doOpt(int a){
  case 35:{
   int ride=service_ride();
   if(ride<0)tell("Bring a vehicle to Nightglass first.");
-  else if(cars[ride].cond==100)tell("The vehicle is already at full condition.");
+  else if(vehicle_hp(cars+ride)==VEHICLE_CONDITION_MAX)tell("The vehicle is already at full condition.");
   else if(canDirtyPurchase(32)){
-   cars[ride].cond=100;
-   if(!ride)sv.vehicleCond=sv.carCond[sv.selection]=100;
+   vehicle_set_health(cars+ride,VEHICLE_CONDITION_MAX);
+   if(!ride){sv.vehicleCond=100;vehicle_store_health(sv.selection,cars);}
    tell("Vehicle serviced to 100 condition.");
   }
   break;
@@ -958,15 +1110,17 @@ static void shoot(void){
  if(p.shot>0)return;
  if(!pistol_equipped()){punch();return;}
  PulsePose g=pulse_pose(2.5f);
- /* Block muzzle-level cover at contact; don't fire from the carry pose. */
+ /* Do not consume charge or fire while the pose is held against cover. */
  if(g.hand)return;
- p.shot=sv.gear>0?.21f:.33f;p.trail=.11f;heat(24);
+ int range=sv.gear>0?165:112,damage=sv.gear>0?2:1,hit=-1;
+ float cooldown=sv.gear>0?.21f:.33f;U beam=GOLD;
+ if(!night_venue_apply_pulse(&range,&damage,&cooldown,&beam))return;
+ trailInk=beam;p.shot=cooldown;p.trail=.11f;heat(24);
  firedPulse=g;firedX=p.x;firedY=p.y;firedA=p.a;
- trailX=g.mx;trailY=g.my;particle(trailX,trailY,5,GOLD);
- int range=sv.gear>0?165:112,hit=-1;float best=range;
- float co=g.co,si=g.si;
- /* Keep the original aiming cone, distances and through-cover guard.
-    The actual ray from the muzzle also must have clear sight to a hit. */
+ trailX=g.mx;trailY=g.my;particle(trailX,trailY,5,beam);
+ float best=range,co=g.co,si=g.si;
+ /* Both the original aiming cone and muzzle-level cover checks apply
+    to all fitted pulse frames. */
  for(int i=0;i<LEN(peds);i++){
    Ped*q=peds+i;if(q->hp<=0||npc_replaces(N_ACT_STREET+i))continue;
    float dx=q->x-p.x,dy=q->y-p.y,d=dx*co+dy*si,side=absf(dx*si-dy*co);
@@ -980,7 +1134,7 @@ static void shoot(void){
   float t=street_tracer_fraction(g.mx,g.my,co*left,si*left);
   trailEndX=g.mx+co*left*t;trailEndY=g.my+si*left*t;
  }
- if(hit>=0){Ped*q=peds+hit;q->hp-=sv.gear>0?2:1;particle(q->x,q->y,10,q->role?TEAL:PINK);if(q->hp<=0){q->life=12;heat(q->role?28:41);}}
+ if(hit>=0){Ped*q=peds+hit;q->hp-=damage;particle(q->x,q->y,10,q->role?TEAL:PINK);if(q->hp<=0){q->life=12;heat(q->role?28:41);}}
 }
 #include "dispatch.inc"
 static void npcTick(float dt){
@@ -1041,18 +1195,29 @@ void tick(U keys){
  // Keep fractional frame precision during long sessions.
  anim+=dt;if(anim>=3600.f)anim-=3600.f;
  if(scene==0||scene==5){profiles_tick(tap);return;}
+ if(scene==NIGHT_PHONE_SCENE){if(tap&SAVE)request_save();night_phone_tick(keys,tap);return;}
  if(vd_input(tap))return;
+ if(!p.dead&&menu<0&&!mapOn&&(scene==1||scene==3||scene==4||scene==NIGHT_CLUB_SCENE||scene==NIGHT_GARAGE_SCENE||scene==NIGHT_VENUES_SCENE||scene==NIGHT_TRAP_SCENE)
+    &&night_phone_toggle(tap)){night_phone_open();return;}
  if(!p.dead&&(tap&(SLOT|NEW_SLOT))){profiles_open(!!(tap&NEW_SLOT));return;}
  if(saveFlash>0)saveFlash--;if(saveFlash<0)saveFlash++;
  if(!p.dead&&scene!=2&&menu!=PAUSE_MENU){
    if(sv.playedTicks!=~0u)sv.playedTicks++;
    production_tick(dt);
    revenue_tick();
+   night_world_tick(dt);night_phone_world_tick(dt);night_trap_world_tick(dt);night_club_business_tick();night_venues_world_tick();ng_schedule_tick();outer_life_tick(dt);
  }
  if(tap&SAVE)request_save();
  if(scene==3&&menu!=PAUSE_MENU&&shelterT>0&&(shelterT-=dt)<=0)finish_shelter_rest();
  bank_warning_tick();
- if(scene==3){interior_tick(keys,tap);return;}
+ if(scene==NIGHT_CLUB_SCENE){night_club_tick(keys,tap);return;}
+ if(scene==NIGHT_GARAGE_SCENE){night_garage_tick(keys,tap);return;}
+ if(scene==NIGHT_VENUES_SCENE){night_venues_tick(keys,tap);return;}
+ if(scene==NIGHT_TRAP_SCENE){night_trap_tick(keys,tap);return;}
+ if(night_trap_entry(tap))return;
+ if(night_club_entry(tap))return;
+ if((scene==3||scene==4)&&night_venues_entry(tap))return;
+ if(scene==3){if(menu<0)night_venue_reload(tap);interior_tick(keys,tap);return;}
  if(scene==4){walkin_tick(keys,tap);return;}
  if(scene==2){if(tap&(ESC|ENTER|USE|HELP)){scene=helpBack;}return;}
  if(p.dead){
@@ -1072,6 +1237,11 @@ void tick(U keys){
  if(tap&HELP){helpBack=1;scene=2;return;}
  if((tap&MAP)&&menu<0){mapOn=!mapOn;if(mapOn)navigation_input(tap);return;}
  if(mapOn){if(tap&ESC)mapOn=0;else navigation_input(tap);return;}
+ if((tap&CAMERA)&&p.car>=0&&menu<0){
+  nv.garage[60]=!ch_pref();
+  tell(ch_pref()?(fastGfx?"Chase view selected. Turn off F2 Low FX to use it.":"Chase view / C for overhead."):"Overhead view / C for chase.");
+  request_save();
+ }
  if(tap&GFX){fastGfx=!fastGfx;tell(fastGfx?"Low FX on: rain and dynamic glows off.":"Full FX on.");}
  if(menu<0){
   if(taxi_occupied()&&taxi.phase==TAXI_RIDING&&(taxi.copper==CAB_OFFER||taxi.copper==CAB_VIA))
@@ -1093,11 +1263,12 @@ void tick(U keys){
   if(stoppingToExit){y=0;keys|=BRAKE;}
   /* Pressing the opposite pedal brakes first. The same input can then
    * creep in the other direction instead of launching backwards. */
-  if(y<0)c->s+=s->acc*dt*(c->s<-1.f?1.45f:1.f);
-  if(y>0)c->s-=s->acc*dt*(c->s>1.f?2.4f:.53f);
-  if(!y)c->s*=.977f;if(keys&BRAKE)c->s*=.90f;
+  int power=ng_power(c),gripTier=ng_grip(c);
+  if(y<0)c->s+=s->acc*(1+.12f*power)*dt*(c->s<-1.f?1.45f:1.f);
+  if(y>0)c->s-=s->acc*dt*(c->s>1.f?2.4f*night_world_brake():.53f);
+  if(!y)c->s*=.977f;if(keys&BRAKE)c->s*=1.f-.10f*night_world_brake();
   float healthFactor=.50f+.005f*c->cond;
-  float limit=s->vmax*healthFactor,reverse=s->reverse*healthFactor;
+  float limit=s->vmax*healthFactor*(1+.065f*power),reverse=s->reverse*healthFactor;
   if(c->s>limit)c->s=limit;if(c->s<-reverse)c->s=-reverse;
   if(vd_cross_player_stop(c,cs(c->a)*c->s*dt,sn(c->a)*c->s*dt))c->s=0;
   float f=absf(c->s);
@@ -1106,14 +1277,18 @@ void tick(U keys){
     * at highway speed. Shift brings back quick, tight steering. */
    float grip=f>155.f?155.f/f:1.f;
    if(grip<.65f)grip=.65f;
-   street_turn_car(p.car,wrap(c->a+x*s->turn*grip*(keys&BRAKE?1.3f:1)*dt*(c->s>0?1:-1)));
+   street_turn_car(p.car,wrap(c->a+x*s->turn*(1+.07f*gripTier)*grip*night_world_grip()*(keys&BRAKE?1.3f:1)*dt*(c->s>0?1:-1)));
   }
   float xx=c->x,yy=c->y;
+  if(night_phone_lane_stop(xx,yy,xx+cs(c->a)*c->s*dt,yy+sn(c->a)*c->s*dt,17)){
+   c->s=f=0;
+   if(p.noticeT<=0)tell("Freight Parkway closed. Use the Belt Workshops detour.");
+  }
   street_drive_car(p.car,cs(c->a)*c->s*dt,sn(c->a)*c->s*dt);
   if(d2(c->x-xx,c->y-yy)<f*f*dt*dt*.32f&&f>16){
-   int damage=cl((int)(f*f/1450),1,37);taxiImpact=damage;c->cond=max(0,c->cond-damage);c->s*=-.27f;
-   if(damage>=3){particle(xx,yy,14,GOLD);if(crashFlash<=0){char msg[45];fmt(msg,"CRASH  /  CONDITION ",c->cond);tell(msg);}crashFlash=.45f;}
-   if(p.car==0&&c->owner==1)sv.vehicleCond=sv.carCond[c->type]=c->cond;
+   int damage=cl((int)(f*f/1450),1,37);taxiImpact=damage;vehicle_impact(c,damage);c->s*=-.27f;
+   if(damage>=3){particle(xx,yy,14,GOLD);if(crashFlash<=0){char msg[45];vehicle_condition_text(append(msg,"CRASH  /  CONDITION "),c);tell(msg);}crashFlash=.45f;}
+   if(p.car==0&&c->owner==1){sv.vehicleCond=c->cond;vehicle_store_health(c->type,c);}
   }
   if(f>52){
     float co=cs(c->a),si=sn(c->a);
@@ -1139,8 +1314,13 @@ void tick(U keys){
     end_job();tell("Job failed: the assigned vehicle was wrecked.");
    }else tell("Wrecked. Find another ride or visit Nightglass Motors.");
   }
- }else{float v=(keys&BRAKE?FOOT_SPRINT_SPEED:FOOT_WALK_SPEED)*dt*(x&&y?.707107f:1);if(x||y)p.a=look(x,y);street_player_step(x*v,y*v);npc_stance(p.x,p.y,&p.a);pulse_guard_tick(1,p.x,p.y,p.a,0);
-  if(!npc_attack(keys,p.x,p.y,p.a)){if(keys&PUNCH)punch();else if(keys&FIRE)shoot();}}
+ }else{
+  night_venue_reload(tap);
+  float v=(keys&BRAKE?FOOT_SPRINT_SPEED:FOOT_WALK_SPEED)*dt*night_world_foot()*night_venues_walk_factor()*(x&&y?.707107f:1);
+  if(x||y)p.a=look(x,y);
+  street_player_step(x*v,y*v);npc_stance(p.x,p.y,&p.a);pulse_guard_tick(1,p.x,p.y,p.a,0);
+  if(!npc_attack(keys,p.x,p.y,p.a)){if(keys&PUNCH)punch();else if(keys&FIRE)shoot();}
+ }
  if(stoppingToExit&&p.car>=0&&absf(cars[p.car].s)<5){
   stoppingToExit=0;
   if(!street_exit_car())tell("The door is blocked. Pull into a clear space.");
@@ -1152,7 +1332,8 @@ void tick(U keys){
  by=placeNear();near=carNear();
  if((tap&USE)&&(keys&BRAKE)&&p.car<0&&npc_open_near())tap&=~USE;
  if(vd_frame(keys,tap))tap&=~(USE|ENTER);
- if((tap&USE)&&!job_use_street()){
+ night_garage_street(tap);if(scene!=1)return;
+ if((tap&USE)&&!job_use_street()&&!night_phone_action(tap)&&!night_venue_vendor_entry(tap)){
   if(p.car>=0)vehicle_use(-1);
   else {
    StreetUse target=street_use_target(by,near);
@@ -1181,11 +1362,13 @@ void pointer_input(int sx,int sy,U clicks){
  wheelX=sx;wheelY=sy;
  if(wheelOpen)return;
  if(scene==0||scene==5){profiles_pointer(sx,sy,clicks);return;}
+ if(scene==NIGHT_CLUB_SCENE){night_club_pointer(sx,sy,clicks);return;}
+ if(scene==NIGHT_PHONE_SCENE){night_phone_pointer(sx,sy,clicks);return;}
  if(scene==1&&mapOn&&!p.dead)navigation_pointer(sx,sy,clicks);
 }
 
 static int sx(float x){return(int)x-cx;}static int sy(float y){return(int)y-cy;}
-static int beam_block(int x,int y){return (U)x>=ROOM||(U)y>=ROOM||roofMask[y*ROOM+x];}
+static int beam_block(int x,int y){return (U)x>=ROOM||(U)y>=ROOM||roofMask[y*ROOM+x]||(outer_is_new(x,y)&&!outer_onroad(x,y));}
 static void projectLights(Car*c){
  if(fastGfx||c->cond<=0)return;
  int x=sx(c->x),y=sy(c->y);if(x<-95||y<-95||x>W+95||y>H+95)return;
@@ -1208,6 +1391,15 @@ static void projectLights(Car*c){
  }
 }
 #include "model_vehicle.inc"
+#include "night_vehicles.inc"
+static void carbody(Car*c,int x,int y){
+ int type=cl(c->type,0,4),owned=c==cars&&c->owner==1&&(sv.owned&(1<<type));
+ if(!owned){model_car_stock(c,x,y);return;}
+ NgMods m=ng_installed(type);
+ ng_model(x,y,c->a,1.f,0,type,specs[type].c,m,c->cond,road_lamps(c),owned&&m.sub&&absf(c->s)<2&&p.car<0);
+ int hp=vehicle_hp(c);if(hp>0&&hp<135){disc(x-2,y-3,3,0x303640);if(hp<69)disc(x-3-(int)(anim*8)%7,y-8,3,0x4a535b);}
+ if(c->owner==1&&p.car<0){line(x-4,y-18,x,y-14,LIME);line(x,y-14,x+4,y-18,LIME);}
+}
 typedef struct{int x,y;}Pt;
 static int previewRig;
 /* Keep the gameplay feet on the same world point. Scale the articulated
@@ -1385,6 +1577,7 @@ static void light(int x,int y,int radius,U color,int weight){
  int rr=radius*radius;
  for(int j=max(0,y-radius);j<min(ROOM,y+radius);j++)for(int i=max(0,x-radius);i<min(ROOM,x+radius);i++){int d=(i-x)*(i-x)+(j-y)*(j-y);int a=(rr-d)*weight/rr;if(a>0){U*q=city+j*ROOM+i;*q=mix(*q,color,min(7,a));}}
 }
+#include "street_lamps.inc"
 static void tree_crown(int x,int y,int id){
  const U greens[]={0x356c58,0x4c845e,0x4f786e,0x578c6d};
  U a=greens[id%4];
@@ -1392,12 +1585,13 @@ static void tree_crown(int x,int y,int id){
  disc(x,y-8,11,0x253e3b);disc(x-3,y-11,8,a);disc(x+3,y-11,6,mix(a,0x91bb78,2));
 }
 #include "district_art.inc"
+#include "club_front.inc"
 static void setup_ordinary_doors(void){
  z(ordinaryDoorX,sizeof ordinaryDoorX);z(ordinaryDoorY,sizeof ordinaryDoorY);
  for(int i=0;i<nb;i++){
   const Building*b=buildings+i;
   if(b->w<=0||b->h<=0||zone_is_building(i))continue;
-  int x=b->x+b->w/2+b->ht/4,y=b->y+b->h+15;
+  int x=i==ncFrontId?b->x+121:b->x+b->w/2+b->ht/4,y=b->y+b->h+15;
   ordinaryDoorX[i]=x;ordinaryDoorY[i]=y;
  }
 }
@@ -1447,10 +1641,8 @@ static void bake_scenery(void){
     disc(trunk.x+8,trunk.y+1,12,0x172823);
     tree_crown(trunk.x+3,trunk.y-4,id+i);
    }
-   if(gx&&gy){int xx=x+31,yy=y-34;U c=y<600?0x845987:x>1300?0x388b8c:0x8d7352;light(xx,yy,46,c,4);
-    rect(xx-1,yy-1,3,13,0x293842);rect(xx-4,yy-4,8,4,mix(c,PAPER,5));
-    if((gx+gy)%2==0){int tx=x-34,ty=y+38;light(tx,ty,27,0x549e92,3);rect(tx,ty,2,10,0x4b6364);rect(tx-2,ty-4,6,5,TEAL);}
-   }
+   StreetLamp fixture;
+   for(int k=0;k<2;k++)if(street_lamp_legacy(gx,gy,k,&fixture))street_lamp_bake(&fixture);
  }
  z(roofMask,sizeof roofMask);
  for(int tile=0;tile<64;tile++){
@@ -1468,6 +1660,12 @@ static void bake_scenery(void){
  clipLeft=clipTop=0;clipRight=clipBottom=ROOM;
  for(int i=0;i<LEN(loc);i++)zone_art(i);
  for(int i=0;i<nb;i++)paint_ordinary_door(i);
+ paint_afterimage_front();
+ night_world_bake();
+ outer_bake();
+ for(int i=0;i<LEN(outerNodes);i++){
+  StreetLamp fixture;if(street_lamp_outer(i,&fixture))street_lamp_bake(&fixture);
+ }
  surface=pixels;rw=W;rh=H;clipLeft=clipTop=0;clipRight=W;clipBottom=H;
 }
 static void diamond(int x,int y,int r,U c){line(x-r,y,x,y-r,c);line(x,y-r,x+r,y,c);line(x+r,y,x,y+r,c);line(x,y+r,x-r,y,c);}
@@ -1543,7 +1741,7 @@ static void hud(void){
  box(650,16,294,79,DARK,0x415766);
  draw_wallet(650,16,294);
  rect(845,70,82,6,0x34434b);rect(845,70,p.hp*82/100,6,0x6ea7ee);
- if(p.car>=0){fmt(v,"CAR ",cars[p.car].cond);textat(670,64,v,cars[p.car].cond<40?GOLD:MUTED,0);}else textat(670,64,pistol_equipped()?"PULSE":"FISTS",MUTED,0);
+ if(p.car>=0){vehicle_condition_text(append(v,"CAR "),cars+p.car);textat(670,64,v,vehicle_hp(cars+p.car)<120?GOLD:MUTED,0);}else textat(670,64,pistol_equipped()?"PULSE":"FISTS",MUTED,0);
  int h=(p.heat>15)+(p.heat>80)+(p.heat>150);
  if(h>0){textat(761,64,"HEAT",PINK,0);for(int i=0;i<h;i++)diamond(813+i*9,76,3,PINK);}
  else if(p.heat>0)textat(761,64,"CLEARING",PINK,0);
@@ -1584,17 +1782,18 @@ static const GuideBinding guideStreet[]={
  {"WASD/ARROWS","Move or steer"},{"SHIFT","Sprint / handbrake"},
  {"E","Use / talk / board"},{"ENTER","Confirm / ride tram"},
  {"HOLD E","Brake to exit at speed"},{"X / SPACE","Punch / attack"},
- {"T","Accept next taxi fare"},{"TAB / V","Wheel / med patch"},
- {"SHIFT + E","Talk at shared prompt"}
+ {"T","Next taxi fare"},{"TAB / V","Wheel / med patch"},
+ {"SHIFT + E","Talk at shared prompt"},{"C","Switch driving view"}
 },guideCareer[]={
  {"M","Open / close atlas"},{"LMB / RMB","Set / clear GPS pin"},
  {"F1","Field guide"},{"F2","Toggle low FX"},
  {"F3 / F4","Saves / new career"},{"F5","Save current career"},
  {"ESC / F6","Pause / city listings"}
 };
+static int guide_step(int count){return count>9?20:count>8?23:26;}
 static void guide_column(int x,const char*title,const GuideBinding *rows,int count,int keyw){
  textat(x,153,title,TEAL,0);rect(x,177,367,1,0x39545e);
- int step=count>8?23:26;
+ int step=guide_step(count);
  for(int i=0;i<count;i++){
   int y=183+i*step;
   if(!(i&1))rect(x,y,367,step-3,0x162931);
@@ -1627,6 +1826,7 @@ static void add_sprite(StreetSprite*list,int*count,int x,int y,int kind,int id){
 /* Actors behind a facade can extend beyond their foot position. Restore
  * only the visible face where that sprite overlaps the baked building. */
 static void cover_behind_buildings(int x,int y){
+ if((U)x>=BASE_ROOM||(U)y>=BASE_ROOM)return;
  int tile=(y/256)*8+x/256;
  if((U)tile>=64)return;
  const int*row=lot[tile];
@@ -1639,6 +1839,29 @@ static void cover_behind_buildings(int x,int y){
    /* The east wall slopes away from the top-right corner. */
    int edge=b->x+b->w+cl((yy-(b->y-b->ht))/2,0,b->ht/2);
    for(int xx=left;xx<min(right,edge);xx++)pixels[(yy-cy)*W+xx-cx]=city[yy*ROOM+xx];
+  }
+ }
+}
+static void night_city_actors(void){
+ int door=night_club_listing();
+ int count=night_club_queue(),wx=ordinaryDoorX[door],wy=ordinaryDoorY[door];
+ if(count&&wx){
+  int x=sx(wx),y=sy(wy);
+  if((unsigned)x<W&&(unsigned)y<H){
+   for(int i=0;i<count;i++){
+    int px=wx-21-(i%4)*16,py=wy+16+(i/4)*13;
+    if(!solid(px,py,5))person(sx(px),sy(py),i%3?0x887392:0x76a7ac,
+                               (int)(sn(anim*(3+i*.4f))*2),-1.5708f,0,i);
+   }
+   if(count>=4){rect(x-73,y+34,50,2,0xc39870);disc(x-73,y+34,2,GOLD);disc(x-23,y+34,2,GOLD);}
+  }
+ }
+ if(night_venue_vendor_pos(&wx,&wy)){
+  int x=sx(wx)-21,y=sy(wy)+21;
+  if(x>-30&&y>-30&&x<W+30&&y<H+30){
+   ng_model(x,y,0,1.65f,0,4,0x884a5c,(NgMods){0,0,0,0,0,0},100,0,0);
+   rect(x-21,y+15,44,2,0xdc8cb2);
+   diamond(sx(wx),sy(wy),9,0xf6aada);
   }
  }
 }
@@ -1695,31 +1918,38 @@ static void draw_street_actors(void){
 /* The field guide is an overlay. Pass its previous view to the renderer
  * without changing the authoritative scene or resuming simulation. */
 static void paint_world(int view){
- if(view==3){interior_paint();return;}
- if(view==4){walkin_paint();return;}
+ if(view==3){interior_paint();if(scene!=2)night_venues_hint();return;}
+ if(view==4){
+  walkin_paint();
+  if(scene!=2){
+   night_venues_hint();
+   if(walkin_active==NIGHT_CLUB_LEGACY&&menu<0){box(695,443,249,28,0x261829,0xad6283);center(818,448,"ENTER / THE AFTERIMAGE",0xf7b5d1,0);}
+  }
+  return;
+ }
+ if(view==NIGHT_CLUB_SCENE){night_club_paint();return;}
+ if(view==NIGHT_GARAGE_SCENE){night_garage_paint();return;}
+ if(view==NIGHT_VENUES_SCENE){night_venues_paint();return;}
+ if(view==NIGHT_TRAP_SCENE){night_trap_paint();return;}
  if(mapOn){minimap();return;}
  cx=camera_left();cy=camera_top();
+ int introVenue=job.kind<0&&vdActive<0?nav_intro_venue():-1;
+ if(ch_draw())goto street_objectives;
  typedef U V4 __attribute__((vector_size(16),aligned(1),may_alias));
  for(int y=0;y<H;y++){const V4 *q=(const V4*)(city+(cy+y)*ROOM+cx);V4 *r=(V4*)(pixels+y*W);for(int x=0;x<W/4;x++)r[x]=q[x];}
  roadFX_paint(cx,cy);
+ night_world_street_fx();
+ night_phone_road_paint();night_trap_street_paint();
  cab_marquee_paint();
- if(!fastGfx)for(int i=0;i<100;i++){int x=(i*197+((int)(anim*28))%W)%W,y=(i*233+((int)(anim*174))%H)%H;
-   U c=mix(pixels[y*W+x],0x6e8d9d,2);line(x,y,x-2,y+5,c);}
- int introVenue=job.kind<0&&vdActive<0?nav_intro_venue():-1;
- for(int i=0;i<LEN(loc);i++){const Place*l=loc+i;int x=sx(l->x),y=sy(l->y);if(x<-110||y<-25||x>W+110||y>H+25)continue;
-  if(i==by||i==introVenue){
-    int w=textw(l->label,0)+16;box(x-w/2,y-40,w,23,DARK,mix(l->tint,DARK,3));center(x,y-40,l->label,l->tint,0);
-  }
- }
- if(introVenue>=0){int tx=sx(loc[introVenue].x),ty=sy(loc[introVenue].y);mark(cl(tx,27,W-27),cl(ty,150,H-70),16+(int)(sn(anim*4)*3),LIME);}
  for(int i=0;i<nc;i++)if(i==p.car||absf(cars[i].s)>9)projectLights(cars+i);
- draw_street_actors();npc_body_paint(cx,cy);vd_world();
+ draw_street_actors();outer_life_paint();night_city_actors();
+ night_phone_contact_paint();npc_body_paint(cx,cy);vd_world();
  atm_kiosk_hint();
  int x=sx(p.x),y=sy(p.y);
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0)disc(sx(fx[i].x),sy(fx[i].y),2,fx[i].c);
  if(p.trail>0){
   int mx=sx(trailX),my=sy(trailY),ex=sx(trailEndX),ey=sy(trailEndY);
-  line(mx,my,ex,ey,GOLD);
+  line(mx,my,ex,ey,trailInk);
   if(p.trail>.064f){
    float m=sq(d2((float)(ex-mx),(float)(ey-my)));
    /* The flash brightens the muzzle, not the far side of a contact. */
@@ -1732,15 +1962,35 @@ static void paint_world(int view){
   box(x-10,y-7,20,14,0x594537,0x9e8163);
   rect(x-9,y-1,18,2,0x272b30);rect(x-2,y-4,4,8,0xd0a07a);
  }
+ ng_world();
+ if(scene==1&&menu<0&&atmOpen<0)night_venues_fx();
+ ng_cam_compose();
+ street_objectives:;
+ for(int i=0;i<LEN(loc);i++){const Place*l=loc+i;int x=sx(l->x),y=sy(l->y);ng_cam_point(&x,&y);if(x<-110||y<-25||x>W+110||y>H+25)continue;
+  if(i==by||i==introVenue){
+    int w=textw(l->label,0)+16;box(x-w/2,y-40,w,23,DARK,mix(l->tint,DARK,3));center(x,y-40,l->label,l->tint,0);
+  }
+ }
+ /* Use map-sized type over the physical marquee, so it is legible even from
+    the player's first position outside Apartment 4. */
+ if(ncFrontId>=0&&p.car<0&&p.x<550&&absf(p.y-ordinaryDoorY[ncFrontId])<215){
+  int x=sx(ordinaryDoorX[ncFrontId]),y=sy(ordinaryDoorY[ncFrontId])+74;
+  const char*label="STRIP CLUB / THE AFTERIMAGE";int w=textw(label,0)+18;
+  if(x>=w/2+4&&x<=W-w/2-4&&y>=169&&y<=H-90){
+   box(x-w/2,y-25,w,24,0x271b30,0xd68eb2);center(x,y-24,label,0xffc5e0,0);
+   tri(x-5,y-25,x+5,y-25,x,y-30,0xd68eb2);
+  }
+ }
+ if(introVenue>=0){int tx=sx(loc[introVenue].x),ty=sy(loc[introVenue].y);ng_cam_point(&tx,&ty);if(tx>=750&&ty>=333)tx=730;mark(cl(tx,27,W-27),cl(ty,150,H-70),16+(int)(sn(anim*4)*3),LIME);}
  if(vdActive>=0&&vdGoalX>=0){
-  int gx=sx(vdGoalX),gy=sy(vdGoalY);
+  int gx=sx(vdGoalX),gy=sy(vdGoalY);ng_cam_point(&gx,&gy);
   if(gx>=25&&gx<W-25&&gy>125&&gy<H-65)diamond(gx,gy,12,TEAL);
   else{int ax=cl(gx,29,W-30),ay=cl(gy,138,H-80);if(ax>730&&ay>365)ax=730;mark(ax,ay,10,TEAL);}
  }
  if(job.kind>=0){
   int ride=job_vehicle_target();
   NavPoint target=nav_job_goal();
-  int x=sx(target.x),y=sy(target.y);
+  int x=sx(target.x),y=sy(target.y);ng_cam_point(&x,&y);
   U color=ride>=0?GOLD:job.kind<4?TEAL:PINK;
   if(job.kind==JOB_SPRINT&&ride<0&&x>=30&&x<W-30&&y>=82&&y<H-60){
    int leg=job.step?job.step-1:0,next=job.step?job.step:1;
@@ -1764,7 +2014,18 @@ static void paint_world(int view){
   }else if(job_venue()>=0||job_room()>=0)diamond(x,y,9,color);
   else mark(x,y,14+(int)(sn(anim*4)*4),color);
  }
- hud();minimap();
+ int phoneX,phoneY;
+ if(job.kind<0&&vdActive<0&&night_phone_route(&phoneX,&phoneY)){
+  int px=sx(phoneX),py=sy(phoneY);ng_cam_point(&px,&py);
+  if(px>=34&&px<=W-34&&py>=97&&py<=H-70&&!(px>=750&&py>=333))diamond(px,py,10,0xff9adb);
+  else {int ax=cl(px,31,W-32),ay=cl(py,148,H-72);if(ax>=750&&ay>=333)ax=730;mark(ax,ay,8,0xff9adb);}
+ }
+ hud();night_world_hud();minimap();ng_gate_overlay();ch_badge();night_trap_hint();
+ if(scene==1&&menu<0&&p.car<0&&!p.dead&&job.kind<0&&vdActive<0&&!vdPanel&&atmOpen<0){
+  int x,y;if(night_venue_vendor_pos(&x,&y)&&d2(p.x-x,p.y-y)<42*42){
+   box(317,486,326,29,DARK,0xf6aada);center(W/2,489,"E   NIGHT SIGNAL VAN",0xf6aada,0);
+  }
+ }
  if(scene==2)return; /* No second modal underneath the guide. */
  if(p.dead){modal(240,149,480,212,PINK);textat(268,171,"DOWN IN VANTA",PINK,1);textat(269,231,sv.home?"Recover at your Breakwater safehouse.":"Tideway Clinic charges up to $35 for recovery.",PAPER,0);textat(269,284,"ENTER  /  RECOVER",LIME,0);return;}
  if(menu>=0){paint_active_menu();draw_wallet(650,16,294);}
@@ -1773,6 +2034,7 @@ static void paint_world(int view){
 #include "weapon_wheel.inc"
 void paint(void){
  if(scene==0||scene==5){profiles_paint();return;}
+ if(scene==NIGHT_PHONE_SCENE){night_phone_paint();return;}
  if(scene==2){paint_world(helpBack);field_guide();return;}
  paint_world(scene);vd_draw();
  bank_warning_draw();
@@ -1782,3 +2044,104 @@ void paint(void){
 
 #include "verdict_activities.inc"
 #include "npc_encounter.inc"
+#include "night_world.inc"
+#if __has_include("night_club.inc")
+#include "night_club.inc"
+#else
+static int night_club_open(int b){(void)b;return 0;}
+static void night_club_tick(U k,U t){(void)k;(void)t;}
+static void night_club_paint(void){}
+static int night_club_track(void){return 0;}
+static int night_club_queue(void){return 0;}
+static int night_club_signature_demand(int n){(void)n;return -1;}
+static void night_club_business_tick(void){}
+static void night_club_pointer(int x,int y,U c){(void)x;(void)y;(void)c;}
+#endif
+#if __has_include("night_garage.inc")
+#include "night_garage.inc"
+#else
+static int night_garage_open(int b){(void)b;return 0;}
+static void night_garage_tick(U k,U t){(void)k;(void)t;}
+static void night_garage_paint(void){}
+static int night_garage_audio(void){return 0;}
+static void ng_reset(void){}
+static void night_garage_street(U tap){(void)tap;}
+static void ng_world(void){}
+static void ng_gate_overlay(void){}
+static int night_garage_meet_site(int*x,int*y){(void)x;(void)y;return 0;}
+static void ng_schedule_tick(void){}
+static NgMods ng_installed(int type){(void)type;return (NgMods){0};}
+static int ng_power(const Car*c){(void)c;return 0;}
+static int ng_grip(const Car*c){(void)c;return 0;}
+static int ng_route_goal(int*x,int*y){(void)x;(void)y;return 0;}
+#endif
+#if __has_include("night_phone.inc")
+#include "night_phone.inc"
+#else
+static void night_phone_open(void){}
+static void night_phone_tick(U k,U t){(void)k;(void)t;}
+static void night_phone_paint(void){}
+static void night_phone_pointer(int x,int y,U c){(void)x;(void)y;(void)c;}
+static void night_phone_world_tick(float dt){(void)dt;}
+static int night_phone_toggle(U tap){(void)tap;return 0;}
+static int night_phone_action(U tap){(void)tap;return 0;}
+static int night_phone_radio(void){return 0;}
+static int night_phone_premium(int consume){(void)consume;return 0;}
+static int night_phone_signature(int design,int consume){(void)design;(void)consume;return 0;}
+static int night_phone_take_link(void){return 0;}
+static void night_phone_link_result(int ok){(void)ok;}
+static void night_phone_rest(int hours){(void)hours;}
+static void night_phone_road_paint(void){}
+static void night_phone_contact_paint(void){}
+static int night_phone_route(int*x,int*y){(void)x;(void)y;return 0;}
+static int night_phone_heat_at(int x,int y){(void)x;(void)y;return 0;}
+static void night_phone_heat_add(int x,int y,int amount){(void)x;(void)y;(void)amount;}
+static int night_phone_lane_stop(float x,float y,float a,float b,int radius){(void)x;(void)y;(void)a;(void)b;(void)radius;return 0;}
+#endif
+#include "night_trap.inc"
+#if __has_include("night_venues.inc")
+#include "night_venues.inc"
+#else
+static int night_venues_open(int b){(void)b;return 0;}
+static void night_venues_tick(U k,U t){(void)k;(void)t;}
+static void night_venues_paint(void){}
+static int night_venues_entry(U tap){(void)tap;return 0;}
+static void night_venues_hint(void){}
+static void night_venues_world_tick(void){}
+static void night_venues_fx(void){}
+static int night_venue_vendor_stop(void){return -1;}
+static int night_venue_apply_pulse(int*a,int*b,float*c,U*d){(void)a;(void)b;(void)c;(void)d;return 1;}
+static void nvk_stats(int*a,int*b,float*c,U*d){(void)a;(void)b;(void)c;(void)d;}
+static void night_venue_reload(U tap){(void)tap;}
+static int night_venue_vendor_pos(int*x,int*y){(void)x;(void)y;return 0;}
+static int night_venue_vendor_entry(U tap){(void)tap;return 0;}
+static float night_venues_walk_factor(void){return 1.f;}
+#endif
+static int night_club_entry(U tap){return scene==4&&walkin_active==NIGHT_CLUB_LEGACY&&menu<0&&(tap&ENTER)&&night_club_open(walkin_active);}
+/* The phone module never opens websites itself. The host consumes one
+ * explicitly confirmed intent, with only the known official site allowed. */
+int take_phone_link(void){return night_phone_take_link();}
+void phone_link_result(int ok){night_phone_link_result(ok);}
+int night_music_track(void){
+ if(scene==NIGHT_CLUB_SCENE){int s=cl(night_club_track(),0,3);return s?2+s:0;}
+ int station=cl(night_phone_radio(),0,3);
+ if(!station||scene==0||scene==5||p.dead)return 0;
+ if(p.car>=0)return 5+station+(night_garage_audio()>0?3:0);
+ return night_garage_audio()==2?11+station:0;
+}
+int exit_save_ok(void){
+ int original=scene;
+ if(original==0||original==5){
+  if(!profileReturn||saveFlash>=0)return 1;
+  scene=profileReturn;
+ }
+ if(p.dead){scene=original;return 1;}
+ request_save();
+ scene=original;
+ return saveFlash>=0;
+}
+
+
+
+#include "outer_life.inc"
+#include "chase_view.inc"

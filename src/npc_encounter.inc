@@ -366,15 +366,18 @@ static int npc_attack(U keys,float x,float y,float a){
   if(f<3||l>13||d2(dx,dy)>=27*27||!npc_clear(x,y,r->x,r->y))return scene==3;
   p.shot=.34f;punchFlash=.21f;npcEnc.hp--;
  }else{
-  int range=sv.gear>0?165:112;
+  int range=sv.gear>0?165:112,damage=sv.gear>0?2:1;
+  float cooldown=sv.gear>0?.21f:.33f;U ink=GOLD;
+  nvk_stats(&range,&damage,&cooldown,&ink);
   PulsePose g=scene==1?pulse_pose(2.5f):npc_local_aim(x,y,a,player_gait(),2.5f,int_solid);
   if(g.hand)return 1;
   if(f<=0||f<g.extent-.01f||f>=range||l>=13.f+f*.12f||
      !npc_clear(x,y,r->x,r->y)||!npc_clear(g.mx,g.my,r->x,r->y))return scene==3;
-  p.shot=sv.gear>0?.21f:.33f;npcEnc.hp-=sv.gear>0?2:1;
+  if(!night_venue_apply_pulse(&range,&damage,&cooldown,&ink))return 1;
+  p.shot=cooldown;npcEnc.hp-=damage;
   if(scene==1){
    p.trail=.11f;firedPulse=g;firedX=p.x;firedY=p.y;firedA=p.a;
-   trailX=g.mx;trailY=g.my;trailEndX=r->x;trailEndY=r->y;particle(trailX,trailY,5,GOLD);
+   trailInk=ink;trailX=g.mx;trailY=g.my;trailEndX=r->x;trailEndY=r->y;particle(trailX,trailY,5,ink);
   }else{
    npcTraceTicks=7;npcTracePose=g;npcTraceEndX=r->x;npcTraceEndY=r->y;
    npcTracePlayerX=x;npcTracePlayerY=y;npcTraceFacing=a;

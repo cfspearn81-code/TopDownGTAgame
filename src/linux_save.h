@@ -1,6 +1,9 @@
 #ifndef DC_LINUX_SAVE_H
 #define DC_LINUX_SAVE_H
 int linux_disk_init(void);
+int linux_disk_lock(void);
+int linux_disk_backup_legacy(void);
+int linux_disk_backup_upgrade(int stock_patches);
 void linux_disk_shutdown(void);
 int disk_read(void *bytes,unsigned size);
 int disk_write(const void *bytes,unsigned size);

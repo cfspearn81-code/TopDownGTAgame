@@ -133,12 +133,12 @@ static void city_rhythm_test(void){
  for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){
   shops++;p.x=ordinaryDoorX[i];p.y=ordinaryDoorY[i];assert(open_space(p.x,p.y));
   NavPoint door=nav_door(LEN(loc)+i);mapOn=1;
-  navigation_pointer(NAV_MAP_X+door.x*NAV_MAP_SIZE/ROOM,NAV_MAP_Y+door.y*NAV_MAP_SIZE/ROOM,0);
+  navigation_pointer(NAV_MAP_X+door.x*NAV_MAP_SIZE/nav_span(),NAV_MAP_Y+door.y*NAV_MAP_SIZE/nav_span(),0);
   assert(navSelected==LEN(loc)+i);mapOn=0;
   NavAnchor connections[6];assert(nav_anchors(door,connections)>0);
   if(tram_hall(i))tram=i;
  }
- assert(shops==63&&tram>=0);
+ assert(shops==63+(ncFrontId>=0)&&tram>=0);
  walkin_open(tram);wi_x=wi_f[0].x+wi_f[0].w/2;wi_y=wi_f[0].y+wi_f[0].h+10;
  assert(wi_at_station());sv.cash=4;press(ENTER);assert(walkin_active==tram&&sv.cash==4);
  sv.cash=10;p.heat=50;press(ENTER);assert(walkin_active==tram&&sv.cash==10);p.heat=0;
@@ -324,12 +324,12 @@ int main(void){
   if(zone_is_building(i))continue;
   assert(ordinaryDoorY[i]&&open_space(ordinaryDoorX[i],ordinaryDoorY[i]));
   move_to(ordinaryDoorX[i],ordinaryDoorY[i]);assert(ordinary_door_near()==i);
-  press(USE);assert(scene==4&&walkin_active==i);paint();
+  press(USE);assert(scene==(i==ncFrontId?NIGHT_CLUB_SCENE:4)&&walkin_active==i);paint();
   if(portals%10==0){char path[45];char*q=append(path,"build/walkin-");q=number(q,portals);append(q,".ppm");frame(path);}
   /* Return using the existing city-facing outside location, with no save change. */
   scene=1;portals++;
  }
- assert(shells==portals+LEN(loc)&&shells==78);
+ assert(shells==portals+LEN(loc)&&shells==78+(ncFrontId>=0));
  for(int i=0;i<32;i++){
   float a=i*6.283186f/32;rect(0,0,W,H,DARK);person(480,260,0xc6d979,0,a,4,3);
   Pt h=rig(480,260,cs(a),sn(a),1,0,14);int whites=0;
@@ -435,5 +435,5 @@ int main(void){
  sidewalk_patrol_test();
  puts("Passed: vehicle re-entry, parked car selection, pause/map isolation, lethal wreck interaction and driving camera.");
  puts("Passed: stopped recovery handoff, licensed circuit, exact Vectra, two radio studios, carried lockbox, guarded consignment, restitution and safehouse recovery.");
- puts("Passed: apartment spawn with zero cash/fists; doorway/counter walk; three indoor deliveries; weapon purchase; property batch while menu and map stay open; solid car, crash and repair; moving car theft; punch; finite dispatch; warm lights and low FX; GPS/manual route, automatic foot and driving checkpoints, taxi boarding/drop-off/cancellation plus T and 100 varied offers, wallet semantics, 78 building paths, and save checksum.");
+ puts("Passed: apartment spawn with zero cash/fists; doorway/counter walk; three indoor deliveries; weapon purchase; property batch while menu and map stay open; solid car, crash and repair; moving car theft; punch; finite dispatch; warm lights and low FX; GPS/manual route, automatic foot and driving checkpoints, taxi boarding/drop-off/cancellation plus T and 100 varied offers, wallet semantics, all building paths, and save checksum.");
 }

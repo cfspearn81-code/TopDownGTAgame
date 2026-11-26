@@ -1,0 +1,88 @@
+SIGNAL 09 / PORT VANTA FIELD CARD
+================================
+P opens Signal. Left/right selects an app, up/down selects a row, and
+Enter or E acts. P or Escape closes it. Settings can switch the handset
+key to F7 for this save. Time stops while reading.
+
+YOUR FIRST REQUEST
+Inbox > Mara is a prepaid legal job: after accepting, press E on foot
+outside Ferry Market, then outside Mercury Dispatch, for $105 clean.
+The Quest log shows the current handoff address and the manifest.
+Your own pin remains yours. Use Quest log > Pin route to change it.
+Canceling a request never discards your existing stock.
+Night Wire > Customer DM opens the rotating inbox request directly.
+
+GLASSHOUSE
+The Lantern Grow Loft is $3000: buy it with a confirmed press in
+Glasshouse or through the existing shop. Existing owners keep their
+deed, original production, crew and stocks. The new cabinet models
+fictional game strains of cannabis using arcade-only stats and a timer;
+it does not simulate real cultivation. Choose a strain and grade:
+Halo Moss starts unlocked. Lighting opens Prism Fern. Hydroponics opens
+Echo Bloom. Either opens B/Select. Ventilation opens A/Top Shelf.
+C is the standard House grade. Each upgrade grants one power slot.
+
+The Arcade power profile applies to the next lot:
+  Balanced: three units at standard power and time.
+  Low Draw: two units, lower power and a longer timer.
+  Showpiece: four units, extra power, higher cost and local attention.
+The active lot keeps its own strain, grade and profile. Queue it,
+return to play and wait for Signal's notice. Walk to the loft door or
+into its shop, then choose Process and shelve. Stockroom moves up to
+three matching units to your satchel at once; the exact strain and
+grade are preserved on shop shelves, in the satchel and in home storage.
+A full bin holds 99 and doesn't discard extra stock.
+
+For example, Lux requests two House-grade Halo Moss units. Process a
+Balanced batch at the loft, grab it in Stockroom and press E on foot
+outside Apartment Four. Non-prepaid deliveries pay in city scrip. Never
+substitute a different strain or a higher grade: valuation depends on
+the exact order. The Afterimage also requests exact Top Shelf strains.
+
+SAVE COMPATIBILITY
+Afterhours Signal quantities, orders, ownership, grades and running
+timers are preserved. The old collectible print names and edition
+labels in the handset became fictional strain lots and quality grades
+at the same saved indices: field -> House, foil -> Select, signature
+-> Top Shelf. Active old jobs run at the Balanced profile. The legal
+prepaid ferry proof still works exactly as before. Original ungraded
+warehouse stock isn't changed or converted.
+
+NIGHT WIRE
+Use this one feed for customer DMs, nightly rotating meets and race
+invitations, Afterimage headliners and live VIP demands, weather,
+rotating Signal Cart vendor clues, road closures and housing pointers.
+Night Cart gear is posted 19:00-04:59. The same clue pins the daytime
+cosmetic showroom when the street gear counter is not open.
+Ferry Night Garden runs 08:00-17:59; Kiosk Lantern Exchange runs
+22:00-01:59. RSVP to the open pop-up, then press E on foot by its
+address for one House-grade welcome sample per elapsed game day.
+Freight Parkway roadworks close the signed parkway segment at
+06:00-07:59 and 16:00-17:59. Connected local roads stay open.
+District Pulse shows neighborhood attention. Repeat handoffs, police
+sightings, high-grade sales and power-heavy cabinet runs raise it.
+Rival interruptions at 65 delay a handoff without taking your stock.
+A Top Shelf handoff at 85 can trigger the game's existing dispatch.
+Attention cools during ordinary active play. Bunk sleep is a voluntary
+in-game time skip that also reduces the district meter. To clear other
+temporary effects, visit the Bunk or fountain reset at Apartment Four
+or a leased residence. Settings sells a fictional burner SIM token
+for game credits. Activating one rotates the on-screen Signal alias
+and subtracts 15 local attention, then starts a 60-second game
+cooldown. It does not change any active pursuit or real-world service.
+
+MUSIC
+Glasswave, Lantern FM and Freightline are original stations. District
+dial retunes as you travel. Choose Off to mute the station. Garage
+audio upgrades apply to the native mix. YouTube Music is external:
+choose Radio > YouTube Music, then confirm that it opens your browser.
+The game hands off only https://music.youtube.com/. It doesn't embed
+or route commercial streams, sign in on your behalf, or launch a site
+without this confirmation. If the desktop browser handler is missing,
+open the official address yourself.
+
+BELL LANE ANNEX
+Night Wire's Trap House post pins the signed side door in Tide Market.
+It is separate from Lantern Grow Loft and costs $480 clean. The
+Afterimage posts pin its new front entrance west of Apartment Four.
+See TRAP-HOUSE.txt and THE-AFTERIMAGE.txt for directions.

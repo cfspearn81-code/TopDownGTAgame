@@ -1,0 +1,56 @@
+DEAD CHANNEL / BASE VILLAGE | LINUX RELEASE QA
+
+Baseline: exact Outer Loop source from archive SHA-256
+6190500b792213c54ba1d71d602c51e1fada33c077b565749d10392a33375802.
+Baseline ELF SHA-256:
+a8bcbc86d1494a4a43ac61c746c8b7850ba95800418023f21ce8953c081babe7.
+
+Tests use disposable careers, real Linux processes and scripted SDL
+keyboard/mouse input plus software frames. That doesn't certify
+physical audio output or every desktop shell. Package is x86-64 Linux.
+
+Club: a genuinely new zero-cash career walks through Apartment Four's
+door on normal input, stays on the street and walks west for 95 frames,
+then enters the full club directly with E. No first-shift job is started.
+M atlas pointer and Signal both pin (179, 676). Exiting and writing the
+save returns to that door. Shadow Stage still opens into its own original
+foyer and the same club remains reachable via Enter.
+
+Trap House: Bell Lane's signed side entrance is a physical destination.
+The atlas and Signal pin the same spot; the original Bell Lane Tailors
+remains separate. Normal UI paths tested the paid deed, all three upgrade
+types and resulting stats, exact grade preservation, active-job entry
+protection, and wallet debits and earnings. Native SDL replays executed
+a deed and upgrades, a physical room walk, an exact graded stash and a
+rush booking, then relaunched with the remaining timer and claimed
+one $96 payment. Ownership, condition, activity and inventory are real
+save data; no gameplay uses a network.
+
+Street lamps: reference is Career Files at git commit
+bd5d4e61ddb9830b125aabc9bfd03e4a04017e6d. The 49 primary and 25 alternate
+legacy fixtures retain their original positions, colors and 8x4 / 6x5
+lenses. Dark ground bake matches the original fixture sample. Fog,
+Low FX and wet reflection are tested; the same palette/model is adapted
+to the optional perspective view and the added Outer Loop roads.
+
+Vehicles: matched same-speed impacts across five car models checked
+timing, impulse and exactly two-thirds damage. The Nightjar example
+left 80.7 of 100 condition (formerly 71), and 150 raw damage points
+now destroy an undamaged car instead of 100. Exact repair restores
+100. Per-model partial wear survived a restart and switching cars.
+The pre-update test save rewrites byte-for-byte before any collision.
+
+Compatibility: normal Linux 3,664-frame keyboard replay still matches
+the original explicit-save digest. The existing native focus, mouse,
+F1, P/F7, positional resume, Rev2–10 import and POSIX concurrency
+checks were retained. The actual previous Outer Loop ELF wrote a
+synthetic mixed Rev11 career, then the new executable loaded and
+re-saved it without changing old ownership, settings or the adjacent
+slots. New phone fields stay zero until the house is used. No format
+change, no user save access and no GitHub publication.
+
+Rebuild: bash scripts/build-linux.sh
+Re-run targeted tests: bash scripts/test-base-village.sh
+
+Exact release ELF SHA-256:
+fdc07bdefd677d4750db56ccad046224eb0e6bea1734112ee180242975a79dcf
