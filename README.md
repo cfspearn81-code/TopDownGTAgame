@@ -5,9 +5,9 @@ Port Vanta. This is not GTA, a GTA port, or a browser game. The city, artwork,
 and game code are original to this project; the bundled font license is in
 [`docs/FONT-LICENSE.txt`](docs/FONT-LICENSE.txt).
 
-**Play:** [Download the Save Management Windows x64 ZIP](downloads/Dead-Channel-Save-Management-Windows-11-x64.zip?raw=true).
+**Play:** [Download the Port Vanta Contracts Windows x64 ZIP](downloads/Dead-Channel-Port-Vanta-Contracts-Windows-11-x64.zip?raw=true).
 Extract the ZIP and run `DeadChannel.exe`. No installer, network, or account
-is required. The window title reads `Dead Channel | Career Files - Save Management`.
+is required. The window title reads `Dead Channel | Port Vanta Contracts`.
 Previous local saves still load.
 
 Begin in Apartment 4, take Mara's courier job, and explore 78 enterable

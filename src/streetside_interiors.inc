@@ -59,6 +59,16 @@ static U wi_back[W*H],wi_seed;
 static const char *const wi_brand[]={"SALTMARSH","BLUE HOUR","LOW TIDE","HARBOURLIGHT","NINTH ST.","MARINER","BLUEBIRD","COPPER","WEST WIND","TERN","BELL LANE","GREYCAP"};
 static U wi_hash(U n){n=(n^(n>>16))*0x7feb352du;n=(n^(n>>15))*0x846ca68bu;return n^(n>>16);}
 static int wi_index(int b){return (b*7+4)%LEN(wiRoles);}
+static int contract_room(int kind,int x,int y,int exclude){
+ int role=kind==JOB_VAULT?WI_PARCELS:WI_RADIO;
+ int best=-1;float distance=ROOM*ROOM*2.f;
+ for(int i=0;i<nb;i++){
+  if(i==exclude||!ordinaryDoorY[i]||wiRoles[wi_index(i)].plan[0].t!=role)continue;
+  float d=d2(x-ordinaryDoorX[i],y-ordinaryDoorY[i]);
+  if(d<distance){best=i;distance=d;}
+ }
+ return best;
+}
 static const char*walkin_name(int b){
  if(b<0||b>=nb)return "STREET DOOR";
  if(!wi_names[b][0]){char*q=append(wi_names[b],wi_brand[(b/LEN(wiRoles)+wi_index(b)*3)%LEN(wi_brand)]);q=append(q," ");append(q,wiRoles[wi_index(b)].noun);}
@@ -166,21 +176,20 @@ static void walkin_tick(U keys,U tap){
  if(walkin_active<0||walkin_active>=nb){scene=1;return;}
  const float dt=1.f/60;
  if(tap&HELP){helpBack=4;scene=2;return;}
- if(tap&SAVE)request_save();if(tap&GFX)fastGfx=!fastGfx;
+ if(tap&GFX)fastGfx=!fastGfx;
  if(p.noticeT>0)p.noticeT-=dt;
- if(saveFlash>0)saveFlash--;if(saveFlash<0)saveFlash++;
- if(tap&ESC){if(menu>=0){menu=-1;return;}active(12);makeMenu();return;}
+ if(tap&ESC){if(menu>=0){menu=-1;return;}active(PAUSE_MENU);makeMenu();return;}
  if(menu>=0){makeMenu();if(!nopt){menu=-1;return;}if(tap&UP)sel=(sel+nopt-1)%nopt;if(tap&DOWN)sel=(sel+1)%nopt;if(tap&(USE|ENTER))doOpt(opt[sel].action);return;}
  int x=!!(keys&RIGHT)-!!(keys&LEFT),y=!!(keys&DOWN)-!!(keys&UP);
  float v=(keys&BRAKE?3.6f:2.5f)*(x&&y?.707107f:1.f);walking=x||y;
  if(walking){wi_angle=look(x,y);footcycle=wrap(footcycle+.25f);}
  if(!wi_solid(wi_x+x*v,wi_y))wi_x+=x*v;
  if(!wi_solid(wi_x,wi_y+y*v))wi_y+=y*v;
- p.secs+=dt;if(job.kind>=0&&!(job.kind==0&&sv.intro==2)&&(job.time-=dt)<=0){job.kind=-1;tell("Time ran out. You can retry or keep roaming.");}
- businessTick(dt);
+ p.secs+=dt;job_clock_tick(dt);
  if(tap&USE){
   if(wi_at_door()){int b=walkin_active;walkin_active=-1;scene=1;menu=-1;walking=0;
    p.x=ordinaryDoorX[b];p.y=ordinaryDoorY[b];p.a=1.570796f;by=placeNear();near=carNear();return;}
+  if(wi_at_station()&&job_room_action(walkin_active)){job_use_room();return;}
   if(wi_at_station()){wi_sw[walkin_active]^=1;const WiRole*r=wiRoles+wi_role;tell(wi_sw[walkin_active]?r->on:r->off);wi_bake();}
  }
 }
@@ -193,9 +202,13 @@ static void walkin_paint(void){
  char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,district(b->x,b->y));q=append(q,"   /   ");append(q,r->section);
  textat(22,9,ad,MUTED,0);textat(22,31,walkin_name(walkin_active),r->accent,1);draw_wallet(W-231,10,210);
  const InteriorProp*f=wi_f;int sx=f->x+f->w/2,sy=f->y-10;
- if(wi_at_station()){disc(sx,sy,10,0x23343d);center(sx,sy-10,"E",r->accent,0);}else{disc(sx,sy,4,DARK);disc(sx,sy,2,r->accent);}
+ const char *task=job_room_action(walkin_active);
+ U marker=task?PINK:r->accent;
+ if(wi_at_station()){disc(sx,sy,10,0x23343d);center(sx,sy-10,"E",marker,0);}
+ else{disc(sx,sy,4,DARK);disc(sx,sy,2,marker);}
  rect(16,477,W-32,1,0x475a65);
- const char*hint=wi_at_station()?r->action:wi_at_door()?"Return to street":"Walk to the lit station";
+ const char*hint=wi_at_door()?"Return to street":
+     wi_at_station()?(task?task:r->action):task?job_objective():"Walk to the lit station";
  textat(23,484,(wi_at_station()||wi_at_door())?"[E]":"WASD",r->accent,0);textat(81,484,hint,PAPER,0);
  if(p.noticeT>0)textat(23,509,notice,notice_color(),0);else if(saveFlash>0)textat(23,509,"Saved.",CASH_GREEN,0);else if(saveFlash<0)textat(23,509,"Save failed.",CASH_RED,0);
  if(menu>=0){paint_active_menu();draw_wallet(W-231,10,210);}

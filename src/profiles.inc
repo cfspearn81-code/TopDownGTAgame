@@ -67,7 +67,7 @@ static void profiles_open(int create){
  profiles_scan();if(create&&!profileError)new_profile();
 }
 static void profiles_activate(void){
- spawnCars();spawnPlayer();job.kind=-1;z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
+ end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
  navSlot=-1;walking=fn=deadAnim=saveFlash=0;punchFlash=crashFlash=0;lastCar=near=by=-1;
  lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;menu=-1;mapOn=0;profileReturn=0;profileError=0;
  if(sv.intro==0)open_interior(12);

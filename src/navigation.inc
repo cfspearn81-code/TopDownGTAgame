@@ -78,13 +78,18 @@ static void nav_slot(void){
  navSelected=navManualLoc=navVenue=-1;navHover=navKeyboard=0;
 }
 static NavPoint nav_door(int i){return (NavPoint){loc[i].x,loc[i].y};}
+static NavPoint nav_job_goal(void){
+ int ride=job_vehicle_target();
+ if(ride>=0)return (NavPoint){(int)cars[ride].x,(int)cars[ride].y};
+ return (NavPoint){job.xs[job.step],job.ys[job.step]};
+}
 static int nav_objective(NavPoint *to,int *venue){
  *venue=-1;
  if(navHasManual){*venue=navManualLoc;*to=*venue>=0?nav_door(*venue):navManual;return 3;}
  if(job.kind>=0&&job.step>=0&&job.step<job.total){
-  if(job.kind==0&&job.step<3){static const int drops[]={2,3,0};*venue=drops[job.step];*to=nav_door(*venue);}
-  else *to=(NavPoint){job.xs[job.step],job.ys[job.step]};
-  return 2;
+  *venue=job_venue();
+  *to=nav_job_goal();
+  return job_vehicle_target()>=0?4:2;
  }
  if(sv.intro==1||sv.intro==2){*venue=0;*to=nav_door(0);return 1;}
  return 0;
@@ -107,7 +112,7 @@ static void nav_update(void){
  }
  int venue,kind=nav_objective(&goal,&venue);
  if(!kind){navGoalKind=navCount=navDist=navLeg=0;navVenue=-1;return;}
- int driving=venue>=0&&p.car>=0;
+ int driving=p.car>=0&&(venue>=0||(kind==2&&job_room()>=0));
  if(kind!=navGoalKind||venue!=navVenue||!nav_same(navGoal,goal)||navLeg!=(driving?1:0)||anim<navNext-.25f||
     nav_dist(here,navOrigin)>88||(anim>=navNext&&nav_dist(here,navOrigin)>=12)){
   navGoalKind=kind;navVenue=venue;navGoal=goal;navOrigin=here;navNext=anim+.18f;
@@ -289,8 +294,7 @@ static void nav_overlay(const NavView*v,int large){
  NavPoint objective={0,0};
  int realGoal=0;U color=LIME;
  if(job.kind>=0&&job.step>=0&&job.step<job.total){
-  realGoal=1;objective=(NavPoint){job.xs[job.step],job.ys[job.step]};color=job.kind<4?TEAL:PINK;
-  if(job.kind==0&&job.step<3){static const int drops[]={2,3,0};objective=nav_door(drops[job.step]);}
+  realGoal=1;objective=nav_job_goal();color=job_vehicle_target()>=0?GOLD:job.kind<4?TEAL:PINK;
  }else if(sv.intro==1||sv.intro==2){realGoal=1;objective=nav_door(0);}
  if(realGoal){int x=nav_x(v,objective.x),y=nav_y(v,objective.y);
   if(nav_inside(v,x,y,large?12:8)){diamond(x,y,large?11:7,color);dot(x,y,color);}
@@ -318,7 +322,7 @@ static void minimap(void){
   box(x-4,y-4,w+8,h+30,NAV_INK,NAV_RIM);
   const NavView v={x,y,w,h,(int)p.x-span/2,(int)p.y-span*h/(2*w),span};
   nav_overlay(&v,0);box(x+5,y+4,22,21,NAV_INK,NAV_RIM);center(x+16,y+4,"N",PAPER,0);
-  if(navGoalKind){if(atCurb)append(s,"PARK / WALK");else{char *a=append(s,"GPS  ");if(navCount>=2)append(number(a,d)," m");else append(a,nav_dist(here,navGoal)<30?"AT MARKER":"NO ROAD");}
+  if(navGoalKind){if(navGoalKind==4)append(s,"JOB VEHICLE");else if(atCurb)append(s,"PARK / WALK");else{char *a=append(s,"GPS  ");if(navCount>=2)append(number(a,d)," m");else append(a,nav_dist(here,navGoal)<30?"AT MARKER":"NO ROAD");}
    textat(x+4,y+h+1,s,NAV_VIOLET,0);}
   else textat(x+4,y+h+1,"PORT VANTA",MUTED,0);
   textat(x+w-30,y+h+1,"[M]",PAPER,0);return;
@@ -339,7 +343,7 @@ static void minimap(void){
  disc(44,399,4,GOLD);textat(61,388,"LOCAL SERVICES",GOLD,0);
  tri(44,416,38,428,50,428,PAPER);textat(61,414,"YOUR HEADING",PAPER,0);
  dot(39,450,NAV_WALK);dot(44,450,NAV_WALK);dot(49,450,NAV_WALK);textat(61,440,"WALK FROM CURB",NAV_WALK,0);
- textat(31,479,"NORTH UP",MUTED,0);
+ diamond(44,477,6,GOLD);textat(61,466,"JOB VEHICLE",GOLD,0);
  textat(732,53,navKeyboard?"SELECTED":"MAP POINTER",NAV_VIOLET,0);rect(732,79,190,1,NAV_RIM);
  if(navSelected>=0){
   const Place*l=loc+navSelected;
@@ -350,7 +354,9 @@ static void minimap(void){
   textat(732,94,"CITY ATLAS",PAPER,0);wrapped(733,129,"Point at a venue or road to see what you can pin.",MUTED,20);
  }
  textat(732,257,"GUIDANCE",NAV_VIOLET,0);rect(732,281,190,1,NAV_RIM);
- const char *kind=navGoalKind==3?"MANUAL WAYPOINT":navGoalKind==2?"ACTIVE CHECKPOINT":navGoalKind==1?"MERCURY DISPATCH":"NO ACTIVE ROUTE";
+ const char *kind=navGoalKind==4?"JOB VEHICLE":navGoalKind==3?"MANUAL WAYPOINT":navGoalKind==2?"ACTIVE CHECKPOINT":navGoalKind==1?"MERCURY DISPATCH":"NO ACTIVE ROUTE";
+ if(navGoalKind==2&&navVenue>=0)kind=loc[navVenue].label;
+ if(navGoalKind==2&&job_room()>=0)kind=walkin_name(job_room());
  wrapped(733,292,kind,PAPER,20);
  if(navGoalKind){
   if(atCurb)append(s,"PARK HERE / WALK");
@@ -359,7 +365,8 @@ static void minimap(void){
   textat(733,330,s,NAV_VIOLET,0);
   if(navLeg&&!nav_same(navCurb,navGoal))wrapped(733,357,"Park, press E to exit, and follow dots to the door.",MUTED,20);
  }
- textat(732,454,"CITY SIGNAL / ONLINE",MUTED,0);
+ if(saveFlash)textat(732,454,saveFlash>0?"SAVED":"SAVE ERROR",saveFlash>0?CASH_GREEN:CASH_RED,0);
+ else textat(732,454,"F5   SAVE CAREER",MUTED,0);
 }
 #undef NAV_INK
 #undef NAV_SEA

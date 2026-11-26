@@ -35,9 +35,21 @@ int main(void){
  select_action(4,40);select_action(5,41);assert(sv.cash==12000&&sv.b[0].own&&sv.b[1].own);
  select_action(4,48);select_action(4,48);assert(sv.b[0].tier==3&&sv.cash==10200);
  select_action(5,49);select_action(5,49);assert(sv.b[1].tier==3&&sv.cash==5550);
- sv.units=3;select_action(4,44);select_action(5,45);assert(sv.units==0);
+ sv.units=3;select_action(4,44);assert(sv.units==3);
+ open_interior(4);int_switch_room(4,1);select_action(4,44);
+ open_interior(5);select_action(5,45);assert(sv.units==0);
  assert(sv.b[0].timer==120&&sv.b[1].timer==120);
  production_tick(119);assert(sv.stocks[0]==0&&sv.stocks[2]==0);
  production_tick(1);assert(sv.stocks[0]==17&&sv.stocks[2]==18);
+ sv.stocks[0]=30;sv.stocks[1]=10;sv.stocks[2]=35;sv.sales=0;
+ paid=sv.dirty;select_action(7,60);
+ assert(sv.stocks[0]==7&&sv.stocks[1]==10&&sv.stocks[2]==35&&sv.sales==20&&sv.dirty==paid+440);
+ assert(p.heat==0&&peds[40].hp==0);
+ select_action(5,52);assert(warehouse_secured(1)&&!warehouse_secured(0));
+ select_action(7,62);assert(sv.stocks[2]==15&&sv.stocks[0]==7);
+ sv.protect=1;assert(warehouse_secured(0)&&warehouse_secured(1)); /* Legacy universal lockboxes. */
+ sv.stocks[0]=60;sv.stocks[1]=0;sv.stocks[2]=0;sv.units=3;
+ sv.b[0].crew=1;sv.b[1].crew=1;production_tick(1.f);
+ assert(sv.b[0].timer==0&&sv.b[1].timer==120.f&&sv.units==1);
  puts("Passed: all three franchises, clean income, end-of-day delay, no auto payout, correct desk only, persistence, no duplicate claim, late deposit, audit, exact facility prices, upgrades and 120-second batches.");
 }

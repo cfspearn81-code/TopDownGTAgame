@@ -1,3 +1,46 @@
+PORT VANTA CONTRACTS QA
+
+- A fresh-career input replay completed all eight contracts and the
+  Mercury franchise settlement in 29,053 frames. The replay drove the
+  circuit, repaired and returned the van, lost two pursuits, used both
+  relay consoles, fought the rivals and delivered the collected cargo.
+- Integration checks covered payment only on handoff, the stop and car
+  requirements, the lockbox pursuit gate, police response to actual
+  actions, and recovery at an owned safehouse. Crossing a marker alone
+  earned no payout on the action-based contracts.
+- Reviewed all named venue menus, the four rear rooms, and ordinary
+  storefront interactions. Regression checks covered 78 doors, all three
+  franchise accounts, Lantern and Cinder batch controls and storage,
+  local warehouse security, Kiosk stock payments, and Revenue seizure.
+- Save and profile checks covered compatible saves, the creator, deletion,
+  protection during failed writes, and letterboxed mouse input. A legacy
+  warehouse security flag applied to both properties.
+- The Windows executable replay and 180,000-tick sanitizer soak passed.
+  Windows entry-point and save tests used simulated Win32 on Linux.
+  Physical Windows 11 windowing and input remain to be checked.
+
+PORT VANTA PLAYTEST QA
+
+- Started a fresh career and replayed 57,853 fixed-step inputs. Completed
+  Courier Shift, Taxi Fare, Harbor Recovery, Glass Mile Sprint, Vault Run,
+  Hot Property, Signal Raid, and Rival Collection. The route visited all
+  78 building interiors, operated 63 storefront fixtures, and returned
+  through the doors. It bought the Mercury franchise with earned clean
+  cash, used the rear desk, waited through closing and collected once.
+- The same input trace ran through the Windows x64 executable with
+  simulated Win32 services. The final save had four legal job completions,
+  four street job completions, $252 clean and $1,005 street cash.
+- The regular regression suite passed, including profiles, legacy saves,
+  letterboxed mouse input, all three franchises, and both production
+  properties. Added checks for F5 in the atlas, business clock suspension,
+  staged job car guidance, Hot Property handoff restrictions, and wrecks.
+- The regular sanitizer soak passed 180,000 ticks and 2,178 renders.
+  The extended soak passed 1,200,000 ticks and 14,496 renders across 48
+  starting contexts. The full playthrough ran separately with sanitizers.
+- Windows entry-point testing used simulated Win32 services on Linux.
+  Native Windows 11 windowing, display scaling and keyboard focus still
+  need a physical Windows playtest.
+
 SAVE MANAGEMENT / UPRIGHT PREVIEW QA
 
 - Replayed the exact packaged Windows x64 executable through its entry

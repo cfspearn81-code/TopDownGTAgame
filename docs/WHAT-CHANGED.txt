@@ -1,3 +1,30 @@
+PORT VANTA CONTRACTS
+
+- Courier work uses two deliveries and a signed manifest. Taxi riders
+  board an owned or licensed car. Recovery uses the actual stalled van.
+  Sprint timing starts at the line and follows the car you registered.
+- Vault Run uses a lockbox and a pursuit escape. Hot Property uses one
+  marked Vectra and a stopped handoff. Signal Raid uses separate radio
+  consoles. Rival Collection uses a guarded cache and a counter delivery.
+- Buy batch supplies at Ferry Market and use them at the facility's
+  terminal. Warehouse space and security apply to each property. Bulk
+  sales at Kiosk 09 affect stock at the supplying warehouse.
+- Rest at Breakwater or recover there after being downed. Nightglass
+  services a local or garage vehicle. Revenue accepts courier and
+  recovery shifts toward a case.
+
+PORT VANTA PLAYTEST
+
+- Added a gold marker and GPS route to staged job cars.
+- Hot Property tracks the stolen car from pickup to handoff. GPS leads
+  back to it if you change cars. Wrecking it ends the contract.
+- F5 saves from the atlas and reports the result there. Pause and the
+  Field Guide both freeze business timers and tracked playtime.
+- Wrecks stop and use a clear exit when available. Cars also stop when
+  the player is downed at the wheel.
+- Large balances fit in the interior wallet. Storefront switches reset
+  at career changes. Rendering work stays bounded as sessions get longer.
+
 CAREER FILES: SAVE MANAGEMENT
 
 - Added Delete Save with a confirmation showing the character name and

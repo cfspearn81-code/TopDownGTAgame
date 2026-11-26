@@ -99,7 +99,7 @@ static const Feature venue_feature[16]={
  {618,353,136,44,"VITALS STATION","The monitor finds a steady pulse. Ask Sol at triage about treatment."},
  {497,155,140,48,"HOUSE GALLEY","A kettle is still warm. Ask Reed about the safehouse lease and recovery."},
  {577,333,138,48,"RECOVERY WINCH","The yellow hoist is rigged for recovery work. Take an order from Dax."},
- {604,225,156,45,"PUBLIC RECORDS","Civil accounts: Holt can explain a case, collect a penalty or assign restitution work."},
+ {604,225,156,45,"PUBLIC RECORDS","Civil accounts: Holt can explain a case, collect a penalty or record community service."},
  {0},
  {550,154,123,48,"KITCHENETTE","The counter is bare. Mara left a note at the side table about a first shift."},
  {185,155,143,61,"TARGET LANES","The target carriage is behind safety glass. Ada handles purchases at the lit counter."},
@@ -253,6 +253,7 @@ static int int_at_door(void){return d2(interior_x-(W/2),interior_y-428)<43*43;}
 static int int_at_desk(void){return d2(interior_x-interior_desk_x,interior_y-interior_desk_y)<43*43;}
 static int int_at_staff_gate(void){return !interior_subroom&&d2(interior_x-GROW_GATE_X,interior_y-GROW_GATE_Y)<32*32;}
 static int int_at_grow_gate(void){return int_at_staff_gate();}
+static int lantern_terminal(void){return scene==3&&interior_active_loc==4&&interior_subroom;}
 static int int_at_chief(void){return d2(interior_x-CHIEF_X,interior_y-CHIEF_Y)<31*31;}
 static int int_at_custody(void){return d2(interior_x-CUSTODY_X,interior_y-CUSTODY_Y)<33*33;}
 static void int_switch_room(int k,int to){
@@ -263,6 +264,7 @@ static void int_switch_room(int k,int to){
 }
 static void int_leave(void){
  int_expire_fixture_notice();
+ shelterT=0;
  int intro=loc[interior_active_loc].kind==13&&sv.intro==0;
  p.a=-1.570796f;scene=1;menu=-1;interior_active_loc=-1;walking=0;
  by=placeNear();near=carNear();
@@ -273,11 +275,9 @@ static void interior_tick(U keys,U tap){
  const float dt=1.f/60;
  if(interior_fade>0)interior_fade--;
  if(tap&HELP){helpBack=3;scene=2;return;}
- if(tap&SAVE)request_save();
  if(tap&GFX)fastGfx=!fastGfx;
- if(tap&ESC){if(menu>=0){menu=-1;return;}active(12);makeMenu();return;}
+ if(tap&ESC){if(menu>=0){menu=-1;return;}active(PAUSE_MENU);makeMenu();return;}
  if(p.noticeT>0)p.noticeT-=dt;
- if(saveFlash>0)saveFlash--;if(saveFlash<0)saveFlash++;
  if(menu>=0){
   makeMenu();if(!nopt){menu=-1;return;}
   if(tap&UP)sel=(sel+nopt-1)%nopt;if(tap&DOWN)sel=(sel+1)%nopt;
@@ -291,12 +291,15 @@ static void interior_tick(U keys,U tap){
  if(!int_solid(interior_x,interior_y+y*v))interior_y+=y*v;
  interior_cam_x+=((interior_x-W/2)*.13f-interior_cam_x)*.11f;
  interior_cam_y+=((interior_y-282)*.08f-interior_cam_y)*.11f;
- p.secs+=dt;if(job.kind>=0&&!(job.kind==0&&sv.intro==2)&&(job.time-=dt)<=0){job.kind=-1;tell("Time ran out. You can retry or keep roaming.");}
- businessTick(dt);
+ p.secs+=dt;job_clock_tick(dt);
  if(tap&USE){
   int k=loc[interior_active_loc].kind,li=legal_index_for_kind(k);
   if(int_at_door()){if(interior_subroom)int_switch_room(k,0);else int_leave();return;}
-  if(k==4&&int_at_grow_gate()){int_switch_room(k,1);return;}
+  if(k==4&&int_at_grow_gate()){
+   if(sv.b[0].own)int_switch_room(k,1);
+   else tell("Grow room locked. Buy the property at the public counter.");
+   return;
+  }
   if(li>=0&&int_at_staff_gate()){
    if(!sv.legit[li].owned){tell("Staff door locked. Buy the franchise at the public counter's Business Office.");return;}
    int_switch_room(k,1);return;
@@ -982,18 +985,19 @@ static void interior_paint(void){
  textat(27,10,t->line,a,0);int big=textw(t->banner,1)<610;textat(26,29,t->banner,PAPER,big);
  char v[84];
  rect(0,483,W,57,0x111e28);rect(0,483,W,1,0x456570);
- const int dropping=job.kind==0&&loc[n].x==job.xs[job.step]&&loc[n].y==job.ys[job.step];
+ const int dropping=job.kind>=0&&job_venue()==n;
  const char *prompt="WASD / WALK   E / INTERACT   ESC / MENU";
  if(int_at_door())prompt=interior_subroom?(k==4?"E / RETURN TO STORE":"E / RETURN TO PUBLIC COUNTER"):"E / EXIT TO STREET";
- else if(k==4&&int_at_grow_gate())prompt="E / OPEN GROW ROOM";
+ else if(k==4&&int_at_grow_gate())prompt=sv.b[0].own?"E / OPEN GROW ROOM":"GROW ROOM / OWNER ACCESS";
  else if(li>=0&&int_at_staff_gate())prompt=sv.legit[li].owned?"E / OPEN STAFF DOOR":"STAFF DOOR / FRANCHISE OWNERS ONLY";
  else if(k==15&&int_at_chief())prompt="E / SPEAK TO CHIEF RIVAS";
  else if(k==15&&int_at_custody())prompt="E / INSPECT CUSTODY GATE";
- else if(int_at_desk())prompt=k==13?"E / READ NOTE":li>=0&&interior_subroom?"E / USE ACCOUNT DESK":dropping?"E / HAND OFF PACKAGE":k==4&&interior_subroom?"E / OPERATE BATCH TERMINAL":"E / TALK AT THE COUNTER";
+ else if(int_at_desk())prompt=k==13?"E / READ NOTE":li>=0&&interior_subroom?"E / USE ACCOUNT DESK":dropping?(job.kind==JOB_COURIER?"E / SIGN THE MANIFEST":"E / HAND OVER THE CARGO"):k==4&&interior_subroom?"E / OPERATE BATCH TERMINAL":"E / TALK AT THE COUNTER";
  else if(int_feature_near(k))prompt="E / INSPECT FIXTURE";
- if(p.noticeT>0)textat(25,489,notice,notice_color(),0);
+ if(shelterT>0){fmt(v,"RESTING / SECONDS LEFT: ",(int)(shelterT+0.99f));textat(25,489,v,LIME,0);}
+ else if(p.noticeT>0)textat(25,489,notice,notice_color(),0);
  else if(job.kind>=0){
-  char*at=append(v,jobNames[job.kind]);if(job.kind==0&&sv.intro==2){at=append(at,"  /  STOP ");at=number(at,job.step+1);at=append(at," OF ");number(at,job.total);}else{at=append(at,"  /  TIME LEFT: ");number(at,(int)job.time);}textat(25,489,v,job.kind<4?TEAL:PINK,0);
+  char*at=append(v,jobNames[job.kind]);if(!job_has_clock()){at=append(at,"  /  STOP ");at=number(at,job.step+1);at=append(at," OF ");number(at,job.total);}else{at=append(at,"  /  TIME LEFT: ");number(at,(int)job.time);}textat(25,489,v,job.kind<4?TEAL:PINK,0);
  }else textat(25,489,t->instruction,PAPER,0);
  textat(25,514,prompt,a,0);
  if(saveFlash)textat(830,512,saveFlash>0?"SAVED":"SAVE ERROR",saveFlash>0?TEAL:PINK,0);

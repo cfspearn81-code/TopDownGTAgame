@@ -1,10 +1,10 @@
 # Dead Channel | Project handoff
 
-**Shipped baseline:** Career Files: Save Management and Upright Preview,
-2026-11-26. Native Windows 11 x64, offline/single-player. Save format revision 7.
-The ZIP in `downloads/` is the complete playable build, not a patch.
-The game is an original Port Vanta sandbox, independent of John's Room;
-do not substitute a Web build or use Rockstar code/assets.
+**Current release** — Port Vanta Contracts, November 25, 2026.
+Dead Channel is an original, offline single-player game for native Windows 11
+x64. The [Windows ZIP](downloads/Dead-Channel-Port-Vanta-Contracts-Windows-11-x64.zip)
+contains the complete playable game. Save format revision 7 loads existing
+careers, including revisions 2–6. Use the native build and original game assets.
 
 **Maintenance contract:** Update this document before uploading every new
 build, even a hotfix. The next build entry should say what changed, what
@@ -12,17 +12,71 @@ was verified, save compatibility, any untested surface, and the matching
 download/checksum. The repository rules in [AGENTS.md](AGENTS.md) apply to
 human and AI contributors alike.
 
+## Port Vanta Contracts build
+
+Job objectives now use the relevant city spaces and actions.
+
+| Contact | Work and completion |
+|---|---|
+| Mara at Mercury | Sign for two parcels, deliver them at Ferry Market and Nightglass, then return the signed manifest. Taxi passengers board an owned or licensed car at the curb and pay after getting out at the destination. |
+| Dax at Wrecker Yard | Restart the marked stalled work van on foot, then park that van in the service bay and hand it over with E. |
+| Paz at Glass Mile | The clock starts at the start line. The same licensed car must pass each gate and cross the finish. |
+| Ivo at Vault 39 | Collect a lockbox at a parcel counter and lose pursuit before bringing it to Ivo. Hot Property calls for one marked Vectra, which Vera takes at the Kiosk 09 loading bay when the player is clear. |
+| Signal Raid | Take the cartridge from the marked radio console and install it in the backup studio. |
+| Rival Collection | Clear the guards at the East Freight cache, pick up the consignment with E and deliver it to Vera. |
+
+Lantern batches start at the owner's grow-room terminal. Cinder batches use
+the lab station. Ferry Market supplies both facilities and Kiosk 09 buys
+their stock. Each warehouse has its own capacity and security. Bulk sales
+can cost three units of remaining stock at the source facility. The
+distributor handles finished batches for its posted fee.
+
+Breakwater now provides a timed rest and a place to recover when downed.
+Tideway Clinic recovers players who haven't acquired Breakwater. Nightglass
+repairs a vehicle brought to the shop or the selected garage vehicle.
+Treatments and equipment leave the wallet alone when health or armor is
+already full. Revenue accepts a clean-cash penalty or three courier and
+licensed recovery shifts as community service. Revenue freezes accounts
+while its audit timer runs during active play. The three franchise accounts
+still pay their own income and settle at their own staff desk after closing.
+
+The save layout is revision 7 and reads revisions 2–6. Existing Breakwater
+owners can rest there, legacy lockboxes secure both warehouses, and existing
+restitution progress carries forward. Active contracts and rest timers are
+session state. See [QA-REPORT.txt](docs/QA-REPORT.txt) for verification and
+[SHA256SUMS.txt](downloads/SHA256SUMS.txt) for the Windows archive.
+
+## Previous Port Vanta Playtest build
+
+- Vehicle jobs put a gold marker on their staged car and route GPS to it.
+  Hot Property requires the stolen car used at the pickup to reach the
+  handoff. After the pickup, GPS points back to that car if the player swaps
+  rides. Wrecking the delivery car ends the contract.
+- The Pause menu and Field Guide suspend production, franchise timers, and
+  tracked playtime. The atlas and business counters keep production running.
+  F5 saves from the atlas and shows the result there.
+- Wrecks stop and release the player to a clear exit when one is available.
+  Being downed at the wheel stops the car. Interior wallet labels leave
+  space for large amounts, and storefront switches reset on career changes.
+  Angle normalization stays constant-time as the session clock advances.
+- Save revision 7 and the revision 2–6 readers carry forward. Active jobs,
+  traffic, and pursuits remain session state.
+
+The regression suite and sanitizer soak exercise gameplay, save migration,
+profiles, businesses, and the Windows entry point. The input-driven playtest
+completed all eight jobs and visited all 78 interiors, operating all 63
+ordinary storefront fixtures and returning to the street through their doors.
+See [the QA report](docs/QA-REPORT.txt) for the earlier replay details.
+
 ## Current player experience
 
 - A new file begins in the editor, then Apartment 4, with no gun, car or
   money. Follow the first-shift GPS to Mercury Dispatch, interact with Mara
   and visit the courier counters. The introductory courier trip is untimed.
-- Eight distinct jobs: Courier Shift, Taxi Fare, Harbor Recovery, Glass Mile
-  Sprint, Vault Run, Hot Property, Signal Raid and Rival Collection. Legal
-  jobs pay clean cash; street contracts pay street cash. Touch outdoor job
-  checkpoints without pressing E; indoor counters deliberately require E.
-  Some gates require the correct vehicle. Don’t make active jobs save by
-  accident without designing recovery of their transient state.
+- Legal jobs pay clean cash and street contracts pay street cash. Follow
+  the gold vehicle marker or the named GPS destination. Race gates score
+  on crossing. Press E at a counter, cargo, console or stationary handoff
+  according to the objective.
 - Mercury taxi fares use actual passenger boarding/riding/exiting states.
   Complete the first fare before using T for follow-up dispatch; the game
   varies curb pickup, drop-off and rider without immediate repeats. Fare
@@ -81,7 +135,8 @@ the active write target. Users must decide which saves to delete.
 
 | Area | Files / patterns |
 |---|---|
-| Shared engine | `src/game.c`, `src/game.h`: draw primitives, fixed 60 Hz tick, world, jobs, wallet, save schema, dispatch hooks and scene routing |
+| Shared engine | `src/game.c`, `src/game.h`: draw primitives, fixed 60 Hz tick, world, wallet, save schema, dispatch hooks and scene routing |
+| Contracts | `jobs.inc`, taxi logic in `game.c`, interactions in `interiors.inc` and `streetside_interiors.inc`: staged vehicles, job objectives, navigation, handoffs and payout |
 | Windows host | `src/windows.c`: Win32 events, keyboard and WM_CHAR, mouse / letterbox coordinates, fixed step, native DIB and disk writes |
 | City & indoor art | `district_art.inc`, `interiors.inc`, `streetside_interiors.inc`: venue locations, walk-in layouts, staff rooms, collision and door transitions |
 | Roads & law | `street_life.inc`, `dispatch.inc`, `navigation.inc`: traffic, sidewalks, pursuit and road/GPS graph; overview plus interactive cursor |
@@ -114,11 +169,12 @@ operation. Do not use actual player saves as test fixtures.
 `bash scripts/test.sh` checks new career, portraits/presets, save migrations,
 deletion and failure behavior, gameplay through all doors, business and wallet
 state, and the exact generated PE via simulated Win32. Use `--soak` for the
-180,000-tick sanitized stress run. See the zipped prior QA reports for the
-City Interiors and original Career Files test record. Most recent native-PE
-replay exercised delete default cancel, explicit confirm, surviving file load,
-fresh creator and letterboxed map. The game test verified 360 distinct previews
-and arrow clearance across 128 angles. No physical Windows 11 run was done.
+180,000-tick sanitized stress run. The Port Vanta Contracts input replay
+completed all eight jobs and the Mercury franchise settlement in 29,053
+frames through the packaged Windows executable under simulated Win32 on
+Linux. The profile tests covered delete confirmation, surviving file
+load, fresh creation, 360 distinct previews and letterboxed map controls.
+Physical Windows 11 input and display testing remains outstanding.
 
 Known gaps, not promises: active jobs and pursuits reset on relaunch or slot
 change; progress such as wallet, case, property, stock, vehicle condition and

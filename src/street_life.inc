@@ -1,6 +1,6 @@
 /* Lane traffic and pedestrians are transient world state, not save data.
- * Included by game.c after move/open_space. Car 0 is owned, car 2 is reserved
- * for Hot Property, and the final slot is still the scripted work loaner. */
+ * Included by game.c after move/open_space. Car 0 is the active owned ride.
+ * The final slot holds the current job vehicle. */
 #define STREET_HALF_L 15.5f
 #define STREET_HALF_W 8.f
 #define STREET_WALK 38.f
@@ -124,6 +124,12 @@ static int street_foot_car_clear(float x,float y,int ignore,float feet){
  * loaded beside a parked car or displaced by a rear impact can step out. */
 static int street_foot_move_clear(float x,float y){
  if(solid(x,y,10))return 0;
+ for(int i=STREET_CIVILIANS;i<LEN(peds);i++){
+  const Ped *guard=peds+i;
+  if(guard->role!=2||guard->hp<=0)continue;
+  float after=d2(x-guard->x,y-guard->y);
+  if(after<11*11&&after<d2(p.x-guard->x,p.y-guard->y))return 0;
+ }
  for(int i=0;i<nc;i++)if(i||sv.owned){
   const Car*c=cars+i;float after=street_foot_car_depth(c,x,y,7.f);
   if(after<=0)continue;
@@ -141,14 +147,20 @@ static int street_foot_clear(float x,float y,int ignore){
 }
 /* Transactional: find room before taking a payment or issuing a job.
  * The separate apply marks a previously moving slot as no longer ambient. */
-static int street_find_car_space(int id,Car*car,float x,float y){
+static int street_find_car_space(int id,Car*car,float x,float y,int departure){
  static const unsigned char radius[]={23,27,32,37,45,58,74,94,116};
  for(int r=0;r<LEN(radius);r++)for(int i=0;i<16;i++){
   float heading=i*.3926991f,dx=cs(heading)*radius[r],dy=sn(heading)*radius[r];
   for(int j=0;j<2;j++){
    Car next=*car;next.x=x+dx;next.y=y+dy;
    next.a=wrap(car->a+j*1.570796f);next.s=0.f;
-   if(street_car_clear(id,0,&next)){*car=next;return 1;}
+   if(!street_car_clear(id,0,&next))continue;
+   if(departure){
+    Car pullout=next;
+    pullout.x+=cs(next.a)*departure;pullout.y+=sn(next.a)*departure;
+    if(!street_car_clear(id,0,&pullout))continue;
+   }
+   *car=next;return 1;
   }
  }
  return 0;
@@ -442,8 +454,8 @@ static void street_spawn(void){
    cars[nc]=c;streetDrivers[nc]=(StreetDriver){1,loop,n,45.f+(k%4)*4.f};nc++;
   }
  }
- /* Keep the pre-job loaner just off the turning lanes near Wrecker Yard. */
- cars[nc++]=(Car){1818.75f,1049,1.570796f,0,2,2,100};
+ /* The contract slot enters the city when a contact stages a vehicle. */
+ cars[nc++]=(Car){.x=-100,.y=-100};
  for(int i=0;i<LEN(peds);i++){
   if(i<STREET_CIVILIANS)street_spawn_civilian(i);else peds[i]=(Ped){.role=1};
  }

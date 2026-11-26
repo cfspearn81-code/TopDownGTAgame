@@ -13,6 +13,21 @@ static int count_ink(U color,int xa,int ya,int xb,int yb){
  int n=0;for(int y=ya;y<yb;y++)for(int x=xa;x<xb;x++)n+=pixels[y*W+x]==color;
  return n;
 }
+static void visit_job_room(void){
+ int target=job_room();assert(target>=0&&scene==1&&p.car<0);
+ move_to(ordinaryDoorX[target],ordinaryDoorY[target]);press(USE);
+ assert(scene==4&&walkin_active==target);
+ const InteriorProp *f=wi_f;
+ for(int y=f->y-26;y<=f->y+f->h+26;y+=4)for(int x=f->x-26;x<=f->x+f->w+26;x+=4){
+  if(wi_solid(x,y))continue;
+  wi_x=x;wi_y=y;
+  if(wi_at_station()&&!wi_at_door())goto at_station;
+ }
+ assert(0);
+at_station:
+ press(USE);
+ wi_x=W/2;wi_y=416;press(USE);assert(scene==1);
+}
 int main(void){
  init_city();assert(nb<=LEN(buildings));assert(scene==0&&sv.cash==0&&sv.gear==-1&&sv.owned==0&&job.kind<0);
  frame("build/title.ppm");press(ENTER);assert(scene==5);press(ENTER);assert(scene==3&&interior_active_loc==12);walk(0,20);frame("build/apartment.ppm");
@@ -59,12 +74,30 @@ int main(void){
  press(MAP);assert(mapOn);pointer_input(610,334,1);assert(navHasManual);frame("build/map.ppm");
  pointer_input(610,334,2);assert(!navHasManual);pointer_input(500,330,0);press(ENTER);assert(navHasManual);press(ENTER);assert(!navHasManual);
  press(ESC);assert(!mapOn);pointer_input(610,334,1);assert(!navHasManual);
- sv.cash=2999;visit(4);counter();press(ENTER);assert(!sv.b[0].own);sv.cash=7500;press(ENTER);assert(sv.b[0].own&&sv.cash==4500);leave();visit(2);counter();press(ENTER);assert(sv.units>=3);leave();visit(4);counter();press(ENTER);assert(sv.b[0].timer>0&&menu==4);float growAtStart=growth_fraction(0);
+ visit(4);walk(UP,90);assert(int_at_grow_gate());press(USE);assert(!interior_subroom);leave();
+ sv.cash=2999;visit(4);counter();press(ENTER);assert(!sv.b[0].own);
+ sv.cash=7500;press(ENTER);assert(sv.b[0].own&&sv.cash==4500);leave();
+ visit(2);counter();press(ENTER);assert(sv.units>=3);leave();
+ visit(4);counter();press(ENTER);assert(sv.b[0].timer==0);press(ESC);
+ interior_x=GROW_GATE_X;interior_y=GROW_GATE_Y+12;press(USE);assert(lantern_terminal());
+ counter();press(ENTER);assert(sv.b[0].timer>0&&menu==4);
+ float growAtStart=growth_fraction(0);
  walk(0,119);assert(menu==4&&growth_fraction(0)>growAtStart&&absf(sv.b[0].timer-118.f)<.1f);
  int initialStock=sv.stocks[0];walk(0,7150);
  assert(menu==4&&sv.b[0].timer==0&&sv.stocks[0]==initialStock+prod[0].units&&sv.b[0].batches==1);
- walk(0,120);assert(sv.b[0].batches==1);leave();
- start_batch(&sv.b[0],4.f);press(MAP);assert(mapOn);walk(0,245);assert(sv.b[0].timer==0&&sv.b[0].batches==2);press(ESC);
+ walk(0,120);assert(sv.b[0].batches==1);
+ press(ESC);interior_x=W/2;interior_y=418;press(USE);assert(!interior_subroom);leave();
+ start_batch(&sv.b[0],4.f);
+ press(ESC);assert(menu==PAUSE_MENU);
+ float pausedBatch=sv.b[0].timer,pausedDay=sv.dayClock;U pausedTime=sv.playedTicks;
+ walk(0,245);
+ assert(sv.b[0].timer==pausedBatch&&sv.dayClock==pausedDay&&sv.playedTicks==pausedTime);
+ press(ESC);press(HELP);assert(scene==2);
+ walk(0,245);assert(sv.b[0].batches==1&&sv.b[0].timer>3.f);press(HELP);
+ press(MAP);assert(mapOn);
+ saveFlash=0;tick(SAVE);
+ assert(mapOn&&saveFlash>0&&sv.hash==savehash());
+ walk(0,245);assert(sv.b[0].timer==0&&sv.b[0].batches==2);press(ESC);
  visit(4);assert(!interior_subroom);walk(0,20);frame("build/fern-shop.ppm");
  walk(UP,90);assert(int_at_grow_gate());press(USE);assert(scene==3&&interior_subroom);
  start_batch(&sv.b[0],10.f);walk(0,25);frame("build/grow-young.ppm");walk(0,500);frame("build/grow-tall.ppm");
@@ -74,16 +107,23 @@ int main(void){
  visit(14);walk(0,20);frame("build/precinct.ppm");counter();assert(menu==15);press(ESC);
  interior_x=CHIEF_X;interior_y=CHIEF_Y;assert(!int_solid(interior_x,interior_y));press(USE);assert(notice[0]=='C');
  interior_x=CUSTODY_X;interior_y=CUSTODY_Y;assert(!int_solid(interior_x,interior_y));press(USE);assert(notice[0]=='C');leave();
- /* No USE input at any outdoor point. */
- p.heat=0;job=(Job){4,0,2,220,100,{512,768},{512,512}};
- move_to(470,512);walk(RIGHT,6);assert(job.step==1);paint();assert(navGoal.x==768&&navGoal.y==512);
- walk(0,20);assert(job.step==1);
- int paid=sv.dirty;move_to(727,512);walk(RIGHT,6);assert(job.kind<0&&sv.dirty>paid);
- for(int i=0;i<nc;i++){cars[i].x=1900;cars[i].y=1900;streetDrivers[i].live=0;}
- job=(Job){2,0,1,97,100,{1024},{512}};
- move_to(1024,512);assert(job.step==0);
- p.car=0;cars[0]=(Car){987,512,0,145,0,1,100};p.x=987;p.y=512;paid=sv.cash;
- walk(UP,3);assert(job.kind<0&&sv.cash>paid);
+ /* Swept gates only score during a circuit and from the registered car. */
+ p.heat=0;sv.owned=1;sv.charges=1;sv.restitution=1;beginJob(JOB_SPRINT);
+ assert(job.step==0&&!job_has_clock());
+ move_to(job.xs[0],job.ys[0]);assert(job.step==0);
+ for(int i=1;i<nc-1;i++){cars[i].x=1900;cars[i].y=1900;streetDrivers[i].live=0;}
+ p.car=0;cars[0]=(Car){job.xs[0],job.ys[0],0,50,0,1,100};
+ move_to(job.xs[0],job.ys[0]);assert(job.step==1&&job_has_clock()&&jobRide==0);
+ cars[1]=(Car){0,0,0,50,0,2,100};p.car=1;
+ move_to(job.xs[1],job.ys[1]);assert(job.step==1);
+ cars[1].x=1900;cars[1].y=1900;cars[1].s=0;
+ p.car=0;int paid=sv.cash;
+ for(int gate=1;gate<job.total&&job.kind==JOB_SPRINT;gate++){
+  cars[0].s=50;move_to(job.xs[gate],job.ys[gate]);
+  assert(job.kind<0||job.step==gate+1);
+ }
+ assert(job.kind<0&&sv.cash==paid+205&&p.heat==0);
+ assert(sv.charges&&sv.restitution==1);sv.charges=sv.restitution=0;
  p.car=-1;beginJob(1);assert(taxi.phase==TAXI_WAIT&&job.kind==1);
  p.car=0;cars[0]=(Car){job.xs[0],job.ys[0],0,100,0,1,100};p.x=cars[0].x;p.y=cars[0].y;
  taxi_tick(1.f/60);assert(taxi.phase==TAXI_WAIT&&job.step==0);
@@ -115,8 +155,6 @@ int main(void){
  p.car=-1;press(TAXI_NEXT);assert(job.kind<0);beginJob(1);p.car=0;cars[0].s=0;p.x=job.xs[0];p.y=job.ys[0];
  for(int i=0;i<75;i++)taxi_tick(1.f/60);
  assert(taxi.phase==TAXI_RIDING);paid=sv.cash;p.car=-1;taxi_tick(0);assert(job.kind<0&&sv.cash==paid);
- Job sample={6,0,1,10,50,{1024},{512}};job=sample;p.x=1064;p.y=512;
- check_arrival(985,512);assert(job.kind<0);
  p.car=-1;
  assert(facilityPrice[0]==3000&&facilityPrice[1]==10000&&prod[0].time==120&&prod[2].time==120);
  assert(batch_units(0,2)*prod[0].price-batch_supply(0)*15==205);
@@ -165,5 +203,73 @@ int main(void){
   if(i==24)frame("build/facing-north.ppm");
  }
  request_save();assert(savehash()==sv.hash&&saveFlash>0);
+
+ /* Recovery requires a roadside restart and a stopped handoff in the same van. */
+ init_city();scene=1;sv.intro=4;sv.charges=1;sv.restitution=2;
+ visit(10);counter();press(ENTER);assert(job.kind==JOB_RECOVERY);leave();
+ int van=jobRide;assert(van==nc-1&&cars[van].cond==0);
+ paint();assert(navGoalKind==4&&navGoal.x==(int)cars[van].x);
+ move_to(job.xs[0]-25,job.ys[0]);press(ENTER);assert(p.car<0&&job.step==0);
+ press(USE);assert(job.step==1&&cars[van].cond==65);
+ press(ENTER);assert(p.car==van);
+ move_to(job.xs[1],job.ys[1]);assert(job.step==1&&sv.cash==0);
+ cars[van].s=20;press(USE);assert(job.step==1&&p.car==van&&sv.cash==0);
+ cars[van].s=0;
+ press(USE);assert(job.kind<0&&p.car<0&&sv.cash==160&&!sv.charges&&cars[van].cond==0);
+
+ /* Only keying the assigned Vectra can start the delivery leg. */
+ init_city();scene=1;sv.intro=4;sv.owned=1;cars[0].cond=100;
+ visit(1);counter();press(DOWN);press(ENTER);assert(job.kind==JOB_HOT);leave();
+ int target=jobRide;
+ paint();assert(navGoalKind==4&&navGoal.x==(int)cars[target].x);
+ move_to(cars[1].x,cars[1].y+25);press(ENTER);
+ assert(p.car==1&&job.step==0);press(USE);assert(p.car<0);
+ move_to(cars[target].x-25,cars[target].y);press(ENTER);
+ assert(job.step==1&&p.car==target&&job_vehicle_target()<0&&p.heat>=70);
+ move_to(job.xs[1],job.ys[1]);press(USE);assert(job.step==1&&sv.dirty==0);
+ p.heat=0;press(USE);assert(job.kind<0&&p.car<0&&sv.dirty==270);
+ beginJob(JOB_HOT);target=jobRide;
+ move_to(cars[target].x-25,cars[target].y);press(ENTER);assert(job.step==1);
+ cars[target].cond=0;cars[target].s=30.f;tick(0);
+ assert(job.kind<0&&p.car<0&&cars[target].s==0&&street_foot_clear(p.x,p.y,-1));
+ p.car=0;cars[0].s=50.f;p.hit=0.f;p.hp=1;health(10);
+ assert(p.dead&&cars[0].s==0);
+
+ /* The vault and signal jobs use the interactive fixture inside the right room. */
+ init_city();scene=1;sv.intro=4;sv.gear=1;
+ visit(1);counter();press(ENTER);assert(job.kind==JOB_VAULT);leave();
+ move_to(job.xs[0],job.ys[0]);assert(job.step==0&&p.heat==0);
+ visit_job_room();
+ assert(job.step==1&&p.heat>0&&sv.dirty==0);
+ visit(1);counter();assert(job.step==1&&menu<0&&sv.dirty==0);leave();
+ p.heat=0;visit(1);counter();assert(job.kind<0&&sv.dirty==260);leave();
+
+ visit(1);counter();press(DOWN);press(DOWN);press(ENTER);
+ assert(job.kind==JOB_SIGNAL&&jobBuildings[0]!=jobBuildings[1]);leave();
+ visit_job_room();assert(job.kind==JOB_SIGNAL&&job.step==1);
+ move_to(job.xs[1],job.ys[1]);assert(job.step==1&&sv.dirty==260);
+ visit_job_room();assert(job.kind<0&&sv.dirty==560);
+
+ /* The crew guards a physical cache. Use the armory weapon to get to it. */
+ visit(1);counter();press(DOWN);press(DOWN);press(DOWN);press(ENTER);
+ assert(job.kind==JOB_RIVALS);leave();
+ move_to(job.xs[0],job.ys[0]);assert(rivalsDeployed&&job_rivals_active());
+ press(USE);assert(job.step==0&&sv.dirty==560);
+ for(int i=JOB_RIVAL_FIRST;i<JOB_RIVAL_FIRST+JOB_RIVAL_COUNT;i++){
+  Ped *guard=peds+i;
+  if(guard->hp<=0)continue;
+  p.x=guard->x-35;p.y=guard->y;p.a=0;p.shot=0;
+  press(FIRE);assert(guard->hp<=0);
+ }
+ move_to(job.xs[0],job.ys[0]);press(USE);assert(job.step==1&&sv.dirty==560);
+ visit(7);counter();assert(job.kind<0&&sv.dirty==920&&sv.crime==3);leave();
+
+ /* A safehouse requires time inside and becomes the recovery destination. */
+ sv.cash=600;visit(9);counter();press(ENTER);assert(sv.home&&sv.cash==50);
+ p.hp=40;heat(90);press(ENTER);assert(shelterT>0&&p.hp==40&&p.heat>=90);
+ walk(0,610);assert(shelterT==0&&p.hp==100&&p.heat==0);leave();
+ p.hp=1;p.hit=0;health(10);walk(0,50);press(ENTER);
+ assert(!p.dead&&sv.cash==50&&d2(p.x-loc[9].x,p.y-loc[9].y)<9);
+ puts("Passed: stopped recovery handoff, licensed circuit, exact Vectra, two radio studios, carried lockbox, guarded consignment, restitution and safehouse recovery.");
  puts("Passed: apartment spawn with zero cash/fists; doorway/counter walk; three indoor deliveries; weapon purchase; property batch while menu and map stay open; solid car, crash and repair; moving car theft; punch; finite dispatch; warm lights and low FX; GPS/manual route, automatic foot and driving checkpoints, taxi boarding/drop-off/cancellation plus T and 100 varied offers, wallet semantics, 78 building paths, and save checksum.");
 }
