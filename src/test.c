@@ -1,6 +1,7 @@
 #define DC_TEST
 #include "game.c"
 #include <assert.h>
+#include <string.h>
 static void press(U k){tick(k);tick(0);}
 static void walk(U k,int frames){for(int i=0;i<frames;i++)tick(k);tick(0);}
 static void move_to(int x,int y){p.x=x;p.y=y;if(p.car>=0){cars[p.car].x=x;cars[p.car].y=y;}tick(0);}
@@ -27,6 +28,60 @@ static void visit_job_room(void){
 at_station:
  press(USE);
  wi_x=W/2;wi_y=416;press(USE);assert(scene==1);
+}
+static void assert_officer_route(int i){
+ Ped*q=peds+DISPATCH_FIRST+i;
+ float x=absf(q->x-street_nearest_line(q->x)),y=absf(q->y-street_nearest_line(q->y));
+ assert(!solid(q->x,q->y,4));
+ assert(absf(x-STREET_WALK)<.01f||absf(y-STREET_WALK)<.01f);
+ if(x<STREET_WALK-.01f||y<STREET_WALK-.01f)assert(streetWalks[DISPATCH_FIRST+i].cross);
+}
+static void sidewalk_patrol_test(void){
+ init_city();p.heat=0;nc=0;
+ int visited[DISPATCH_UNITS]={0};
+ for(int frame=0;frame<1800;frame++){
+  dispatch_tick(1.f/60);
+  for(int i=0;i<DISPATCH_UNITS;i++){
+   DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;
+   assert_officer_route(i);
+   if(d2(q->x-u->beat.x,q->y-u->beat.y)<1)visited[i]=1;
+   if(u->station)for(int j=4;j<i;j++)assert(dispatch_distance(u->home,dispatchUnits[j].home)>=24);
+  }
+ }
+ for(int i=0;i<DISPATCH_UNITS;i++)assert(visited[i]);
+ /* A call from the middle of a road is answered from the pavement.
+  * Then remove heat while units are away and follow them back home. */
+ p.x=1024;p.y=1100;p.heat=180;p.hp=100;
+ for(int frame=0;frame<1800;frame++){
+  dispatch_tick(1.f/60);
+  for(int i=0;i<DISPATCH_UNITS;i++)assert_officer_route(i);
+ }
+ assert(dispatch_visible()&&dispatch_engaged()==6);
+ p.heat=0;
+ for(int frame=0;frame<2400;frame++){
+  dispatch_tick(1.f/60);
+  for(int i=0;i<DISPATCH_UNITS;i++)assert_officer_route(i);
+ }
+ for(int i=0;i<DISPATCH_UNITS;i++)assert(dispatchUnits[i].state==D_POST);
+ /* A moving player's car has priority before entry. A parked car on the
+  * stripes also blocks entry. After it clears, ambient drivers yield. */
+ Ped*q=peds+DISPATCH_FIRST;StreetWalk*w=streetWalks+DISPATCH_FIRST;
+ q->x=474;q->y=550;*w=(StreetWalk){.mx=q->x,.my=q->y};
+ DispatchPoint opposite={550,550};
+ nc=2;p.car=1;cars[1]=(Car){502,485,1.570796f,90,0,0,100};
+ for(int i=0;i<60;i++)dispatch_walk_to(0,opposite,1.f/60,37);
+ assert(q->x==474&&!w->cross);
+ cars[1].y=550;cars[1].s=0;
+ for(int i=0;i<60;i++)dispatch_walk_to(0,opposite,1.f/60,37);
+ assert(q->x==474&&!w->cross);
+ cars[1].y=400;
+ for(int i=0;i<35;i++)dispatch_walk_to(0,opposite,1.f/60,37);
+ assert(w->cross&&q->x>480);
+ Car approaching={q->x,520,1.570796f,65,0,0,100};
+ assert(street_yield(&approaching,0,1));
+ for(int i=0;i<120;i++){dispatch_walk_to(0,opposite,1.f/60,37);assert_officer_route(0);}
+ assert(q->x==550&&q->y==550&&!w->cross);
+ puts("Passed: sidewalk posts, neighborhood beats, pursuit, return, and crosswalk traffic.");
 }
 int main(void){
  init_city();assert(nb<=LEN(buildings));assert(scene==0&&sv.cash==0&&sv.gear==-1&&sv.owned==0&&job.kind<0);
@@ -179,7 +234,7 @@ int main(void){
    U c=pixels[y*W+x];if(c==CASH_GREEN&&y<37)green++;if(c==CASH_RED&&y>=39&&y<64)red++;if(c==0x6ea7ee){assert(y>=70&&y<76);blue++;}
  }
  assert(green&&red&&blue);frame("build/economy-hud.ppm");
- gain(0,105,"Street sale.");paint();
+ gain(0,105,"Street sale.");assert(strstr(notice,"DIRTY MONEY +$105"));paint();
  assert(notice_color()==CASH_RED&&count_ink(CASH_RED,20,438,700,467)>30&&count_ink(CASH_GREEN,20,438,700,467)==0);
  p.car=0;paint();assert(count_ink(CASH_RED,650,40,944,63)>40);
  p.car=-1;visit(0);walk(0,20);gain(0,34,"Street sale.");paint();
@@ -297,6 +352,7 @@ int main(void){
  cars[0].s=-50;for(int i=0;i<120;i++)update_camera_lead();
  assert(camera_left()<1024-W/2);p.x=35;assert(camera_left()==0);
  spawnPlayer();assert(cameraLeadX==0&&cameraLeadY==0);
+ sidewalk_patrol_test();
  puts("Passed: vehicle re-entry, parked car selection, pause/map isolation, lethal wreck interaction and driving camera.");
  puts("Passed: stopped recovery handoff, licensed circuit, exact Vectra, two radio studios, carried lockbox, guarded consignment, restitution and safehouse recovery.");
  puts("Passed: apartment spawn with zero cash/fists; doorway/counter walk; three indoor deliveries; weapon purchase; property batch while menu and map stay open; solid car, crash and repair; moving car theft; punch; finite dispatch; warm lights and low FX; GPS/manual route, automatic foot and driving checkpoints, taxi boarding/drop-off/cancellation plus T and 100 varied offers, wallet semantics, 78 building paths, and save checksum.");

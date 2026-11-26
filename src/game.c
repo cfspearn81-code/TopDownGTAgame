@@ -158,7 +158,7 @@ static U noticeInk;
 static U notice_color(void){return noticeInk?noticeInk:PAPER;}
 static void tell(const char*s){append(notice,s);p.noticeT=4.4f;noticeInk=0;}
 static void wallet_note(const char*s,int a,int clean){
- char*q=append(notice,s);q=append(q,clean?"  CLEAN +$":"  STREET +$");number(q,a);
+ char*q=append(notice,s);q=append(q,clean?"  CLEAN +$":"  DIRTY MONEY +$");number(q,a);
  p.noticeT=4.4f;noticeInk=clean?CASH_GREEN:CASH_RED;
 }
 static void cashNote(const char*s,int a){wallet_note(s,a,1);}
@@ -168,9 +168,9 @@ static void draw_wallet(int x,int y,int w){
  for(int i=0;i<2;i++){
   int ry=y+3+i*22;U color=i?CASH_RED:CASH_GREEN;
   rect(x+3,ry+3,4,14,color);fmt(v,"$",i?sv.dirty:sv.cash);
-  const char *label=i?"STREET CASH":"CLEAN CASH";
+  const char *label=i?"DIRTY MONEY":"CLEAN CASH";
   int amountX=x+w-11-textw(v,0);
-  if(x+13+textw(label,0)+10>amountX)label=i?"STREET":"CLEAN";
+  if(x+13+textw(label,0)+10>amountX)label=i?"DIRTY":"CLEAN";
   textat(x+13,ry,label,color,0);
   textat(amountX,ry,v,color,0);
  }
@@ -488,7 +488,7 @@ static void businessTick(float dt){
  if(sv.audit&&(sv.auditT-=dt)<=0){
   sv.dirty=0;sv.pending=0;sv.clearT=0;legal_seize();
   sv.audit=0;sv.charges=1;sv.restitution=0;
-  tell("Revenue froze the accounts and seized recorded street funds.");noticeInk=CASH_RED;
+  tell("Revenue froze the accounts and seized recorded dirty money.");noticeInk=CASH_RED;
   request_save();
  }
 }
@@ -572,7 +572,7 @@ static void makeMenu(void){
  case 10:add("LICENSED RECOVERY","Restart Dax's stalled van, then drive it to his service bay.",12);add("BUSINESS OFFICE","Buy or manage the recovery franchise.",LEGAL_OPEN);break;
  case 11:
  if(sv.charges){add("PAY CASE PENALTY  $180","Clean credits only. Clears purchase restrictions immediately.",80);fmt(strings[nopt],"COMMUNITY SERVICE  /  ",sv.restitution);append(strings[nopt]+sl(strings[nopt])," OF 3");add(strings[nopt],"Complete three courier or recovery shifts to clear the case.",0);}
- else add(sv.audit?"AUDIT TEAM EN ROUTE":"NO OPEN CASE","High-value purchases with street credit may trigger a case.",0);
+ else add(sv.audit?"AUDIT TEAM EN ROUTE":"NO OPEN CASE","High-value purchases with dirty money may trigger a case.",0);
  break;
  case 15:add("DISPATCH DESK","The station and neighborhood posts share one finite police roster.",0);break;
  case 13:add("GO INSIDE","Step into your apartment.",94);break;
@@ -693,7 +693,7 @@ static void npcTick(float dt){
    float ox=q->x,oy=q->y;move(&q->x,&q->y,dx*v,dy*v,9);
    if(d2(ox-q->x,oy-q->y)>.01f)q->s=70;
   }
-  if(dist<72*72&&dist>4&&q->cool<=0&&dispatch_line(q->x,q->y,p.x,p.y,2)){q->cool=1.05f;if(p.quiet<3)p.quiet=3;health(8);particle(p.x,p.y,5,PINK);}
+  if(dist<72*72&&dist>4&&q->cool<=0&&street_line_open(q->x,q->y,p.x,p.y,2)){q->cool=1.05f;if(p.quiet<3)p.quiet=3;health(8);particle(p.x,p.y,5,PINK);}
  }
  dispatch_tick(dt);
 }

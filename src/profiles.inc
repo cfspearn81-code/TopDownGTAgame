@@ -290,7 +290,7 @@ static void profile_list_paint(void){
  if(cardCount&&cards[cardSelected].status){
   Card*c=cards+cardSelected;portrait(686,133,210,156,&c->look,4,0);
   center(791,301,c->intro<3?"FIRST SHIFT":"PORT VANTA CAREER",TEAL,0);
-  center(791,324,"CLEAN / STREET",MUTED,0);
+  center(791,324,"CLEAN CASH / DIRTY MONEY",MUTED,0);
  }else{
   rect(686,138,210,155,0x10252f);
   for(int r=0;r<10;r++){int h=(r*23+27)%88;rect(690+r*20,275-h,17,h,0x233e4a);rect(694+r*20,279-h,3,7,r&1?TEAL:0x586067);}

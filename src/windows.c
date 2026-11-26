@@ -100,7 +100,7 @@ void entry(void){
  static const U16 cls[]=L"DeadChannelNative11";
  Class k={sizeof(Class),0x23,wnd,0,0,instance,0,__imp_LoadCursorW(0,(void*)32512),0,0,cls,0};
  if(!__imp_RegisterClassExW(&k)){__imp_ExitProcess(1);return;}
- Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Street Handling",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
+ Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Sidewalk Patrols",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
  if(!win){__imp_ExitProcess(2);return;}
  directories();set_session_seed((U)__imp_GetTickCount64());init_city();__imp_ShowWindow(win,1);
  U64 t=__imp_GetTickCount64(); unsigned acc=0;int wasFocused=1,lastW=0,lastH=0;

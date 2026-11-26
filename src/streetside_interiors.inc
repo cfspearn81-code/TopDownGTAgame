@@ -200,7 +200,7 @@ static void walkin_paint(void){
  for(int i=0;i<W*H;i++)pixels[i]=wi_back[i];
  person((int)wi_x,(int)wi_y,0x56baae,walking?(int)(sn(footcycle)*4):0,wi_angle,4,1);
  char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,district(b->x,b->y));q=append(q,"   /   ");append(q,r->section);
- textat(22,9,ad,MUTED,0);textat(22,31,walkin_name(walkin_active),r->accent,1);draw_wallet(W-231,10,210);
+ textat(22,9,ad,MUTED,0);textat(22,31,walkin_name(walkin_active),r->accent,1);draw_wallet(W-291,10,270);
  const InteriorProp*f=wi_f;int sx=f->x+f->w/2,sy=f->y-10;
  const char *task=job_room_action(walkin_active);
  U marker=task?PINK:r->accent;
@@ -211,5 +211,5 @@ static void walkin_paint(void){
      wi_at_station()?(task?task:r->action):task?job_objective():"Walk to the lit station";
  textat(23,484,(wi_at_station()||wi_at_door())?"[E]":"WASD",r->accent,0);textat(81,484,hint,PAPER,0);
  if(p.noticeT>0)textat(23,509,notice,notice_color(),0);else if(saveFlash>0)textat(23,509,"Saved.",CASH_GREEN,0);else if(saveFlash<0)textat(23,509,"Save failed.",CASH_RED,0);
- if(menu>=0){paint_active_menu();draw_wallet(W-231,10,210);}
+ if(menu>=0){paint_active_menu();draw_wallet(W-291,10,270);}
 }

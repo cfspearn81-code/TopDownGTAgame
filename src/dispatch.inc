@@ -1,181 +1,91 @@
 /* A fixed city roster. Calls are routed from where a unit actually is.
  * Transient world state only: no changes to the save layout. */
-enum{DISPATCH_FIRST=44,DISPATCH_UNITS=8,DISPATCH_SIDE=62,DISPATCH_CELLS=62*62,DISPATCH_PATH=144};
 enum{D_POST,D_RESPONSE,D_SEARCH,D_RETURN,D_DOWN};
 typedef struct{float x,y;} DispatchPoint;
 typedef struct{
- DispatchPoint home,beat,goal,path[DISPATCH_PATH];
- int state,station,turn,len,next;
- float rethink,atPost,down;
+ DispatchPoint home,beat;
+ int state,station,turn;
+ float atPost,down;
 } DispatchUnit;
 static DispatchUnit dispatchUnits[DISPATCH_UNITS];
-static unsigned char dispatchRoad[DISPATCH_CELLS],dispatchEdges[DISPATCH_CELLS];
-static short dispatchCost[DISPATCH_CELLS],dispatchFrom[DISPATCH_CELLS],dispatchPosition[DISPATCH_CELLS],dispatchHeap[DISPATCH_CELLS],dispatchReverse[DISPATCH_CELLS];
-static int dispatchHeapCount,dispatchEnd;
 static int dispatchCase,dispatchSaw,dispatchReported,dispatchLost,dispatchLevel;
 static float dispatchWait,dispatchCooldown,dispatchQuiet,dispatchSightAge,dispatchLastHeat,dispatchStrike;
 static DispatchPoint dispatchCall;
 
-static float dispatch_px(int key){return 48.f+(key%DISPATCH_SIDE)*32.f;}
-static float dispatch_py(int key){return 48.f+(key/DISPATCH_SIDE)*32.f;}
-static int dispatch_cell(float x,float y){return cl((int)((y-32.f)/32),0,DISPATCH_SIDE-1)*DISPATCH_SIDE+cl((int)((x-32.f)/32),0,DISPATCH_SIDE-1);}
-static int dispatch_line(float x,float y,float tx,float ty,float r){
- return street_line_open(x,y,tx,ty,r);
+/* A sidewalk address lies on one face of a block. Either end of that
+ * face leads to the corner network used by civilian walkers. */
+typedef struct{DispatchPoint point,ends[2];} DispatchAddress;
+static DispatchAddress dispatch_address(float x,float y){
+ int left=cl((int)x/256,0,7)*256,top=cl((int)y/256,0,7)*256;
+ float x0=left+STREET_WALK,x1=left+256-STREET_WALK;
+ float y0=top+STREET_WALK,y1=top+256-STREET_WALK;
+ float sx=x<x0?x0:x>x1?x1:x,sy=y<y0?y0:y>y1?y1:y;
+ float curbX=x-left<128?x0:x1,curbY=y-top<128?y0:y1;
+ if(sx==curbX&&sy==curbY)
+  return (DispatchAddress){{sx,sy},{{sx,sy},{sx,sy}}};
+ if(absf(x-curbX)<absf(y-curbY))
+  return (DispatchAddress){{curbX,sy},{{curbX,y0},{curbX,y1}}};
+ return (DispatchAddress){{sx,curbY},{{x0,curbY},{x1,curbY}}};
 }
-static void dispatch_prepare(void){
- static const int steps[]={1,-1,DISPATCH_SIDE,-DISPATCH_SIDE};
- for(int k=0;k<DISPATCH_CELLS;k++){
-  float x=dispatch_px(k),y=dispatch_py(k);int xr=(int)x%256,yr=(int)y%256;
-  dispatchRoad[k]=(unsigned char)(solid(x,y,8)?0:(xr<=48||xr>=208||yr<=48||yr>=208)?1:3);
-  dispatchEdges[k]=0;
- }
- for(int k=0;k<DISPATCH_CELLS;k++)if(dispatchRoad[k]){
-  int c=k%DISPATCH_SIDE,r=k/DISPATCH_SIDE;
-  for(int j=0;j<4;j++){
-   if((j==0&&c==DISPATCH_SIDE-1)||(j==1&&c==0)||(j==2&&r==DISPATCH_SIDE-1)||(j==3&&r==0))continue;
-   const int b=k+steps[j];
-   if(dispatchRoad[b]&&dispatch_line(dispatch_px(k),dispatch_py(k),dispatch_px(b),dispatch_py(b),8))
-    dispatchEdges[k]|=(unsigned char)(1u<<j);
-  }
- }
+static float dispatch_distance(DispatchPoint a,DispatchPoint b){
+ return absf(a.x-b.x)+absf(a.y-b.y);
 }
-static int dispatch_near(float x,float y){
- const int ref=dispatch_cell(x,y),cx=ref%DISPATCH_SIDE,cy=ref/DISPATCH_SIDE;
- float best=1e9f;int chosen=-1;
- for(int j=max(0,cy-3);j<=min(DISPATCH_SIDE-1,cy+3);j++)for(int i=max(0,cx-3);i<=min(DISPATCH_SIDE-1,cx+3);i++){
-  int k=j*DISPATCH_SIDE+i;if(!dispatchRoad[k]||!dispatchEdges[k])continue;
-  const float tx=dispatch_px(k),ty=dispatch_py(k),d=d2(x-tx,y-ty);
-  if(d<best&&dispatch_line(x,y,tx,ty,8)){chosen=k;best=d;}
- }
- return chosen;
-}
-/* A narrow clearance or the tip of a facade can hide every coarse grid
- * center even though the point is reachable. Try a short clear dogleg. */
-static int dispatch_anchor(float x,float y,DispatchPoint*via,int*bent){
- int direct=dispatch_near(x,y);*bent=0;
- if(direct>=0)return direct;
- static const unsigned char radii[]={8,14,22,34,51};
- int choice=-1;float best=1e9f;
- for(int r=0;r<LEN(radii)&&radii[r]<best;r++)for(int n=0;n<16;n++){
-  float angle=n*.392699082f,xx=x+cs(angle)*radii[r],yy=y+sn(angle)*radii[r];
-  if(!dispatch_line(x,y,xx,yy,8))continue;
-  int k=dispatch_near(xx,yy);if(k<0)continue;
-  float cost=radii[r]+sq(d2(dispatch_px(k)-xx,dispatch_py(k)-yy));
-  if(cost<best){best=cost;choice=k;*via=(DispatchPoint){xx,yy};*bent=1;}
- }
- return choice;
-}
-static int dispatch_h(int key){
- int x=key%DISPATCH_SIDE-dispatchEnd%DISPATCH_SIDE,y=key/DISPATCH_SIDE-dispatchEnd/DISPATCH_SIDE;
- return max(x,-x)+max(y,-y);
-}
-static int dispatch_better(int a,int b){
- int x=dispatch_h(a),y=dispatch_h(b),r=dispatchCost[a]+x,s=dispatchCost[b]+y;
- return r<s||(r==s&&x<y);
-}
-static void dispatch_insert(int key){
- int k=dispatchPosition[key];
- if(k<0)k=dispatchHeapCount++;
- while(k>0){const int j=(k-1)/2,a=dispatchHeap[j];if(!dispatch_better(key,a))break;dispatchHeap[k]=(short)a;dispatchPosition[a]=(short)k;k=j;}
- dispatchHeap[k]=(short)key;dispatchPosition[key]=(short)k;
-}
-static int dispatch_pop(void){
- int result=dispatchHeap[0],last=dispatchHeap[--dispatchHeapCount],i=0;
- dispatchPosition[result]=-2;
- if(dispatchHeapCount==0)return result;
- while(i*2+1<dispatchHeapCount){
-  int j=i*2+1,key=dispatchHeap[j];
-  if(j+1<dispatchHeapCount&&dispatch_better(dispatchHeap[j+1],key)){key=dispatchHeap[++j];}
-  if(!dispatch_better(key,last))break;
-  dispatchHeap[i]=(short)key;dispatchPosition[key]=(short)i;i=j;
- }
- dispatchHeap[i]=(short)last;dispatchPosition[last]=(short)i;return result;
-}
-static void dispatch_plan(DispatchUnit*u,Ped*q,DispatchPoint to,float wait){
- u->next=u->len=0;u->goal=to;u->rethink=wait;
- const float dx=q->x-to.x,dy=q->y-to.y;
- if(d2(dx,dy)<150.f*150.f&&dispatch_line(q->x,q->y,to.x,to.y,8)){u->path[u->len++]=to;return;}
- DispatchPoint entry,exit;int bentEntry,bentExit;
- const int from=dispatch_anchor(q->x,q->y,&entry,&bentEntry),target=dispatch_anchor(to.x,to.y,&exit,&bentExit);
- if(from<0)return;
- dispatchEnd=target>=0?target:dispatch_cell(to.x,to.y);dispatchHeapCount=0;
- for(int i=0;i<DISPATCH_CELLS;i++){dispatchCost[i]=32767;dispatchFrom[i]=-1;dispatchPosition[i]=-1;}
- dispatchCost[from]=0;dispatch_insert(from);
- static const int steps[]={1,-1,DISPATCH_SIDE,-DISPATCH_SIDE};
- int nearest=from;
- while(dispatchHeapCount){
-  int k=dispatch_pop();
-  if(dispatch_h(k)<dispatch_h(nearest))nearest=k;
-  if(k==dispatchEnd){nearest=k;break;}
-  int edges=dispatchEdges[k];
-  for(int j=0;j<4;j++)if(edges&(1u<<j)){
-   const int a=k+steps[j],cost=dispatchCost[k]+dispatchRoad[a];
-   if(dispatchPosition[a]!=-2&&cost<dispatchCost[a]){dispatchCost[a]=(short)cost;dispatchFrom[a]=(short)k;dispatch_insert(a);}
-  }
- }
- /* Collapse collinear subdivisions into turn points, preserving the
-  * walkable segments chosen by the road-biased grid. */
- int n=0,delta=0;
- for(int k=nearest;k>=0&&n<LEN(dispatchReverse);k=dispatchFrom[k]){
-  const int parent=dispatchFrom[k],nextDelta=parent-k;
-  if(!n||parent<0||nextDelta!=delta)dispatchReverse[n++]=(short)k;
-  delta=nextDelta;
- }
- if(bentEntry)u->path[u->len++]=entry;
- while(n&&u->len<LEN(u->path)-2){int k=dispatchReverse[--n];u->path[u->len++]=(DispatchPoint){dispatch_px(k),dispatch_py(k)};}
- if(!n&&nearest==target){if(bentExit)u->path[u->len++]=exit;u->path[u->len++]=to;}
-}
-static void dispatch_step(DispatchUnit*u,Ped*q,float dt,float speed){
+static int dispatch_walk_to(int i,DispatchPoint target,float dt,float speed){
+ Ped*q=peds+DISPATCH_FIRST+i;StreetWalk*w=streetWalks+DISPATCH_FIRST+i;
  q->s=0;
- while(u->next<u->len){
-  const DispatchPoint t=u->path[u->next];const float dx=t.x-q->x,dy=t.y-q->y,d=sq(d2(dx,dy));
-  if(d<.22f){u->next++;continue;}
-  const float amount=speed*dt<d?speed*dt:d,oldX=q->x,oldY=q->y;
-  const float a=look(dx,dy),turn=wrap(a-q->a),cap=dt*12.f;
-  q->a=wrap(q->a+(turn>cap?cap:turn<-cap?-cap:turn));
-  move(&q->x,&q->y,dx*amount/d,dy*amount/d,8);
-  q->s=sq(d2(q->x-oldX,q->y-oldY))/dt;
-  if(q->s<1)u->rethink=0;
-  return;
+ if(w->pause>0){w->pause-=dt;return 0;}
+ if(d2(q->x-w->mx,q->y-w->my)<.18f){
+  q->x=w->mx;q->y=w->my;w->cross=0;w->blocked=0;
+  DispatchAddress from=dispatch_address(q->x,q->y),to=dispatch_address(target.x,target.y);
+  DispatchPoint here={q->x,q->y},next=to.point;
+  if(dispatch_distance(here,next)<.01f)return 1;
+  int sameFace=(here.x==next.x&&(int)here.y/256==(int)next.y/256)||
+               (here.y==next.y&&(int)here.x/256==(int)next.x/256);
+  if(!sameFace){
+   float best=1e9f;
+   /* A corner can leave along either axis. A walker mid-block must reach
+    * an end of their own sidewalk before turning. */
+   DispatchPoint start=here,end=to.point;
+   for(int a=0;a<2;a++)for(int b=0;b<2;b++){
+    float length=dispatch_distance(here,from.ends[a])+dispatch_distance(from.ends[a],to.ends[b])+
+                 dispatch_distance(to.ends[b],to.point);
+    if(length<best){best=length;start=from.ends[a];end=to.ends[b];}
+   }
+   next=start;
+   if(dispatch_distance(here,start)==0){
+    if(here.x!=end.x)next.x=street_corner_step(here.x,end.x,&w->cross);
+    else if(here.y!=end.y)next.y=street_corner_step(here.y,end.y,&w->cross);
+   }
+  }
+  w->mx=next.x;w->my=next.y;
+  if(!street_can_start_leg(q,w))return 0;
  }
+ street_walk_step(q,w,dt,w->cross&&speed<62.f?62.f:speed);
+ return 0;
 }
 static int dispatch_engaged(void){
  int live=0;for(int i=0;i<DISPATCH_UNITS;i++)if((dispatchUnits[i].state==D_RESPONSE||dispatchUnits[i].state==D_SEARCH)&&peds[DISPATCH_FIRST+i].hp>0)live++;return live;
 }
 static int dispatch_visible(void){return dispatchSaw;}
 static int dispatch_posted(int i){return i>=DISPATCH_FIRST&&i<DISPATCH_FIRST+DISPATCH_UNITS&&dispatchUnits[i-DISPATCH_FIRST].state==D_POST;}
-static DispatchPoint dispatch_station_post(int index,DispatchPoint door){
- /* The venue door may be beside a facade, not in the center of the road.
-  * Lay out distinct, reachable positions on the approach sidewalks. */
- static const unsigned char radii[]={28,36,49,63,82,106,134,171,216};
- DispatchPoint best=door;float score=1e9f;
- for(int r=0;r<LEN(radii);r++)for(int n=0;n<16;n++){
-  float angle=(n+(index-4)*4)*.3926990817f;
-  DispatchPoint q={door.x+cs(angle)*radii[r],door.y+sn(angle)*radii[r]};
-  if(solid(q.x,q.y,8)||dispatch_near(q.x,q.y)<0)continue;
-  int free=1;
-  for(int j=0;j<index;j++)if(d2(dispatchUnits[j].home.x-q.x,dispatchUnits[j].home.y-q.y)<26.f*26.f){free=0;break;}
-  if(!free)continue;
-  float x=absf(q.x-street_nearest_line(q.x)),y=absf(q.y-street_nearest_line(q.y));
-  float street=x<y?x:y;
-  float cost=radii[r]+(street<28.f?38.f:absf(street-STREET_WALK)*.27f);
-  if(cost<score){best=q;score=cost;}
- }
- return best;
-}
 static void dispatch_reset(void){
- /* Beat offices opposite the first jobs, around freight and in the wards;
-  * remaining units start visibly parked near the physical station. */
+ /* Four neighborhood beats and four posts on the station frontage. */
  static const short posts[][4]={{512,558,512,731},{256,990,419,990},{1536,1216,1700,1216},{798,1568,965,1568}};
- int sx=1280,sy=512;
- for(int j=0;j<LEN(loc);j++)if(loc[j].kind==15){sx=loc[j].x;sy=loc[j].y;break;}
- dispatch_prepare();
+ int hq=0;
+ for(int j=0;j<LEN(loc);j++)if(loc[j].kind==15){hq=j;break;}
+ StreetAddress station=street_venue_address(hq,0);
  for(int i=0;i<DISPATCH_UNITS;i++){
   DispatchUnit*u=dispatchUnits+i;z(u,sizeof *u);u->station=i>=LEN(posts);
-  if(!u->station){u->home=(DispatchPoint){posts[i][0],posts[i][1]};u->beat=(DispatchPoint){posts[i][2],posts[i][3]};}
-  else{u->home=dispatch_station_post(i,(DispatchPoint){sx,sy});u->beat=u->home;}
-  if(solid(u->home.x,u->home.y,8))u->home=dispatch_station_post(i,(DispatchPoint){sx,sy});
-  if(solid(u->beat.x,u->beat.y,8))u->beat=u->home;
+  if(u->station){
+   /* The HQ entrance faces the east/west sidewalk. Space the four posts
+    * along its frontage, inside this block and clear of the crossings. */
+   float offset=(i-LEN(posts)-1.5f)*28.f;
+   u->home=dispatch_address(station.x+offset,station.y).point;u->beat=u->home;
+  }else{
+   u->home=dispatch_address(posts[i][0],posts[i][1]).point;
+   u->beat=dispatch_address(posts[i][2],posts[i][3]).point;
+  }
+  streetWalks[DISPATCH_FIRST+i]=(StreetWalk){.mx=u->home.x,.my=u->home.y};
   u->atPost=1.f+i*.53f;peds[DISPATCH_FIRST+i]=(Ped){u->home.x,u->home.y,i<6?1.57f:-1.57f,0,i<4?2:3,1,0,0,0};
  }
  dispatchCase=dispatchSaw=dispatchReported=dispatchLost=dispatchLevel=0;
@@ -200,7 +110,7 @@ static void dispatch_tick(float dt){
  for(int i=0;i<DISPATCH_UNITS;i++){
   DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;
   if(q->hp<=0){if(u->state!=D_DOWN){u->state=D_DOWN;u->down=24.f;}continue;}
-  if(wanted&&u->state!=D_RETURN&&d2(p.x-q->x,p.y-q->y)<177.f*177.f&&dispatch_line(q->x,q->y,p.x,p.y,2)){
+  if(wanted&&u->state!=D_RETURN&&d2(p.x-q->x,p.y-q->y)<177.f*177.f&&street_line_open(q->x,q->y,p.x,p.y,2)){
    dispatchCall=(DispatchPoint){p.x,p.y};dispatchSightAge=0;
    if(u->state==D_RESPONSE||u->state==D_SEARCH){dispatchSaw=1;u->state=D_RESPONSE;}
   }
@@ -216,7 +126,7 @@ static void dispatch_tick(float dt){
    if(score<best){best=score;choice=i;}
   }
   if(choice>=0){
-   DispatchUnit*u=dispatchUnits+choice;u->state=D_RESPONSE;u->rethink=0;u->len=u->next=0;u->atPost=0;
+   DispatchUnit*u=dispatchUnits+choice;u->state=D_RESPONSE;u->atPost=0;
    dispatchCooldown=wanted==1?1.55f:wanted==2?1.1f:.72f;
    if(!dispatchReported){dispatchReported=1;tell("DISPATCH: nearest patrol responding from its beat.");}
    else if(wanted>dispatchLevel&&wanted>=2)tell("DISPATCH: requesting station backup.");
@@ -231,25 +141,23 @@ static void dispatch_tick(float dt){
    /* The same slot comes back on another quiet shift, out of the camera's
     * vicinity. A downed officer never replenishes the active case. */
    if(!dispatchCase&&p.heat<=0){u->down-=dt;if(u->down<=0&&!street_on_camera(u->home.x,u->home.y)&&street_foot_clear(u->home.x,u->home.y,-1)){
-    *q=(Ped){u->home.x,u->home.y,0,0,u->station?3:2,1,0,0,0};u->state=D_POST;u->atPost=2.f;u->len=u->next=0;
+    *q=(Ped){u->home.x,u->home.y,0,0,u->station?3:2,1,0,0,0};u->state=D_POST;u->atPost=2.f;
+    streetWalks[DISPATCH_FIRST+i]=(StreetWalk){.mx=u->home.x,.my=u->home.y};
    }}continue;
   }
-  q->cool-=dt;u->rethink-=dt;
-  if((u->state==D_RESPONSE||u->state==D_SEARCH)&&p.heat<=0){u->state=D_RETURN;u->rethink=0;}
+  q->cool-=dt;
+  if((u->state==D_RESPONSE||u->state==D_SEARCH)&&p.heat<=0){u->state=D_RETURN;}
   if(u->state==D_POST||u->state==D_RETURN){
    DispatchPoint dest=u->state==D_RETURN||!u->turn?u->home:u->beat;
-   if(d2(dest.x-q->x,dest.y-q->y)<1.f){
+   if(dispatch_walk_to(i,dest,dt,u->state==D_RETURN?96.f:37.f)){
     q->s=0;
     if(u->state==D_RETURN){u->state=D_POST;u->turn=0;u->atPost=3.f;}
-    else if(!u->station&&(u->atPost-=dt)<=0){u->turn=!u->turn;u->atPost=2.0f;u->rethink=0;}
-   }else{
-    if(u->rethink<=0)dispatch_plan(u,q,dest,1.1f);
-    dispatch_step(u,q,dt,u->state==D_RETURN?96.f:37.f);
+    else if(!u->station&&(u->atPost-=dt)<=0){u->turn=!u->turn;u->atPost=2.0f;}
    }
    continue;
   }
   const float d=d2(p.x-q->x,p.y-q->y);
-  const int eyes=wanted&&d<177.f*177.f&&dispatch_line(q->x,q->y,p.x,p.y,2);
+  const int eyes=wanted&&d<177.f*177.f&&street_line_open(q->x,q->y,p.x,p.y,2);
   if(eyes&&d<65.f*65.f&&q->cool<=0&&dispatchStrike<=0){
    q->cool=1.36f;dispatchStrike=.66f;health(u->station?10:8);particle(p.x,p.y,5,PINK);
   }
@@ -264,9 +172,7 @@ static void dispatch_tick(float dt){
    if(!open_space(dest.x,dest.y))dest=dispatchCall;
   }
   if(eyes){dest=(DispatchPoint){p.x,p.y};u->state=D_RESPONSE;}
-  if((eyes&&d<25.f*25.f)||d2(dest.x-q->x,dest.y-q->y)<3.f*3.f){q->s=0;continue;}
-  if(u->rethink<=0&&(u->next>=u->len||d2(dest.x-u->goal.x,dest.y-u->goal.y)>17.f*17.f))
-   dispatch_plan(u,q,dest,.54f+i*.035f);
-  dispatch_step(u,q,dt,u->state==D_SEARCH?77.f:speeds[max(1,wanted)]+(u->station?7.f:0.f));
+  if(eyes&&d<25.f*25.f&&!streetWalks[DISPATCH_FIRST+i].cross){q->s=0;continue;}
+  dispatch_walk_to(i,dest,dt,u->state==D_SEARCH?77.f:speeds[max(1,wanted)]+(u->station?7.f:0.f));
  }
 }

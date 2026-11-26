@@ -1,8 +1,8 @@
 DEAD CHANNEL / PORT VANTA
-Street Handling for Windows 11 x64
+Sidewalk Patrols for Windows 11 x64
 
 1. Extract the entire ZIP to a normal folder and open DeadChannel.exe.
-   Look for "Dead Channel | Street Handling" in the window title.
+   Look for "Dead Channel | Sidewalk Patrols" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -19,7 +19,7 @@ keyboard, press Right, then Enter. Enter alone cancels. The career
 you're currently playing is protected; close and reopen the game and
 delete it from the launch screen if you want to remove it.
 Left / Right changes pages. Playtime, portrait, clean cash (green) and
-street cash (red) come from the save. Older saves didn't track playtime;
+dirty money (red) come from the save. Older saves didn't track playtime;
 after playing in this version, their clock is marked "Since update."
 
 CHARACTER CREATOR
@@ -46,6 +46,8 @@ dash above the radar shows the vehicle model, direction and speed. Slow
 down with Shift before trying to exit at speed. Blue radar dots mark
 responding officers. Wait for CLEARING to disappear before a hot handoff.
 The thin teal bar below health shows your remaining armor.
+Patrol officers walk the sidewalks and check traffic before using crosswalks,
+even during a pursuit. Watch for people already crossing.
 Business clocks run in the atlas and at the counter. Pause and the field
 guide freeze them.
 Close the window to save your live career. Title/creator don't create

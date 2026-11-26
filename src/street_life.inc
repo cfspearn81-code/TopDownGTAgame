@@ -7,6 +7,7 @@
 #define STREET_EXIT_SPEED 78.f
 #define STREET_WALK 38.f
 #define STREET_CIVILIANS 40
+enum{DISPATCH_FIRST=44,DISPATCH_UNITS=8};
 
 typedef struct {int l,t,r,b;} StreetLoop;
 static const StreetLoop streetLoops[]={
@@ -18,7 +19,7 @@ enum{STREET_LEAVE,STREET_EN_ROUTE,STREET_ARRIVE};
 typedef struct {float x,y,cx,cy;} StreetAddress;
 typedef struct {int goal,visits,cross,leg;float tx,ty,mx,my,ax,ay,pause,crossX,crossY,blocked;} StreetWalk;
 static StreetDriver streetDrivers[LEN(cars)];
-static StreetWalk streetWalks[STREET_CIVILIANS];
+static StreetWalk streetWalks[DISPATCH_FIRST+DISPATCH_UNITS];
 static int streetJunctionOwner[64];
 
 static int street_overlap(const Car*a,const Car*b){
@@ -223,11 +224,14 @@ static void street_loop_point(int which,int n,float*x,float*y){
  n%=12;
  *x=((n<6)?right:left)+o[n][0];*y=((n<3||n>=9)?top:bottom)+o[n][1];
 }
+static int street_is_walker(int i){
+ return i<STREET_CIVILIANS?peds[i].role==0:i>=DISPATCH_FIRST;
+}
 static int street_yield(const Car*c,float fx,float fy){
  /* No ambient vehicle flattens a pedestrian. Brake early for anyone
   * ahead in this lane and wait for a crossing to clear. */
  float limit=22.f+c->s*.54f;
- for(int i=0;i<STREET_CIVILIANS;i++)if(peds[i].hp>0&&peds[i].role==0&&streetWalks[i].cross){
+ for(int i=0;i<LEN(streetWalks);i++)if(peds[i].hp>0&&street_is_walker(i)&&streetWalks[i].cross){
   float dx=peds[i].x-c->x,dy=peds[i].y-c->y;
   float along=dx*fx+dy*fy,side=absf(dy*fx-dx*fy);
   if(along>=-13&&along<limit&&side<13.5f){
@@ -248,10 +252,10 @@ static int street_yield(const Car*c,float fx,float fy){
 static int street_ambient_step(int id,float dx,float dy){
  Car*c=cars+id,next=*c;next.x+=dx;next.y+=dy;
  float co=cs(next.a),si=sn(next.a);
- for(int j=0;j<STREET_CIVILIANS+1;j++){
+ for(int j=0;j<=LEN(streetWalks);j++){
   float ux,uy;
-  if(j==STREET_CIVILIANS){if(p.car>=0||p.dead)continue;ux=p.x-next.x;uy=p.y-next.y;}
-  else{if(peds[j].hp<=0||peds[j].role)continue;ux=peds[j].x-next.x;uy=peds[j].y-next.y;}
+  if(j==LEN(streetWalks)){if(p.car>=0||p.dead)continue;ux=p.x-next.x;uy=p.y-next.y;}
+  else{if(peds[j].hp<=0||!street_is_walker(j))continue;ux=peds[j].x-next.x;uy=peds[j].y-next.y;}
   if(d2(ux,uy)<24.f*24.f&&absf(ux*co+uy*si)<STREET_HALF_L+3.f&&absf(uy*co-ux*si)<STREET_HALF_W+3.f){
    if(d2(ux,uy)<=d2(ux+dx,uy+dy))return 0;
   }
@@ -393,6 +397,27 @@ static float street_corner_step(float value,float target,int*cross){
  }
  return target;
 }
+static int street_can_start_leg(Ped*q,StreetWalk*w){
+ if(!w->cross)return 1;
+ if(street_civ_traffic(q,w->mx,w->my)){
+  w->mx=q->x;w->my=q->y;w->cross=0;w->pause=.18f;return 0;
+ }
+ w->crossX=q->x;w->crossY=q->y;return 1;
+}
+static void street_walk_step(Ped*q,StreetWalk*w,float dt,float speed){
+ float dx=w->mx-q->x,dy=w->my-q->y,n=sq(d2(dx,dy));
+ if(n<.001f)return;
+ q->a=look(dx,dy);float step=speed*dt;if(step>n)step=n;
+ float x=q->x+dx*(step/n),y=q->y+dy*(step/n);
+ if(!solid(x,y,4)&&street_foot_car_clear(x,y,-1,3.f)){
+  q->x=x;q->y=y;q->s=speed;w->blocked=0;
+ }else if(w->cross==1&&(w->blocked+=dt)>.40f){
+  /* A car can turn toward a stripe after a civilian has started crossing.
+   * Don't leave both users yielding forever: return to the same curb, then
+   * wait for a second opening. Never step off the zebra into traffic. */
+  w->mx=w->crossX;w->my=w->crossY;w->cross=2;w->blocked=0;w->pause=.15f;
+ }
+}
 static void street_tick_civilian(int i,float dt){
  Ped*q=peds+i;StreetWalk*w=streetWalks+i;q->s=0;
  if(w->pause>0){w->pause-=dt;return;}
@@ -411,27 +436,11 @@ static void street_tick_civilian(int i,float dt){
    w->leg=STREET_ARRIVE;w->mx=w->ax;w->my=w->ay;
   }else if(absf(q->x-w->tx)>.4f)w->mx=street_corner_step(q->x,w->tx,&w->cross);
   else w->my=street_corner_step(q->y,w->ty,&w->cross);
-  if(w->cross){
-   if(street_civ_traffic(q,w->mx,w->my)){w->mx=q->x;w->my=q->y;w->cross=0;w->pause=.18f;return;}
-   w->crossX=q->x;w->crossY=q->y;
-  }
+  if(!street_can_start_leg(q,w))return;
  }
- float dx=w->mx-q->x,dy=w->my-q->y,n=sq(d2(dx,dy));
- if(n<.001f)return;
  float speed=w->cross?62.f:27.f+(i%6)*2.f;
  if(p.heat>35.f&&d2(p.x-q->x,p.y-q->y)<110.f*110.f)speed+=17.f;
-
- q->a=look(dx,dy);float step=speed*dt;if(step>n)step=n;
- float x=q->x+dx*(step/n),y=q->y+dy*(step/n);
- if(!solid(x,y,4)&&street_foot_car_clear(x,y,-1,3.f)){
-  q->x=x;q->y=y;q->s=speed;w->blocked=0;
- }else if(w->cross==1&&(w->blocked+=dt)>.40f){
-  /* A car can turn toward a stripe after a civilian has started crossing.
-   * Don't leave both users yielding forever: return to the same curb, then
-   * wait for a second opening. Never step off the zebra into traffic. */
-  w->mx=w->crossX;w->my=w->crossY;w->cross=2;w->blocked=0;w->pause=.15f;
- }
-
+ street_walk_step(q,w,dt,speed);
 }
 static void street_spawn(void){
  z(streetDrivers,sizeof streetDrivers);z(streetWalks,sizeof streetWalks);
