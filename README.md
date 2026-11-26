@@ -5,10 +5,10 @@ Port Vanta. This is not GTA, a GTA port, or a browser game. The city, artwork,
 and game code are original to this project; the bundled font license is in
 [`docs/FONT-LICENSE.txt`](docs/FONT-LICENSE.txt).
 
-**Play:** [Download the Port Vanta Contracts Windows x64 ZIP](downloads/Dead-Channel-Port-Vanta-Contracts-Windows-11-x64.zip?raw=true).
+**Play:** [Download the Street Handling Windows x64 ZIP](downloads/Dead-Channel-Street-Handling-Windows-11-x64.zip?raw=true).
 Extract the ZIP and run `DeadChannel.exe`. No installer, network, or account
-is required. The window title reads `Dead Channel | Port Vanta Contracts`.
-Previous local saves still load.
+is required. The window title reads `Dead Channel | Street Handling`.
+Previous local saves still load. The driving camera looks into turns, the vehicle dash shows speed and direction, and the radar marks responding patrols.
 
 Begin in Apartment 4, take Mara's courier job, and explore 78 enterable
 buildings. Earn clean cash from legal jobs, take street contracts, drive and

@@ -1,3 +1,35 @@
+STREET HANDLING QA
+
+- Started in the creator with an empty career and used keyboard input for
+  the journey. Completed Courier Shift, Taxi Fare, Harbor Recovery, Glass
+  Mile Sprint, Vault Run, Hot Property, Signal Raid and Rival Collection.
+  Used all 15 named venue counters and operated all 63 storefront fixtures.
+  Bought the Mercury franchise, deposited street credits, waited for
+  closing in active play and collected at the rear desk.
+- Replayed the 57,765-frame input recording through the Windows x64
+  executable on Linux with simulated Win32. The in-memory disk recorded
+  23 atomic writes. The final revision-7 save checksum was bf6ce0ab.
+  The career had four legal and four street completions, $255 clean and
+  $970 street. Repeat with bash scripts/test.sh --tour.
+- Continued that career via game-code keyboard input through 2,053,263
+  total fixed steps, including waiting for earned income at counters.
+  Triggered a Revenue audit and paid the fine. Bought and rested at
+  Breakwater, acquired all five cars and all three franchises, and visited
+  all three rear account desks. Bought and secured Lantern and Cinder,
+  upgraded both to tier three, hired their crews and sold all three stock
+  types at Kiosk 09. The extended economy run used the Linux game harness.
+- The standard suite passed, including career creation, save migration,
+  save failures, delete protection, both wallets and letterboxed input.
+  The 180,000-tick sanitizer soak passed. The extended soak passed
+  1,200,000 ticks and 14,496 renders across 48 starting contexts.
+- Reproduced the original crash-frame bug at a venue door. The previous
+  game entered the interior while its player was down. The updated game
+  stayed in the downed scene and recovered. Additional checks covered
+  re-entry heat, vehicle selection, forward and reverse camera lead,
+  world-edge clamping, career reset and pause/map input.
+- Physical Windows 11 input, HiDPI display and window focus remain to be
+  tested. The executable tests above used simulated Win32 on Linux.
+
 PORT VANTA CONTRACTS QA
 
 - A fresh-career input replay completed all eight contracts and the
