@@ -59,6 +59,15 @@ static U wi_back[W*H],wi_seed;
 static const char *const wi_brand[]={"SALTMARSH","BLUE HOUR","LOW TIDE","HARBOURLIGHT","NINTH ST.","MARINER","BLUEBIRD","COPPER","WEST WIND","TERN","BELL LANE","GREYCAP"};
 static U wi_hash(U n){n=(n^(n>>16))*0x7feb352du;n=(n^(n>>15))*0x846ca68bu;return n^(n>>16);}
 static int wi_index(int b){return (b*7+4)%LEN(wiRoles);}
+static const char*storefront_sign(int i){return wiRoles[wi_index(i)].noun;}
+static int tram_hall(int b){return wiRoles[wi_index(b)].plan[0].t==WI_TIMETABLE;}
+static int tram_destination(int b){
+ for(int offset=1;offset<nb;offset++){
+  int stop=(b+offset)%nb;
+  if(ordinaryDoorY[stop]&&tram_hall(stop))return stop;
+ }
+ return -1;
+}
 static int contract_room(int kind,int x,int y,int exclude){
  int role=kind==JOB_VAULT?WI_PARCELS:WI_RADIO;
  int best=-1;float distance=ROOM*ROOM*2.f;
@@ -172,6 +181,15 @@ static void walkin_open(int building){
  walkin_active=building;wi_layout(building);wi_x=W/2;wi_y=416;wi_angle=-1.570796f;walking=0;scene=4;menu=-1;mapOn=0;
  wi_bake();
 }
+static void tram_board(void){
+ int destination=tram_destination(walkin_active);
+ if(destination<0)return;
+ if(job.kind>=0){tell("Finish or abandon the active contract before boarding.");return;}
+ if(p.heat>0){tell("The tram gates are closed to riders in pursuit.");return;}
+ if(sv.cash<5){tell("A tram ticket costs $5 clean cash.");return;}
+ sv.cash-=5;p.x=ordinaryDoorX[destination];p.y=ordinaryDoorY[destination];
+ walkin_open(destination);tell("Arrived. Exit to the street.");request_save();
+}
 static void walkin_tick(U keys,U tap){
  if(walkin_active<0||walkin_active>=nb){scene=1;return;}
  const float dt=1.f/60;
@@ -186,11 +204,16 @@ static void walkin_tick(U keys,U tap){
  if(!wi_solid(wi_x+x*v,wi_y))wi_x+=x*v;
  if(!wi_solid(wi_x,wi_y+y*v))wi_y+=y*v;
  p.secs+=dt;job_clock_tick(dt);
+ if((tap&ENTER)&&tram_hall(walkin_active)&&wi_at_station()&&!wi_at_door()){tram_board();return;}
  if(tap&USE){
-  if(wi_at_door()){int b=walkin_active;walkin_active=-1;scene=1;menu=-1;walking=0;
+  if(wi_at_door()){if(storefrontCaption){p.noticeT=0;storefrontCaption=0;}
+   int b=walkin_active;walkin_active=-1;scene=1;menu=-1;walking=0;
    p.x=ordinaryDoorX[b];p.y=ordinaryDoorY[b];p.a=1.570796f;by=placeNear();near=carNear();return;}
   if(wi_at_station()&&job_room_action(walkin_active)){job_use_room();return;}
-  if(wi_at_station()){wi_sw[walkin_active]^=1;const WiRole*r=wiRoles+wi_role;tell(wi_sw[walkin_active]?r->on:r->off);wi_bake();}
+  if(wi_at_station()&&tram_hall(walkin_active)){
+   int to=tram_destination(walkin_active);if(to>=0){char msg[95];char*end=append(msg,"Next tram: ");append(end,walkin_name(to));tell(msg);storefrontCaption=1;}return;
+  }
+  if(wi_at_station()){wi_sw[walkin_active]^=1;const WiRole*r=wiRoles+wi_role;tell(wi_sw[walkin_active]?r->on:r->off);storefrontCaption=1;wi_bake();}
  }
 }
 static void walkin_paint(void){
@@ -200,7 +223,7 @@ static void walkin_paint(void){
  for(int i=0;i<W*H;i++)pixels[i]=wi_back[i];
  person((int)wi_x,(int)wi_y,0x56baae,walking?(int)(sn(footcycle)*4):0,wi_angle,4,1);
  char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,district(b->x,b->y));q=append(q,"   /   ");append(q,r->section);
- textat(22,9,ad,MUTED,0);textat(22,31,walkin_name(walkin_active),r->accent,1);draw_wallet(W-231,10,210);
+ textat(22,9,ad,MUTED,0);textat(22,31,walkin_name(walkin_active),r->accent,1);draw_wallet(W-291,10,270);
  const InteriorProp*f=wi_f;int sx=f->x+f->w/2,sy=f->y-10;
  const char *task=job_room_action(walkin_active);
  U marker=task?PINK:r->accent;
@@ -208,8 +231,8 @@ static void walkin_paint(void){
  else{disc(sx,sy,4,DARK);disc(sx,sy,2,marker);}
  rect(16,477,W-32,1,0x475a65);
  const char*hint=wi_at_door()?"Return to street":
-     wi_at_station()?(task?task:r->action):task?job_objective():"Walk to the lit station";
+     wi_at_station()?(task?task:tram_hall(walkin_active)?"Departures    [ENTER] Ride tram / $5 clean":r->action):task?job_objective():"Walk to the lit station";
  textat(23,484,(wi_at_station()||wi_at_door())?"[E]":"WASD",r->accent,0);textat(81,484,hint,PAPER,0);
  if(p.noticeT>0)textat(23,509,notice,notice_color(),0);else if(saveFlash>0)textat(23,509,"Saved.",CASH_GREEN,0);else if(saveFlash<0)textat(23,509,"Save failed.",CASH_RED,0);
- if(menu>=0){paint_active_menu();draw_wallet(W-231,10,210);}
+ if(menu>=0){paint_active_menu();draw_wallet(W-291,10,270);}
 }

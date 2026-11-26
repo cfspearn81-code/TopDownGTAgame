@@ -67,7 +67,7 @@ static void profiles_open(int create){
  profiles_scan();if(create&&!profileError)new_profile();
 }
 static void profiles_activate(void){
- end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
+ sprintBest=0;end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
  navSlot=-1;walking=fn=deadAnim=saveFlash=0;punchFlash=crashFlash=0;lastCar=near=by=-1;
  lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;menu=-1;mapOn=0;profileReturn=0;profileError=0;
  if(sv.intro==0)open_interior(12);
@@ -290,7 +290,7 @@ static void profile_list_paint(void){
  if(cardCount&&cards[cardSelected].status){
   Card*c=cards+cardSelected;portrait(686,133,210,156,&c->look,4,0);
   center(791,301,c->intro<3?"FIRST SHIFT":"PORT VANTA CAREER",TEAL,0);
-  center(791,324,"CLEAN / STREET",MUTED,0);
+  center(791,324,"CLEAN CASH / DIRTY MONEY",MUTED,0);
  }else{
   rect(686,138,210,155,0x10252f);
   for(int r=0;r<10;r++){int h=(r*23+27)%88;rect(690+r*20,275-h,17,h,0x233e4a);rect(694+r*20,279-h,3,7,r&1?TEAL:0x586067);}

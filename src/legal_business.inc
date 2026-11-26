@@ -72,10 +72,10 @@ static void legal_counter_menu(int i){
   char*label=append(strings[nopt],"TODAY CLOSES IN ");legal_duration(label,LEGAL_DAY_SECONDS-sv.dayClock);
   add(strings[nopt],"Deposits made in the final 45 seconds clear at tomorrow's closing.",0);
   if(amount>=LEGAL_MIN_TRANSFER){
-   label=append(strings[nopt],"DEPOSIT $");label=number(label,amount);append(label," STREET CREDITS");
+   label=append(strings[nopt],"DEPOSIT $");label=number(label,amount);append(label," DIRTY MONEY");
    char*note=append(strings[LEN(strings)-1],"25% game fee, rounded up. Collect $");note=number(note,legal_net(amount));append(note," clean at this desk after closing.");
    add_colored(strings[nopt],strings[LEN(strings)-1],LEGAL_DEPOSIT_FIRST+i,CASH_RED);
-  }else add_colored("DEPOSIT STREET CREDITS","Bring at least $5 in street credits. Only one deposit per desk at a time.",0,CASH_RED);
+  }else add_colored("DEPOSIT DIRTY MONEY","Bring at least $5 in dirty money. Only one deposit per desk at a time.",0,CASH_RED);
  }
  add("LEAVE DESK","Close the account and keep walking.",LEGAL_COUNTER_BACK);
 }
@@ -114,7 +114,7 @@ static int legal_opt(int action,int*currentMenu){
  }
  if(b->pending>0){tell("One deposit per desk. Collect this one first.");return 1;}
  const int amount=legal_amount(i);
- if(amount<LEGAL_MIN_TRANSFER){tell("Bring at least $5 in street credits to deposit.");return 1;}
+ if(amount<LEGAL_MIN_TRANSFER){tell("Bring at least $5 in dirty money to deposit.");return 1;}
  sv.dirty-=amount;b->pending=legal_net(amount);b->cooldown=LEGAL_DAY_SECONDS-sv.dayClock;
  if(b->cooldown<LEGAL_MIN_WINDOW){
   b->cooldown+=LEGAL_DAY_SECONDS;tell("Deposit recorded. Collect here after tomorrow's closing.");

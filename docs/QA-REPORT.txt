@@ -1,3 +1,45 @@
+CITY RHYTHM QA
+
+- Reviewed the city render, all 15 named venues, 63 storefronts, four rear
+  rooms, five garage vehicles and the player and NPC figure renders. Compared
+  the maps and rotated vehicle models before and after the changes. Checked
+  the taxi, sprint, tram timetable and atlas in actual gameplay frames.
+- Checked all 114 trunk obstacles, the exposed roof and wall edges of every
+  active building, angled car collision, and clear park paths. Checked road
+  connections and map selection at every storefront. A legacy-style position
+  inside an extended roof loaded on nearby clear ground.
+- The new keyboard tour creates a career and completes all eight contract
+  types plus a repeat courier manifest. It visits 15 named venues and all
+  63 ordinary buildings, uses all 63 fixtures, buys Mercury, and collects its
+  settlement. It then pins Blue Hour Tram Hall using the atlas, pays the fare,
+  rides to Harbourlight Tram Hall, exits to the street and saves.
+- The Windows executable replay on simulated Win32 ran 60,569 frames with
+  26 atomic writes and final save digest f3397161. Final balances were $426
+  clean cash and $970 dirty money, with five legal and four street completions.
+- The standard game, profile, economy and executable checks passed. Targeted
+  cases cover blocked tram purchases, independent shop GPS pins, repeat
+  courier destinations, and cancelling or completing a braking exit. The
+  extended sanitizer run covered 1,200,000 ticks and 14,496 renders across
+  48 starting contexts. Physical Windows 11 testing remains outstanding.
+
+SIDEWALK PATROLS QA
+
+- Followed the eight officers at their posts, on neighborhood patrol, during
+  a six-officer response to a road call, and on return. Checked their
+  positions against the sidewalk and crossing coordinates at each step.
+- An approaching player vehicle and a parked vehicle on the crossing each
+  kept the officer at the curb. After the lane cleared the officer crossed
+  and ambient traffic yielded.
+- Standard game, career, economy, and simulated Win32 executable checks
+  passed. The sanitizer soak completed 180,000 ticks and 2,178 renders.
+- Replayed the 57,765-frame keyboard tour. It still completed all eight
+  jobs, visited 15 named venues and 63 storefronts, and ended with $255
+  clean cash and $970 dirty money. Compared with Street Handling, only
+  armor (13 to 11) and the checksum changed in the final save. The Windows
+  executable replay made 23 atomic writes and matched checksum 664909bd.
+- Windows executable checks used simulated Win32 on Linux. Physical
+  Windows 11 display, focus, and keyboard testing remain outstanding.
+
 STREET HANDLING QA
 
 - Started in the creator with an empty career and used keyboard input for

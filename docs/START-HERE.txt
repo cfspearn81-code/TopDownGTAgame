@@ -1,8 +1,8 @@
 DEAD CHANNEL / PORT VANTA
-Street Handling for Windows 11 x64
+City Rhythm for Windows 11 x64
 
 1. Extract the entire ZIP to a normal folder and open DeadChannel.exe.
-   Look for "Dead Channel | Street Handling" in the window title.
+   Look for "Dead Channel | City Rhythm" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -19,7 +19,7 @@ keyboard, press Right, then Enter. Enter alone cancels. The career
 you're currently playing is protected; close and reopen the game and
 delete it from the launch screen if you want to remove it.
 Left / Right changes pages. Playtime, portrait, clean cash (green) and
-street cash (red) come from the save. Older saves didn't track playtime;
+dirty money (red) come from the save. Older saves didn't track playtime;
 after playing in this version, their clock is marked "Since update."
 
 CHARACTER CREATOR
@@ -42,21 +42,38 @@ F1: field guide. F2: low FX. F5: save. Esc: pause / back
 The gold job marker leads to the assigned vehicle. F5 also saves with the
 atlas open.
 When driving, the camera leads into turns and reverses with the car. The
-dash above the radar shows the vehicle model, direction and speed. Slow
-down with Shift before trying to exit at speed. Blue radar dots mark
+dash above the radar shows the vehicle model, direction and speed. Hold E at speed to brake and
+exit when the car stops. Release E to keep driving. A blocked door requires
+a clear parking spot. Blue radar dots mark
 responding officers. Wait for CLEARING to disappear before a hot handoff.
 The thin teal bar below health shows your remaining armor.
+Patrol officers walk the sidewalks and check traffic before using crosswalks,
+even during a pursuit. Watch for people already crossing.
 Business clocks run in the atlas and at the counter. Pause and the field
 guide freeze them.
 Close the window to save your live career. Title/creator don't create
 or write a career unless you choose Start Career.
 
+GETTING AROUND PORT VANTA
+On the atlas, point at a named venue or one of the small storefront door
+markers and click to pin its entrance. Space cycles named venues. Use Left
+and Right to browse shop doors and Enter to pin one. Select an owned business
+to check stock, settlement, or payout status. Accepting a new job sets its GPS.
+
+Gold T markers indicate tram halls. Walk up to the timetable, press E for
+the next destination, and Enter to buy a $5 clean-cash ticket and ride.
+Finish an active job and lose any pursuit before boarding.
+
 JOBS AND BUSINESSES
 Courier: hand over both parcels at their counters and return the signed
-manifest to Mara. Taxi riders use owned or licensed cars and board when
-you stop at the curb. Harbor Recovery requires restarting the stalled van
+manifest to Mara. The first shift pays $140 including the opening bonus,
+enough for the $125 Mote at Nightglass. Later manifests rotate the stops.
+Taxi riders board an owned or licensed car when you stop at the curb. Harbor Recovery requires restarting the stalled van
 with E, driving it to Dax's marked service bay, stopping and pressing E.
 Start the Glass Mile clock by crossing the line and finish in the same car.
+Your finish time is compared to your best in this career session. Taxi,
+Hot Property, and the running sprint have deadlines. The other contracts are untimed.
+The HUD shows the fare and projected tip while the rider is aboard.
 Vault Run requires taking the lockbox at the marked parcel counter. Lose
 police before meeting Ivo. In Hot Property, steal the marked Vectra and
 clear pursuit, then stop in Vera's marked bay and press E. Signal Raid

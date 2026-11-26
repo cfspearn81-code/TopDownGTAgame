@@ -1,6 +1,52 @@
 # Dead Channel | Project handoff
 
-**Current build** — Street Handling, November 26, 2026. The
+**Current build** — [City Rhythm for Windows x64](downloads/Dead-Channel-City-Rhythm-Windows-11-x64.zip), November 26, 2026.
+
+City collision now uses a common set of per-block obstacles for people, car
+bodies, sight lines and routing. Building bounds cover the visible north roof
+edge and projected east wall. Park paths and storefront approaches stay open.
+The 114 rendered trees have solid trunks. Street sprites draw in depth order,
+and the facade covers an actor passing behind it. Garage models have distinct
+cabin trim, including a ribbed cargo van and a striped Nightjar. The rotated
+windows, character shadows, storefront signs and fixture captions were revised.
+
+Mara's first shift pays for a Mote. Later manifests rotate destinations.
+Recovery, courier, Vault Run, Signal Raid and Rival Collection are untimed.
+Taxi fares display the current tip, and passengers accept curbside stops.
+The Glass Mile sprint reports a finish time and session best. Holding E at
+speed brakes and exits. Releasing E cancels the pending exit. On foot, Enter
+boards cars. E is reserved for doors and other world interactions.
+
+The atlas supports all 78 doors and shows owned-business status. A newly
+accepted job selects its GPS route. At either tram hall's timetable, E shows
+the other station and Enter buys a $5 clean-cash ride when the player is free
+of an active contract or pursuit. The car stays where the player parked it.
+
+The save layout remains revision 7 with the existing revision 2–6 readers.
+Loading a career whose position now intersects scenery finds nearby clear
+ground. Sprint records last for the active career session. The verified archive
+checksum is in [SHA256SUMS.txt](downloads/SHA256SUMS.txt). Physical Windows
+11 input and display verification remains open.
+
+**Previous build** — [Sidewalk Patrols for Windows x64](downloads/Dead-Channel-Sidewalk-Patrols-Windows-11-x64.zip), November 26, 2026.
+Officers use the civilian sidewalk
+and crossing rules on patrol, on calls, and when returning to their posts.
+The red balance is labeled dirty money. Save revision 7 and the revision 2–6
+loaders carry forward. The download checksum is in [SHA256SUMS.txt](downloads/SHA256SUMS.txt).
+
+Patrol beats and station posts start on the pavement. Calls and searches
+target the nearest sidewalk, and officers finish each crossing before
+redirecting. Officers and civilians share crossing checks, vehicle clearance,
+and withdrawal to the curb if a car blocks a crossing in progress.
+
+The standard regressions passed, including the new patrol, pursuit, return,
+moving-car and blocked-crosswalk cases. The keyboard tour ran 57,765 frames
+through the Windows executable with simulated Win32. The final career had
+four legal and four street completions, $255 clean cash and $970 dirty money.
+The new digest is `664909bd`. The 180,000-tick sanitizer soak passed.
+Physical Windows 11 verification is outstanding.
+
+**Previous build** — Street Handling, November 26, 2026. The
 [Windows x64 ZIP](downloads/Dead-Channel-Street-Handling-Windows-11-x64.zip)
 contains the native game, player notes and rebuildable source. Save revision 7
 continues to load careers from revisions 2–6.
@@ -87,8 +133,8 @@ See [the QA report](docs/QA-REPORT.txt) for the earlier replay details.
 
 - A new file begins in the editor, then Apartment 4, with no gun, car or
   money. Follow the first-shift GPS to Mercury Dispatch, interact with Mara
-  and visit the courier counters. The introductory courier trip is untimed.
-- Legal jobs pay clean cash and street contracts pay street cash. Follow
+  and visit the courier counters. Courier trips are untimed.
+- Legal jobs pay clean cash and street contracts pay dirty money. Follow
   the gold vehicle marker or the named GPS destination. Race gates score
   on crossing. Press E at a counter, cargo, console or stationary handoff
   according to the objective.
@@ -105,14 +151,14 @@ See [the QA report](docs/QA-REPORT.txt) for the earlier replay details.
   collision. Cars can be stolen, damaged, purchased and repaired at
   Nightglass; headlights are clipped by buildings. The police roster is finite
   (eight officers with HQ and neighborhood posts), not an infinite spawner.
-- UI keeps clean cash green, street cash red, including sale notices. Do
-  not collapse them into one value. Purchases that draw heavily on street
-  cash can trigger Revenue, seizure and a case. Clear the case through
+- UI keeps clean cash green, dirty money red, including sale notices. Do
+  not collapse them into one value. Purchases that draw heavily on dirty
+  money can trigger Revenue, seizure and a case. Clear the case through
   restitution or a fine; no “wait in prison” loop.
 - Legal franchise buy-ins: Mercury Dispatch $360, Ferry Market $710,
   Wrecker Yard $1,200. Passive clean income per 120 active seconds:
   $24/$36/$49. Purchase via Business Office and enter the staff door.
-  The fictional desk converts capped game street credits with a 25% fee,
+  The fictional desk converts a limited amount of dirty money with a 25% fee,
   available to claim at the same desk after simulated closing; no duplicate
   claim. The in-game day runs 480 active seconds. Deposits in the last
   45 seconds defer another day. Audit can freeze or seize credits.
@@ -181,10 +227,12 @@ operation. Do not use actual player saves as test fixtures.
 
 ## Verification and remaining work
 
-The Street Handling keyboard tour starts a new career, finishes the eight
-contracts, uses the counters and doors in all 78 buildings, buys the Mercury
-franchise and collects a settlement. Run `bash scripts/test.sh --tour` to replay
-its 57,765 fixed steps through the Windows executable using simulated Win32.
+The City Rhythm keyboard tour starts a new career, finishes all eight contracts
+and a repeat courier manifest, visits every building, uses all 63 ordinary
+storefront fixtures, buys the Mercury franchise, collects a settlement, and
+rides the tram. Run `bash scripts/test.sh --tour` to replay its 60,569 fixed
+steps through the Windows executable using simulated Win32. The replay ended
+with $426 clean cash, $970 dirty money, and revision-7 digest `f3397161`.
 The fixture stores a final save digest and run-length encoded keyboard input.
 
 The extended sanitizer run passed 1,200,000 ticks and 14,496 renders across
@@ -208,7 +256,7 @@ change; progress such as wallet, case, property, stock, vehicle condition and
 customization is persistent. Pre-update career time is unavailable. There is
 no audio, multiplayer, installer or cloud save sync. Windows verification
 should include a real resizable-window/HiDPI session, first courier and taxi,
-an indoor menu, clean/street notices and an intentional delete of a disposable
+an indoor menu, clean cash and dirty money notices and an intentional delete of a disposable
 slot. Preserve the working desktop build while experimenting.
 
 ## Packaging checklist

@@ -1,6 +1,7 @@
 #define DC_TEST
 #include "game.c"
 #include <assert.h>
+#include <string.h>
 static void press(U k){tick(k);tick(0);}
 static void walk(U k,int frames){for(int i=0;i<frames;i++)tick(k);tick(0);}
 static void move_to(int x,int y){p.x=x;p.y=y;if(p.car>=0){cars[p.car].x=x;cars[p.car].y=y;}tick(0);}
@@ -27,6 +28,120 @@ static void visit_job_room(void){
 at_station:
  press(USE);
  wi_x=W/2;wi_y=416;press(USE);assert(scene==1);
+}
+static void assert_officer_route(int i){
+ Ped*q=peds+DISPATCH_FIRST+i;
+ float x=absf(q->x-street_nearest_line(q->x)),y=absf(q->y-street_nearest_line(q->y));
+ assert(!solid(q->x,q->y,4));
+ assert(absf(x-STREET_WALK)<.01f||absf(y-STREET_WALK)<.01f);
+ if(x<STREET_WALK-.01f||y<STREET_WALK-.01f)assert(streetWalks[DISPATCH_FIRST+i].cross);
+}
+static void sidewalk_patrol_test(void){
+ init_city();p.heat=0;nc=0;
+ int visited[DISPATCH_UNITS]={0};
+ for(int frame=0;frame<1800;frame++){
+  dispatch_tick(1.f/60);
+  for(int i=0;i<DISPATCH_UNITS;i++){
+   DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;
+   assert_officer_route(i);
+   if(d2(q->x-u->beat.x,q->y-u->beat.y)<1)visited[i]=1;
+   if(u->station)for(int j=4;j<i;j++)assert(dispatch_distance(u->home,dispatchUnits[j].home)>=24);
+  }
+ }
+ for(int i=0;i<DISPATCH_UNITS;i++)assert(visited[i]);
+ /* A call from the middle of a road is answered from the pavement.
+  * Then remove heat while units are away and follow them back home. */
+ p.x=1024;p.y=1100;p.heat=180;p.hp=100;
+ for(int frame=0;frame<1800;frame++){
+  dispatch_tick(1.f/60);
+  for(int i=0;i<DISPATCH_UNITS;i++)assert_officer_route(i);
+ }
+ assert(dispatch_visible()&&dispatch_engaged()==6);
+ p.heat=0;
+ for(int frame=0;frame<2400;frame++){
+  dispatch_tick(1.f/60);
+  for(int i=0;i<DISPATCH_UNITS;i++)assert_officer_route(i);
+ }
+ for(int i=0;i<DISPATCH_UNITS;i++)assert(dispatchUnits[i].state==D_POST);
+ /* A moving player's car has priority before entry. A parked car on the
+  * stripes also blocks entry. After it clears, ambient drivers yield. */
+ Ped*q=peds+DISPATCH_FIRST;StreetWalk*w=streetWalks+DISPATCH_FIRST;
+ q->x=474;q->y=550;*w=(StreetWalk){.mx=q->x,.my=q->y};
+ DispatchPoint opposite={550,550};
+ nc=2;p.car=1;cars[1]=(Car){502,485,1.570796f,90,0,0,100};
+ for(int i=0;i<60;i++)dispatch_walk_to(0,opposite,1.f/60,37);
+ assert(q->x==474&&!w->cross);
+ cars[1].y=550;cars[1].s=0;
+ for(int i=0;i<60;i++)dispatch_walk_to(0,opposite,1.f/60,37);
+ assert(q->x==474&&!w->cross);
+ cars[1].y=400;
+ for(int i=0;i<35;i++)dispatch_walk_to(0,opposite,1.f/60,37);
+ assert(w->cross&&q->x>480);
+ Car approaching={q->x,520,1.570796f,65,0,0,100};
+ assert(street_yield(&approaching,0,1));
+ for(int i=0;i<120;i++){dispatch_walk_to(0,opposite,1.f/60,37);assert_officer_route(0);}
+ assert(q->x==550&&q->y==550&&!w->cross);
+ puts("Passed: sidewalk posts, neighborhood beats, pursuit, return, and crosswalk traffic.");
+}
+static void city_rhythm_test(void){
+ init_city();scene=1;nc=0;
+ int trees=0,shops=0,tram=-1;
+ for(int tile=0;tile<64;tile++){
+  BlockScenery*block=scenery+tile;
+  for(int i=0;i<block->count;i++){
+   StreetBounds b=block->walls[i];
+   float x=b.x+b.w*.5f,y=b.y+b.h*.5f;
+   assert(solid(b.x+1,b.y+1,0)&&solid(b.x+b.w-1,b.y+b.h-1,0));
+   assert(!street_line_open(b.x-15,y,b.x+b.w+15,y,1));
+   Car car={.x=x,.y=y,.a=.78f};assert(street_hits_wall(&car));
+   if(i<block->treesFrom)continue;
+   trees++;p.x=b.x-11;p.y=y;float before=p.x;
+   for(int j=0;j<18;j++)street_player_step(2,0);
+   assert(p.x>=before&&p.x<=b.x-10);
+  }
+  if(!lot[tile][0]){
+   int x=(tile%8)*256,y=(tile/8)*256;
+   assert(street_line_open(x+48,y+126,x+208,y+126,10));
+   assert(street_line_open(x+126,y+48,x+126,y+208,10));
+  }
+ }
+ assert(trees>0);
+ for(int i=0;i<nb;i++){
+  const Building*b=buildings+i;if(!b->w)continue;
+  int roofY=max(b->y/256*256+42,b->y-b->ht);
+  int east=min(b->x/256*256+213,b->x+b->w+b->ht/2-1);
+  assert(solid(b->x+b->w/2,roofY+1,0));
+  assert(solid(east,b->y+b->h/2,0));
+  assert(street_hits_wall(&(Car){.x=east+2,.y=b->y+b->h/2,.a=.78f}));
+ }
+ for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){
+  shops++;p.x=ordinaryDoorX[i];p.y=ordinaryDoorY[i];assert(open_space(p.x,p.y));
+  NavPoint door=nav_door(LEN(loc)+i);mapOn=1;
+  navigation_pointer(NAV_MAP_X+door.x*NAV_MAP_SIZE/ROOM,NAV_MAP_Y+door.y*NAV_MAP_SIZE/ROOM,0);
+  assert(navSelected==LEN(loc)+i);mapOn=0;
+  NavAnchor connections[6];assert(nav_anchors(door,connections)>0);
+  if(tram_hall(i))tram=i;
+ }
+ assert(shops==63&&tram>=0);
+ walkin_open(tram);wi_x=wi_f[0].x+wi_f[0].w/2;wi_y=wi_f[0].y+wi_f[0].h+10;
+ assert(wi_at_station());sv.cash=4;press(ENTER);assert(walkin_active==tram&&sv.cash==4);
+ sv.cash=10;p.heat=50;press(ENTER);assert(walkin_active==tram&&sv.cash==10);p.heat=0;
+ beginJob(JOB_COURIER);press(ENTER);assert(walkin_active==tram&&sv.cash==10);end_job();
+ int stop=tram_destination(tram);press(ENTER);
+ assert(walkin_active==stop&&sv.cash==5&&sv.x==ordinaryDoorX[stop]&&sv.y==ordinaryDoorY[stop]);
+ press(USE);assert(scene==1&&p.x==ordinaryDoorX[stop]);
+ sv.intro=4;sv.legal=1;beginJob(JOB_COURIER);int first=job_venue();assert(!job_has_clock());
+ job_clock_tick(400);assert(job.kind==JOB_COURIER);
+ for(int i=0;i<3;i++)assert(interior_job_drop(job_venue()));
+ beginJob(JOB_COURIER);assert(job_venue()!=first);end_job();
+ sv.owned=1;nc=1;p.car=0;p.x=900;p.y=512;cars[0]=(Car){900,512,0,125,0,1,100};
+ press(USE);assert(p.car==0&&!stoppingToExit);
+ cars[0].s=125;walk(USE,90);assert(p.car==-1&&absf(cars[0].s)<5);
+ nc=2;cars[1]=(Car){p.x+24,p.y,0,0,1,0,100};p.heat=0;
+ press(USE);assert(p.car<0&&!cars[1].reported&&p.heat==0);
+ const Building*b=buildings+zone_idx[0];sv.x=b->x+b->w/2;sv.y=b->y-b->ht+2;
+ spawnPlayer();assert(open_space(p.x,p.y)&&d2(p.x-sv.x,p.y-sv.y)<45*45);
+ printf("Passed: %d tree trunks, roof edges, park paths, all storefront pins and approaches, trams, courier rotation, braking exits and old save positions.\n",trees);
 }
 int main(void){
  init_city();assert(nb<=LEN(buildings));assert(scene==0&&sv.cash==0&&sv.gear==-1&&sv.owned==0&&job.kind<0);
@@ -179,7 +294,7 @@ int main(void){
    U c=pixels[y*W+x];if(c==CASH_GREEN&&y<37)green++;if(c==CASH_RED&&y>=39&&y<64)red++;if(c==0x6ea7ee){assert(y>=70&&y<76);blue++;}
  }
  assert(green&&red&&blue);frame("build/economy-hud.ppm");
- gain(0,105,"Street sale.");paint();
+ gain(0,105,"Street sale.");assert(strstr(notice,"DIRTY MONEY +$105"));paint();
  assert(notice_color()==CASH_RED&&count_ink(CASH_RED,20,438,700,467)>30&&count_ink(CASH_GREEN,20,438,700,467)==0);
  p.car=0;paint();assert(count_ink(CASH_RED,650,40,944,63)>40);
  p.car=-1;visit(0);walk(0,20);gain(0,34,"Street sale.");paint();
@@ -297,6 +412,8 @@ int main(void){
  cars[0].s=-50;for(int i=0;i<120;i++)update_camera_lead();
  assert(camera_left()<1024-W/2);p.x=35;assert(camera_left()==0);
  spawnPlayer();assert(cameraLeadX==0&&cameraLeadY==0);
+ city_rhythm_test();
+ sidewalk_patrol_test();
  puts("Passed: vehicle re-entry, parked car selection, pause/map isolation, lethal wreck interaction and driving camera.");
  puts("Passed: stopped recovery handoff, licensed circuit, exact Vectra, two radio studios, carried lockbox, guarded consignment, restitution and safehouse recovery.");
  puts("Passed: apartment spawn with zero cash/fists; doorway/counter walk; three indoor deliveries; weapon purchase; property batch while menu and map stay open; solid car, crash and repair; moving car theft; punch; finite dispatch; warm lights and low FX; GPS/manual route, automatic foot and driving checkpoints, taxi boarding/drop-off/cancellation plus T and 100 varied offers, wallet semantics, 78 building paths, and save checksum.");
