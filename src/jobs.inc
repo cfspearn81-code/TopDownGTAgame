@@ -312,7 +312,7 @@ static const char *job_objective(void){
      job.step==0?"Cross the start line to begin timing.":
      p.car!=jobRide?"Return to the car you started the sprint in.":"Follow the marked circuit to the finish.";
  case JOB_VAULT:return job.step==0?"Take the lockbox from the marked parcel counter.":
-     p.heat>0?"Go outside and lose pursuit. Then return to Ivo at Vault 39.":"Hand the lockbox to Ivo at Vault 39.";
+     p.heat>0?"Go outside and lose pursuit. Then return to Ivo at Vault 39.":"Find Ivo behind Vault 39's Employees Only door.";
  case JOB_HOT:return job.step==0?"Steal the marked Vectra.":
      p.car!=jobRide?"Return to the marked Vectra.":
      p.heat>0?"Lose the police with the marked car.":"Stop at Kiosk 09's marked bay and press E.";

@@ -106,6 +106,16 @@ static View framebuffer(Rect r){
  else v.h=(int)((long long)v.w*H/W);
  v.x=(r.r-v.w)/2;v.y=(r.b-v.h)/2;return v;
 }
+/* Never erase game pixels to draw the letterbox. GDI can expose separate
+ * operations during a redraw; the old full-client BLACKNESS was visible
+ * before the next StretchDIBits, particularly under wheel mouse motion. */
+static void letterbox_bars(Handle dc,Rect r,View v){
+ int right=v.x+v.w,bottom=v.y+v.h;
+ if(v.y>0)__imp_PatBlt(dc,0,0,r.r,v.y,0x00000042);
+ if(bottom<r.b)__imp_PatBlt(dc,0,bottom,r.r,r.b-bottom,0x00000042);
+ if(v.x>0)__imp_PatBlt(dc,0,v.y,v.x,v.h,0x00000042);
+ if(right<r.r)__imp_PatBlt(dc,right,v.y,r.r-right,v.h,0x00000042);
+}
 static void mouse_message(Handle w,S64 packed,U buttons){
  Rect r;if(!__imp_GetClientRect(w,&r))return;
  View v=framebuffer(r);
@@ -113,13 +123,19 @@ static void mouse_message(Handle w,S64 packed,U buttons){
  if(x>=0&&y>=0&&x<v.w&&y<v.h)pointer_input((int)((long long)x*W/v.w),(int)((long long)y*H/v.h),buttons);
  else pointer_input(-1,-1,buttons);
 }
-static int redraw,mouseTracked;
+static int redraw=1,barsDirty=1,mouseTracked,focusWasInterrupted;
 static S64 wnd(Handle window,U m,U64 w,S64 l){
  if(m==0x0002){request_save();__imp_PostQuitMessage(0);return 0;}
- if(m==0x000f||m==0x0005||m==0x0006)redraw=1;
+ /* No class background brush: DefWindowProc validates WM_PAINT and
+  * this host handles any later WM_ERASEBKGND without clearing the view. */
+ if(m==0x000f||m==0x0005)redraw=barsDirty=1;
+ if(m==0x0006)redraw=1;
+ if(m==0x0008){clear_input();pointer_input(-1,-1,0);focusWasInterrupted=1;redraw=1;}
  if(m==0x02a3){mouseTracked=0;pointer_input(-1,-1,0);return 0;}
  if(m==0x0200||m==0x0201||m==0x0204){
    if(!mouseTracked){struct {U len,flags;Handle window;U hover;} request={24,2,window,0};mouseTracked=__imp_TrackMouseEvent(&request);}
+   /* Render pointer changes with the next 60 Hz frame, not once per
+      mouse packet. The selected position is still updated on every event. */
    mouse_message(window,l,m==0x0201?1u:m==0x0204?2u:0u);return 0;
  }
  if(m==0x0102){text_input((U)w);return 0;}
@@ -130,29 +146,29 @@ static int key(int v){return (__imp_GetAsyncKeyState(v)&0x8000)!=0;}
 static U input(void){U r=0;
  if(key('W')||key(0x26))r|=UP;if(key('S')||key(0x28))r|=DOWN;if(key('A')||key(0x25))r|=LEFT;if(key('D')||key(0x27))r|=RIGHT;
  if(key('E'))r|=USE;if(key(0x20))r|=FIRE;if(key(0x10))r|=BRAKE;if(key(0x1b))r|=ESC;if(key('M'))r|=MAP;
- if(key(0x2e))r|=DELETE_SLOT;if(key(0x74))r|=SAVE;if(key(0x75))r|=ACTIVITIES;if(key(0x0d))r|=ENTER;if(key(0x70))r|=HELP;if(key(0x71))r|=GFX;if(key(0x72))r|=SLOT;if(key(0x73))r|=NEW_SLOT;if(key('X'))r|=PUNCH;if(key('T'))r|=TAXI_NEXT;return r;
+ if(key(0x2e))r|=DELETE_SLOT;if(key(0x74))r|=SAVE;if(key(0x75))r|=ACTIVITIES;if(key(0x0d))r|=ENTER;if(key(0x70))r|=HELP;if(key(0x71))r|=GFX;if(key(0x72))r|=SLOT;if(key(0x73))r|=NEW_SLOT;if(key('X'))r|=PUNCH;if(key('T'))r|=TAXI_NEXT;if(key(0x09))r|=WHEEL;if(key('V'))r|=USE_PATCH;return r;
 }
-static int redraw=1;
 static Bitmap dib={40,W,-H,1,32,0,0,0,0,0,0,0};
 void entry(void){
  __imp_SetProcessDPIAware();Handle instance=__imp_GetModuleHandleW(0);
  static const U16 cls[]=L"DeadChannelNative11";
  Class k={sizeof(Class),0x23,wnd,0,0,instance,0,__imp_LoadCursorW(0,(void*)32512),0,0,cls,0};
  if(!__imp_RegisterClassExW(&k)){__imp_ExitProcess(1);return;}
- Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Port Vanta Sessions",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
+ Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Conversation Hold Hotfix",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
  if(!win){__imp_ExitProcess(2);return;}
  directories();set_session_seed((U)__imp_GetTickCount64());init_city();__imp_ShowWindow(win,1);
  U64 t=__imp_GetTickCount64(); unsigned acc=0;int wasFocused=1,lastW=0,lastH=0;U focusBlocked=0;
  for(;;){Msg m;while(__imp_PeekMessageW(&m,0,0,0,1)){if(m.msg==0x0012){__imp_ExitProcess((U)m.wp);return;}__imp_TranslateMessage(&m);__imp_DispatchMessageW(&m);}
   U64 now=__imp_GetTickCount64(), elapsed=now-t;t=now;if(elapsed>60)elapsed=60;acc+=(unsigned)elapsed*60;
   int focus=__imp_GetForegroundWindow()==win,update=0;
-  if(!focus&&wasFocused){clear_input();acc=0;}
-  if(focus&&!wasFocused)focusBlocked=input();wasFocused=focus;
+  if(!focus&&wasFocused){clear_input();pointer_input(-1,-1,0);acc=0;redraw=1;}
+  if(focus&&(!wasFocused||focusWasInterrupted)){focusBlocked=input();focusWasInterrupted=0;}wasFocused=focus;
   while(acc>=1000){if(focus){U down=input();focusBlocked&=down;tick(down&~focusBlocked);}acc-=1000;update=1;}
-  if((update&&focus)||redraw){int repaint=redraw;redraw=0;Rect r;if(__imp_GetClientRect(win,&r)&&r.r>0&&r.b>0){
+  if((update&&focus)||redraw){redraw=0;Rect r;if(__imp_GetClientRect(win,&r)&&r.r>0&&r.b>0){
    View v=framebuffer(r);int sw=v.w,sh=v.h;
    if(sw>0&&sh>0){radio_audio(take_radio_record());paint();Handle dc=__imp_GetDC(win);
-    if(dc){if((sw!=r.r||sh!=r.b)&&(repaint||r.r!=lastW||r.b!=lastH))__imp_PatBlt(dc,0,0,r.r,r.b,0x00000042);
+    if(dc){
+      if(barsDirty||r.r!=lastW||r.b!=lastH){letterbox_bars(dc,r,v);barsDirty=0;}
       __imp_StretchDIBits(dc,v.x,v.y,sw,sh,0,0,W,H,pixels,&dib,0,0x00cc0020);__imp_ReleaseDC(win,dc);
       lastW=r.r;lastH=r.b;}}
   }}

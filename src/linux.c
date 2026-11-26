@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char title[]="Dead Channel | Port Vanta Sessions";
+static const char title[]="Dead Channel | Conversation Hold Hotfix";
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *surface_tex;
@@ -25,7 +25,7 @@ static const U binding[SDL_NUM_SCANCODES]={
  [SDL_SCANCODE_LSHIFT]=BRAKE,[SDL_SCANCODE_RSHIFT]=BRAKE,[SDL_SCANCODE_ESCAPE]=ESC,
  [SDL_SCANCODE_M]=MAP,[SDL_SCANCODE_F5]=SAVE,[SDL_SCANCODE_F6]=ACTIVITIES,[SDL_SCANCODE_RETURN]=ENTER,[SDL_SCANCODE_KP_ENTER]=ENTER,
  [SDL_SCANCODE_F1]=HELP,[SDL_SCANCODE_F2]=GFX,[SDL_SCANCODE_F3]=SLOT,[SDL_SCANCODE_F4]=NEW_SLOT,
- [SDL_SCANCODE_T]=TAXI_NEXT,[SDL_SCANCODE_DELETE]=DELETE_SLOT
+ [SDL_SCANCODE_T]=TAXI_NEXT,[SDL_SCANCODE_TAB]=WHEEL,[SDL_SCANCODE_V]=USE_PATCH,[SDL_SCANCODE_DELETE]=DELETE_SLOT
 };
 static void stop(int sig){(void)sig;stop_signal=1;}
 
@@ -61,7 +61,7 @@ static void event(const SDL_Event *e){
  case SDL_WINDOWEVENT:
   switch(e->window.event){
    case SDL_WINDOWEVENT_CLOSE:running=0;break;
-   case SDL_WINDOWEVENT_FOCUS_LOST:focused=0;clear_keys();pointer_input(-1,-1,0);break;
+   case SDL_WINDOWEVENT_FOCUS_LOST:focused=0;clear_keys();pointer_input(-1,-1,0);redraw=1;break;
    case SDL_WINDOWEVENT_FOCUS_GAINED:focused=1;redraw=1;break;
    case SDL_WINDOWEVENT_LEAVE:pointer_input(-1,-1,0);redraw=1;break;
    case SDL_WINDOWEVENT_SIZE_CHANGED:case SDL_WINDOWEVENT_RESIZED:
@@ -76,7 +76,7 @@ static void event(const SDL_Event *e){
      * manufacture a fresh press (notably E) after returning to the window. */
     if(held&&e->key.repeat&&!down[code])break;
     if(held&&code==SDL_SCANCODE_BACKSPACE)text_input(8);
-    if(held&&!e->key.repeat&&!down[code])buffered|=binding[code];
+    if(held&&!e->key.repeat&&!down[code])buffered|=binding[code]&~WHEEL; /* Tab does not open on a completed tap. */
     down[code]=(Uint8)held;
    }
    break;

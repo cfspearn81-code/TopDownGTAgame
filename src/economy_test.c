@@ -8,6 +8,10 @@ static unsigned stored_n;
 static int failWrite;
 int disk_write(const void*p,unsigned n){assert(n==sizeof(Save));if(failWrite)return 0;cp(stored,p,n);stored_n=n;return 1;}
 int disk_read(void*p,unsigned n){if(n!=stored_n)return 0;cp(p,stored,n);return 1;}
+static void historical_save(void){
+ /* Construct the bytes an old build wrote, not the current save writer. */
+ sv.x=p.x;sv.y=p.y;sv.hp=p.hp;sv.hash=savehash();assert(disk_write(&sv,sizeof sv));
+}
 static void select_action(int m,int a){active(m);makeMenu();doOpt(a);}
 static void check_revenue_receipt(int kind,int clean,int dirty){
  RevenueReceipt r=revenue_seizure_notice();assert(r.kind==kind&&r.clean==clean&&r.dirty==dirty);
@@ -204,7 +208,7 @@ static void test_old_day_clock_save(void){
  sv.legit[0]=(LegalBusiness){.owned=1,.pending=23,.cooldown=10.f};
  sv.legit[1]=(LegalBusiness){.owned=1,.pending=45,.cooldown=490.f};
  sv.legit[2]=(LegalBusiness){.owned=1,.pending=67};
- request_save();load_save();
+ historical_save();load_save();
  assert(wason&&sv.rev==SAVE_REV&&sv.dayClock==470.f&&sv.bank==777&&sv.dirty==654&&sv.cash==743&&sv.dirtySpent==402);
  assert(sv.charges&&sv.restitution==2&&sv.sweepTicks==137);
  assert(sv.legit[0].pending==23&&sv.legit[0].cooldown==970.f);
@@ -228,7 +232,7 @@ static void test_lantern_operator_only(void){
   sv=prior;sv.rev=(U)rev;
   if(rev==8){
    sv.sweepTicks=(int)hashbytes(LEGACY8_SIZE-4);cp(stored,&sv,LEGACY8_SIZE);stored_n=LEGACY8_SIZE;
-  }else request_save();
+  }else historical_save();
   load_save();
   Business expected=prior.b[0];expected.crew=1;
   assert(wason&&sv.rev==SAVE_REV&&sv.hash==savehash()&&!memcmp(&sv.b[0],&expected,sizeof expected));

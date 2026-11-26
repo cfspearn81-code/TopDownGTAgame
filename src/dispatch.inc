@@ -109,6 +109,7 @@ static void dispatch_tick(float dt){
   * at the original call, updates the shared location. Walls break contact. */
  for(int i=0;i<DISPATCH_UNITS;i++){
   DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;
+  if(npc_replaces(N_ACT_STREET+DISPATCH_FIRST+i)||npc_holds(N_ACT_STREET+DISPATCH_FIRST+i))continue;
   if(q->hp<=0){if(u->state!=D_DOWN){u->state=D_DOWN;u->down=24.f;}continue;}
   if(wanted&&u->state!=D_RETURN&&d2(p.x-q->x,p.y-q->y)<177.f*177.f&&street_line_open(q->x,q->y,p.x,p.y,2)){
    dispatchCall=(DispatchPoint){p.x,p.y};dispatchSightAge=0;
@@ -121,6 +122,7 @@ static void dispatch_tick(float dt){
   const int needStation=stationActive<wanted-1&&dispatch_engaged()>=wanted*2-(wanted-1);
   for(int i=0;i<DISPATCH_UNITS;i++){
    DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;
+  if(npc_replaces(N_ACT_STREET+DISPATCH_FIRST+i)||npc_holds(N_ACT_STREET+DISPATCH_FIRST+i))continue;
    if(q->hp<=0||(u->state!=D_POST&&u->state!=D_RETURN))continue;
    float score=absf(q->x-dispatchCall.x)+absf(q->y-dispatchCall.y)+(u->station&&wanted<3?88.f:0.f)+(needStation&&!u->station?5000.f:0.f);
    if(score<best){best=score;choice=i;}
@@ -137,6 +139,7 @@ static void dispatch_tick(float dt){
  if(dispatchReported&&!dispatchLost&&p.heat<=0&&dispatchQuiet<.06f){dispatchLost=1;tell("DISPATCH: no contact. Units returning to posts.");}
  for(int i=0;i<DISPATCH_UNITS;i++){
   DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;
+  if(npc_replaces(N_ACT_STREET+DISPATCH_FIRST+i)||npc_holds(N_ACT_STREET+DISPATCH_FIRST+i))continue;
   if(u->state==D_DOWN){
    /* The same slot comes back on another quiet shift, out of the camera's
     * vicinity. A downed officer never replenishes the active case. */

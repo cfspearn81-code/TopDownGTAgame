@@ -166,7 +166,7 @@ static void wi_bake(void){
 }
 static void walkin_open(int building){
  if(building<0||building>=nb||buildings[building].w<=0||buildings[building].h<=0||zone_is_building(building))return;
- walkin_active=building;wi_layout(building);wi_x=W/2;wi_y=416;wi_angle=-1.570796f;walking=0;scene=4;menu=-1;mapOn=0;
+ pulse_guard_reset();walkin_active=building;wi_layout(building);wi_x=W/2;wi_y=416;wi_angle=-1.570796f;walking=0;scene=4;menu=-1;mapOn=0;
  wi_bake();
 }
 /* One ticket rule shared by gate, departure board and atlas. */
@@ -200,6 +200,7 @@ static void walkin_tick(U keys,U tap){
  if(walking){wi_angle=look(x,y);footcycle=wrap(footcycle+.25f*FOOT_PACE);}
  if(!wi_solid(wi_x+x*v,wi_y))wi_x+=x*v;
  if(!wi_solid(wi_x,wi_y+y*v))wi_y+=y*v;
+ pulse_guard_tick(4,wi_x,wi_y,wi_angle,wi_solid);
  p.secs+=dt;job_clock_tick(dt);
  if(vd_frame(keys,tap))tap&=~(USE|ENTER);
  if((tap&ENTER)&&tram_hall(walkin_active)&&wi_at_station()&&!wi_at_door()){tram_board();return;}
@@ -234,7 +235,7 @@ static void walkin_paint(void){
  const WiRole*r=wiRoles+wi_role;
  /* Tight copy compiles to vector stores; the heavy scenery bakes once per visit. */
  for(int i=0;i<W*H;i++)pixels[i]=wi_back[i];
- person((int)wi_x,(int)wi_y,0x56baae,walking?(int)(sn(footcycle)*4):0,wi_angle,4,1);
+ player_in_room(wi_x,wi_y,0,0,0x56baae,walking?(int)(sn(footcycle)*4):0,wi_angle,1,wi_solid);
  char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,venue_address(walkin_active));q=append(q,"   /   ");append(q,r->section);
  draw_day_clock(5);textat(DAY_BADGE_LABEL_X,9,ad,MUTED,0);wi_title(walkin_name(walkin_active),r->accent);draw_wallet(W-291,10,270);
  const InteriorProp*f=wi_f;int sx=f->x+f->w/2,sy=f->y-10;

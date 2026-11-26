@@ -1,6 +1,7 @@
 #include "game.h"
 #include "font.inc"
 #include "verdict_api.inc"
+#include "npc_api.inc"
 #ifdef DC_TEST
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,7 +86,7 @@ static void interior_paint(void);
 typedef struct{int x,y;const char *label,*npc,*note;U tint;int kind;} Place;
 static const Place originalLoc[]={
 {256,512,"MERCURY DISPATCH","Mara Finch","Legal work: delivery routes and taxi fares.",TEAL,0},
-{512,768,"VAULT 39","Ivo Slate","Optional contracts from the city's underworld.",PINK,1},
+{512,768,"VAULT 39","Ivo Slate","Nightclub and bar. Private meetings are in the back.",PINK,1},
 {768,512,"FERRY MARKET","June Vale","Supplies, provisions and recovery items.",GOLD,2},
 {1024,768,"NIGHTGLASS MOTORS","Lex Rook","Buy, repair and switch between owned rides.",TEAL,3},
 {512,1280,"LANTERN GROW LOFT","Nell Ash","The starter grow property. Turn credits into game-only batches.",LIME,4},
@@ -141,12 +142,12 @@ static Particle fx[100];static int fn;
 typedef struct{int own,crew,tier,product,durationMs,batches;float timer;} Business;
 typedef struct{int owned;float elapsed,cooldown;int pending;} LegalBusiness;
 #include "character.inc"
-typedef struct{U magic,rev;int cash,hp,armor,gear,units,owned,selection,legal,crime,sales,arrests,vehicleCond,home;float x,y;Business b[2];int stocks[3],dirty,pending,audit,charges,restitution,legacyRivalCooldown,protect;float clearT,auditT;U intro;int carCond[5];U taxiFares;LegalBusiness legit[3];float dayClock;U playedTicks;Look look;unsigned char legacyClock,reserved;char name[20];int bank,dirtySpent,sweepTicks;U hash;} Save;
-enum{SAVE_REV=10,DAY_SECONDS=24*60,LEGACY_DAY_SECONDS=8*60,
+typedef struct{U magic,rev;int cash,hp,armor,gear,units,owned,selection,legal,crime,sales,arrests,vehicleCond,home;float x,y;Business b[2];int stocks[3],dirty,pending,audit,charges,restitution,legacyRivalCooldown,protect;float clearT,auditT;U intro;int carCond[5];U taxiFares;LegalBusiness legit[3];float dayClock;U playedTicks;Look look;unsigned char legacyClock,medPatches;char name[20];int bank,dirtySpent,sweepTicks;U hash;} Save;
+enum{SAVE_REV=10,SAVE_REV_PATCHES=11,MAX_MED_PATCHES=99,DAY_SECONDS=24*60,LEGACY_DAY_SECONDS=8*60,
  REVENUE_DIRTY_LIMIT=500,REVENUE_SWEEP_TICKS=5*60*60,WALLET_LIMIT=2147483647, SAVE_STOCK_LIMIT=500000000};
 #define LEGACY8_SIZE (__builtin_offsetof(Save,sweepTicks)+4)
 #define LEGACY7_SIZE (__builtin_offsetof(Save,bank)+4)
-_Static_assert(sizeof(Save)==304&&__builtin_offsetof(Save,bank)==288&&__builtin_offsetof(Save,dirtySpent)==292&&__builtin_offsetof(Save,sweepTicks)==296&&__builtin_offsetof(Save,hash)==300,"Unexpected on-disk save layout");
+_Static_assert(sizeof(Save)==304&&__builtin_offsetof(Save,medPatches)==267&&__builtin_offsetof(Save,bank)==288&&__builtin_offsetof(Save,dirtySpent)==292&&__builtin_offsetof(Save,sweepTicks)==296&&__builtin_offsetof(Save,hash)==300,"Unexpected on-disk save layout");
 #define LEGACY6_SIZE (__builtin_offsetof(Save,playedTicks)+4)
 static Save sv;
 enum{DAY_BADGE_X=16,DAY_BADGE_W=104,DAY_BADGE_H=24,DAY_BADGE_LABEL_X=131};
@@ -204,7 +205,7 @@ static void cab_choose_route(U tap),cab_passing_copper(void),cab_marquee_paint(v
 static int lastTaxiPickup=-1,lastTaxiDrop=-1,lastTaxiRider=-1;
 static U taxiSeed=0xc3b11d19u;
 static U taxi_random(void){taxiSeed^=taxiSeed<<13;taxiSeed^=taxiSeed>>17;taxiSeed^=taxiSeed<<5;return taxiSeed;}
-void set_session_seed(U seed){taxiSeed=(seed^0xc3b11d19u)|1u;}
+void set_session_seed(U seed){taxiSeed=(seed^0xc3b11d19u)|1u;npcRandom=seed^0xa1387f29u;}
 static const struct {const char*name;U outfit;int face;} riders[]={
  {"MIA",0xd5a9eb,2},{"ROWAN",0x91e6ce,1},{"JULES",0xff9e92,4},{"ARI",0x9bbdff,0},
  {"SASHA",0xfcd37e,3},{"DEV",0xbcafd9,2},{"IMANI",0xef90c8,1},{"NOAH",0xaad482,4},
@@ -232,7 +233,10 @@ static void update_camera_lead(void){
 }
 static int camera_left(void){return cl((int)(p.x+cameraLeadX)-W/2,0,ROOM-W);}
 static int camera_top(void){return cl((int)(p.y+cameraLeadY)-H/2,0,ROOM-H);}
-static U prev;
+static U prev,wheelSuppressed;
+static int wheelOpen,wheelPreviewFists,wheelFists,wheelX=-1,wheelY=-1,wheelFeedback;
+static int wheel_tick(U keys,U tap);
+static int pistol_equipped(void){return sv.gear>=0&&!wheelFists;}
 static int by=-1,near=-1,lastCar=-1,helpBack=1;
 #define CASH_GREEN 0x85F36Bu
 #define CASH_RED   0xFF535Cu
@@ -290,6 +294,7 @@ static void setupCity(void){
 }
 #include "road_fx.inc"
 #include "street_life.inc"
+#include "pulse_pose.inc"
 static void dispatch_reset(void);
 static void spawnCars(void){street_spawn();dispatch_reset();}
 static U hashbytes(unsigned n){const unsigned char *a=(const unsigned char*)&sv;U h=2166136261u;for(unsigned i=0;i<n;i++)h=(h^a[i])*16777619u;return h;}
@@ -312,7 +317,7 @@ static int valid_ledger_save(int day_seconds){
  return 1;
 }
 static void legacy_profile(void){
- sv.playedTicks=0;sv.look=defaultLook;sv.legacyClock=1;sv.reserved=0;z(sv.name,sizeof sv.name);
+ sv.playedTicks=0;sv.look=defaultLook;sv.legacyClock=1;sv.medPatches=0;z(sv.name,sizeof sv.name);
 }
 /* Preserve the current time of day and which closing each outstanding
  * deposit was promised. Rev9 and older put those closings 8 minutes apart. */
@@ -327,11 +332,15 @@ static void migrate_day_clock(void){
  }
 }
 static int business_crew_limit(int site){return site==0?1:2;}
+/* Empty stock keeps the original Rev10 encoding and can still be opened by
+ * older builds. The same-size Rev11 format makes that formerly reserved
+ * byte meaningful only while it carries 1..99 patches. */
+static void stamp_save(void){sv.rev=sv.medPatches?SAVE_REV_PATCHES:SAVE_REV;sv.hash=savehash();}
 static void accept_loaded_save(void){
  /* The old Lantern distributor includes its operator. Current and old
     careers keep that hire, along with the original batch and balances. */
  sv.b[0].crew=min(sv.b[0].crew,business_crew_limit(0));
- sv.rev=SAVE_REV;sv.hash=savehash();wason=1;
+ stamp_save();wason=1;
 }
 static void seal_loaded(int bank_already_present){
  /* A legacy pending flag used the retired threshold. Only confirmed cases
@@ -373,7 +382,8 @@ static void starter_save(void){
 }
 static int name_ok(const char*n){for(int i=0;i<20;i++){if(!n[i])return 1;if(n[i]<32||n[i]>126)return 0;}return 0;}
 static int valid_profile_save(void){
- return sv.intro<=4&&look_valid(&sv.look)&&sv.legacyClock<=1&&!sv.reserved&&name_ok(sv.name);
+ int patch_ok=sv.rev==SAVE_REV_PATCHES?sv.medPatches>0&&sv.medPatches<=MAX_MED_PATCHES:!sv.medPatches;
+ return sv.intro<=4&&look_valid(&sv.look)&&sv.legacyClock<=1&&patch_ok&&name_ok(sv.name);
 }
 static int valid_banking_save(void){
  return sv.bank>=0&&sv.dirtySpent>=0&&!sv.audit&&sv.auditT==0.f;
@@ -385,7 +395,7 @@ void load_save(void){
  wason=0;z(&sv,sizeof sv);
 #ifndef DC_TEST
  if(disk_read(&sv,sizeof sv)&&sv.magic==0x44433131&&sv.hash==savehash()&&valid_save_core()&&valid_profile_save()&&valid_banking_save()&&valid_sweep_save()){
-  if(sv.rev==SAVE_REV&&valid_ledger_save(DAY_SECONDS)){accept_loaded_save();return;}
+  if((sv.rev==SAVE_REV||sv.rev==SAVE_REV_PATCHES)&&valid_ledger_save(DAY_SECONDS)){accept_loaded_save();return;}
   if(sv.rev==9&&valid_ledger_save(LEGACY_DAY_SECONDS)){
    migrate_day_clock();accept_loaded_save();return;
   }
@@ -400,7 +410,7 @@ void load_save(void){
 #endif
  starter_save();
 }
-void request_save(void){if(scene==0||scene==5||p.dead)return;sv.x=p.x;sv.y=p.y;sv.hp=p.hp;sv.hash=savehash();
+void request_save(void){if(scene==0||scene==5||p.dead)return;sv.x=p.x;sv.y=p.y;sv.hp=p.hp;stamp_save();
 #ifndef DC_TEST
  saveFlash=disk_write(&sv,sizeof sv)?200:-200;
 #else
@@ -414,6 +424,8 @@ static void profiles_pointer(int sx,int sy,U clicks);
 static void profiles_paint(void);
 static int stoppingToExit;
 static void spawnPlayer(void){
+ npc_reset();pulse_guard_reset();
+ wheelFists=wheelOpen=wheelFeedback=0;wheelSuppressed=0;
  stoppingToExit=0;
  cameraLeadX=cameraLeadY=0;
  p=(Player){0};p.x=sv.x;p.y=sv.y;
@@ -604,6 +616,7 @@ static const char* taxi_objective(void){
  return "Passenger getting out. Hold still.";
 }
 static void taxi_tick(float dt){
+ if(npc_replaces(N_ACT_RIDER+taxi.rider)||npc_holds(N_ACT_RIDER+taxi.rider))return;
  if(taxi.phase==TAXI_WALKING&&taxi.linger>0){
    taxi.linger-=dt;if(taxi_walk_to(loc[taxi.dropoff].x,loc[taxi.dropoff].y,dt))taxi.linger=0;
  }
@@ -768,8 +781,9 @@ static void makeMenu(void){
  add("VAULT RUN","Take the sealed lockbox, lose the police and bring it back to Ivo.",14);
  add("HOT PROPERTY","Steal the marked Vectra and hand it off to Vera after losing the police.",15);
  add("SIGNAL RAID","Move the relay cartridge from its studio to a backup console.",16);
- add("RIVAL COLLECTION","Recover the guarded consignment and deliver it to Vera.",17);break;
- case 2:priced("SUPPLY CRATE",45,"Three universal game-only batch credits.",20);priced("MED PATCH",25,"Treat minor injuries. Restores up to 50 health.",22);add("BUSINESS OFFICE","Buy or manage this market outlet.",LEGAL_OPEN);break;
+ add("RIVAL COLLECTION","Recover the guarded consignment and deliver it to Vera.",17);
+ add("TALK TO IVO","Ask him about the club after hours.",97);break;
+ case 2:priced("SUPPLY CRATE",45,"Three universal game-only batch credits.",20);priced("MED PATCH",25,p.hp<100?"Use a patch now to restore up to 50 HP.":"At full HP, stock a patch. Hold Tab, press V when hurt.",22);add("BUSINESS OFFICE","Buy or manage this market outlet.",LEGAL_OPEN);break;
  case 14:if(sv.gear<0)priced("BASIC PULSE PISTOL",95,"A ranged weapon. Space uses your equipped tool.",25);
  priced("ARMOR VEST",55,"Adds 45 points of protective armor.",21);
  if(sv.gear==0)priced("PULSE AMP",155,"Upgrade your pulse pistol's range and damage.",23);break;
@@ -836,10 +850,12 @@ static void makeMenu(void){
  add("SHOW CONTROLS","Movement, action and menu keys.",93);
  add("CITY LISTINGS  /  F6","Free-roam activities and neighborhood stories.",96);break;
  }
+ if(npc_front_option())add("PERSONAL INTERACTION","Say hello, stay quiet, or draw your owned pistol.",N_ACT_OPEN);
  if(menu!=PAUSE_MENU&&legal_menu_index(menu)<0&&legal_rear_index(menu)<0)add("BACK","Close this menu.",90);
  sel=cl(sel,0,max(0,nopt-1));
 }
 static void doOpt(int a){
+ if(a==N_ACT_OPEN){if(npc_open_context())menu=-1;return;}
  if(a==CAB_RANK_ACTION){cab_rank_counter();return;}
  if(legal_opt(a,&menu))return;
  if(a>=10&&a<=17){beginJob(a-10);return;}
@@ -863,8 +879,15 @@ static void doOpt(int a){
  switch(a){
  case 20:if(canDirtyPurchase(45)){sv.units+=3;tell("Three supply credits added.");}break;
  case 21:if(sv.armor==90)tell("Armor is already full.");else if(canDirtyPurchase(55)){sv.armor=min(90,sv.armor+45);tell("Armor equipped.");}break;
- case 22:case 24:if(p.hp==100)tell("Health is already full.");else if(canDirtyPurchase(a==22?25:42)){p.hp=min(100,p.hp+(a==22?50:100));tell("Vitality restored.");}break;
- case 25:if(sv.gear<0&&canDirtyPurchase(95)){sv.gear=0;if(sv.intro==3)sv.intro=4;tell("Pulse tool equipped. Space to fire.");}break;
+ case 22:
+  if(p.hp==100&&sv.medPatches>=MAX_MED_PATCHES){tell("Patch stock is full. Nothing charged.");return;}
+  if(canDirtyPurchase(25)){
+   if(p.hp<100){p.hp=min(100,p.hp+50);tell("Vitality restored.");}
+   else{char m[68];fmt(m,"Med patch stocked. Hold Tab to see your supply: ",++sv.medPatches);tell(m);}
+  }
+  break;
+ case 24:if(p.hp==100)tell("Health is already full.");else if(canDirtyPurchase(42)){p.hp=100;tell("Vitality restored.");}break;
+ case 25:if(sv.gear<0&&canDirtyPurchase(95)){sv.gear=0;wheelFists=0;if(sv.intro==3)sv.intro=4;tell("Pulse pistol equipped. Space fires. Hold Tab to switch.");}break;
  case 23:if(sv.gear!=0)tell("An unmodified pulse pistol is required.");else if(canDirtyPurchase(155)){sv.gear=1;tell("Pulse amp installed.");}break;
  case 35:{
   int ride=service_ride();
@@ -912,6 +935,7 @@ static void doOpt(int a){
  case 93:helpBack=scene;scene=2;return;
  case 94:open_interior(12);return;
  case 95:profiles_open(0);return;
+ case 97:if(menu==1)tell("Ivo: Mika keeps the club. Behind this door, people ask me for favors.");return;
  case 96:menu=-1;vdPanel=1;vdCursor=0;return;
  default:return;
  }
@@ -922,7 +946,7 @@ static void punch(void){
  p.shot=.34f;punchFlash=.21f;float co=cs(p.a),si=sn(p.a);
  int hit=-1;float best=27*27;
  for(int i=0;i<LEN(peds);i++){Ped*q=peds+i;float dx=q->x-p.x,dy=q->y-p.y,d=d2(dx,dy);
-  if(q->hp<=0||dx*co+dy*si<3||absf(dy*co-dx*si)>13||d>=best)continue;
+  if(q->hp<=0||npc_replaces(N_ACT_STREET+i)||dx*co+dy*si<3||absf(dy*co-dx*si)>13||d>=best)continue;
   if(!street_reach_open(p.x,p.y,q->x,q->y,1,-1))continue;
   hit=i;best=d;
  }
@@ -932,25 +956,36 @@ static void punch(void){
 }
 static void shoot(void){
  if(p.shot>0)return;
- if(sv.gear<0){punch();return;}
- p.shot=sv.gear>0?.21f:.33f;p.trail=.11f;heat(24);particle(p.x+cs(p.a)*14,p.y+sn(p.a)*14,5,GOLD);
+ if(!pistol_equipped()){punch();return;}
+ PulsePose g=pulse_pose(2.5f);
+ /* Block muzzle-level cover at contact; don't fire from the carry pose. */
+ if(g.hand)return;
+ p.shot=sv.gear>0?.21f:.33f;p.trail=.11f;heat(24);
+ firedPulse=g;firedX=p.x;firedY=p.y;firedA=p.a;
+ trailX=g.mx;trailY=g.my;particle(trailX,trailY,5,GOLD);
  int range=sv.gear>0?165:112,hit=-1;float best=range;
- float co=cs(p.a),si=sn(p.a);
+ float co=g.co,si=g.si;
+ /* Keep the original aiming cone, distances and through-cover guard.
+    The actual ray from the muzzle also must have clear sight to a hit. */
  for(int i=0;i<LEN(peds);i++){
-   Ped*q=peds+i;if(q->hp<=0)continue;
+   Ped*q=peds+i;if(q->hp<=0||npc_replaces(N_ACT_STREET+i))continue;
    float dx=q->x-p.x,dy=q->y-p.y,d=dx*co+dy*si,side=absf(dx*si-dy*co);
-   if(d>0&&d<best&&side<13+d*.12f&&street_reach_open(p.x,p.y,q->x,q->y,1,-1)){hit=i;best=d;}
+   if(d>0&&d>=g.extent-.01f&&d<best&&side<13+d*.12f&&
+      street_reach_open(p.x,p.y,q->x,q->y,1,-1)&&street_reach_open(g.mx,g.my,q->x,q->y,1,-1)){hit=i;best=d;}
  }
- trailX=p.x;trailY=p.y;
  if(hit>=0){trailEndX=peds[hit].x;trailEndY=peds[hit].y;}
- else{float t=street_tracer_fraction(p.x,p.y,co*range,si*range);
-  trailEndX=p.x+co*range*t;trailEndY=p.y+si*range*t;}
+ else{
+  float end=street_tracer_fraction(p.x,p.y,co*range,si*range)*range;
+  float left=end-g.extent;if(left<0)left=0;
+  float t=street_tracer_fraction(g.mx,g.my,co*left,si*left);
+  trailEndX=g.mx+co*left*t;trailEndY=g.my+si*left*t;
+ }
  if(hit>=0){Ped*q=peds+hit;q->hp-=sv.gear>0?2:1;particle(q->x,q->y,10,q->role?TEAL:PINK);if(q->hp<=0){q->life=12;heat(q->role?28:41);}}
 }
 #include "dispatch.inc"
 static void npcTick(float dt){
  for(int i=0;i<JOB_RIVAL_FIRST+JOB_RIVAL_COUNT;i++){
-  Ped*q=peds+i;q->cool-=dt;
+  Ped*q=peds+i;if(npc_replaces(N_ACT_STREET+i)||npc_holds(N_ACT_STREET+i))continue;q->cool-=dt;
   if(q->hp<=0){q->life-=dt;if(q->life<0&&i<STREET_CIVILIANS)street_respawn_civilian(i);continue;}
   if(!q->role){street_tick_civilian(i,dt);continue;}
   if(q->role!=2)continue;
@@ -998,7 +1033,10 @@ static StreetUse street_use_target(int venue,int ride){
  return (StreetUse){STREET_USE_NONE,-1};
 }
 void tick(U keys){
- const float dt=1.f/60; U tap=keys&~prev;prev=keys;
+ const float dt=1.f/60; wheelSuppressed&=keys;keys&=~wheelSuppressed;
+ U tap=keys&~prev;prev=keys;
+ keys=npc_filter_keys(keys,&tap);
+ if(wheel_tick(keys,tap)){stoppingToExit=0;return;}
  if(!(keys&USE)||scene!=1||menu>=0||mapOn||p.dead||p.car<0)stoppingToExit=0;
  // Keep fractional frame precision during long sessions.
  anim+=dt;if(anim>=3600.f)anim-=3600.f;
@@ -1050,7 +1088,7 @@ void tick(U keys){
  float checkpointX=p.x,checkpointY=p.y;
  roadFX_tick();
  street_tick_traffic(dt);
- if(p.car>=0){Car*c=cars+p.car;const CarSpec*s=specs+c->type;
+ if(p.car>=0){pulse_guard_reset();Car*c=cars+p.car;const CarSpec*s=specs+c->type;
   float speedBefore=absf(c->s),angleBefore=c->a;int taxiImpact=0;
   if(stoppingToExit){y=0;keys|=BRAKE;}
   /* Pressing the opposite pedal brakes first. The same input can then
@@ -1079,7 +1117,7 @@ void tick(U keys){
   }
   if(f>52){
     float co=cs(c->a),si=sn(c->a);
-    for(int i=0;i<LEN(peds);i++)if(peds[i].hp>0){
+    for(int i=0;i<LEN(peds);i++)if(peds[i].hp>0&&!npc_replaces(N_ACT_STREET+i)){
       float u=peds[i].x-c->x,v=peds[i].y-c->y;
       if(absf(u*co+v*si)<15&&absf(v*co-u*si)<6.5f){
         peds[i].hp=0;peds[i].life=12;c->s*=.55f;particle(c->x,c->y,11,PINK);
@@ -1101,7 +1139,8 @@ void tick(U keys){
     end_job();tell("Job failed: the assigned vehicle was wrecked.");
    }else tell("Wrecked. Find another ride or visit Nightglass Motors.");
   }
- }else{float v=(keys&BRAKE?FOOT_SPRINT_SPEED:FOOT_WALK_SPEED)*dt*(x&&y?.707107f:1);if(x||y)p.a=look(x,y);street_player_step(x*v,y*v);if(keys&PUNCH)punch();else if(keys&FIRE)shoot();}
+ }else{float v=(keys&BRAKE?FOOT_SPRINT_SPEED:FOOT_WALK_SPEED)*dt*(x&&y?.707107f:1);if(x||y)p.a=look(x,y);street_player_step(x*v,y*v);npc_stance(p.x,p.y,&p.a);pulse_guard_tick(1,p.x,p.y,p.a,0);
+  if(!npc_attack(keys,p.x,p.y,p.a)){if(keys&PUNCH)punch();else if(keys&FIRE)shoot();}}
  if(stoppingToExit&&p.car>=0&&absf(cars[p.car].s)<5){
   stoppingToExit=0;
   if(!street_exit_car())tell("The door is blocked. Pull into a clear space.");
@@ -1111,6 +1150,7 @@ void tick(U keys){
  job_rival_encounter();
  taxi_tick(dt);
  by=placeNear();near=carNear();
+ if((tap&USE)&&(keys&BRAKE)&&p.car<0&&npc_open_near())tap&=~USE;
  if(vd_frame(keys,tap))tap&=~(USE|ENTER);
  if((tap&USE)&&!job_use_street()){
   if(p.car>=0)vehicle_use(-1);
@@ -1121,9 +1161,11 @@ void tick(U keys){
    case STREET_USE_SHOP:walkin_open(target.id);break;
    case STREET_USE_ATM:atm_open(target.id);break;
    case STREET_USE_CAR:vehicle_use(target.id);break;
+   default:npc_open_near();break;
    }
   }
  }
+ npc_encounter_tick(dt);
  if(scene!=1)return;
  if(job.kind==1&&taxi.phase>=TAXI_RIDING&&p.car!=taxi.ride)taxi_tick(0);
  p.quiet-=dt;if(p.quiet<=0&&p.heat>0){float rate=p.car>=0?26:19;p.heat-=dt*rate;if(p.heat<0)p.heat=0;}
@@ -1132,10 +1174,12 @@ void tick(U keys){
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0){fx[i].t-=dt;fx[i].x+=fx[i].vx*dt;fx[i].y+=fx[i].vy*dt;}
 }
 int get_scene(void){return scene;}
-void clear_input(void){prev=0;stoppingToExit=0;}
+void clear_input(void){prev=0;stoppingToExit=0;wheelOpen=wheelFeedback=0;wheelSuppressed=0;}
 void pointer_input(int sx,int sy,U clicks){
  /* Host letterboxing/leave messages have no logical click target. */
  if((U)sx>=W||(U)sy>=H){sx=sy=-1;clicks=0;}
+ wheelX=sx;wheelY=sy;
+ if(wheelOpen)return;
  if(scene==0||scene==5){profiles_pointer(sx,sy,clicks);return;}
  if(scene==1&&mapOn&&!p.dead)navigation_pointer(sx,sy,clicks);
 }
@@ -1163,41 +1207,7 @@ static void projectLights(Car*c){
   pixels[py*W+px]=RGB(r,g,bl);
  }
 }
-static void carbody(Car*c,int x,int y){
- float ca=cs(c->a),sa=sn(c->a);int ax[4],ay[4];
- static const int vx[]={-16,15,15,-16},vy[]={-8,-8,8,8};
- U color=c->cond>0?specs[c->type].c:0x3b4447;
-
- for(int i=0;i<4;i++){ax[i]=x+(int)(vx[i]*ca-vy[i]*sa);ay[i]=y+(int)(vx[i]*sa+vy[i]*ca);}
- tri(ax[0]+3,ay[0]+5,ax[1]+3,ay[1]+5,ax[2]+3,ay[2]+5,0x10191f);tri(ax[0]+3,ay[0]+5,ax[2]+3,ay[2]+5,ax[3]+3,ay[3]+5,0x10191f);
- for(int i=0;i<4;i++)disc(x+(int)(vx[i]*.66f*ca-vy[i]*sa),y+(int)(vx[i]*.66f*sa+vy[i]*ca),3,0x0d141c);
- tri(ax[0],ay[0],ax[1],ay[1],ax[2],ay[2],color);tri(ax[0],ay[0],ax[2],ay[2],ax[3],ay[3],color);
- for(int i=0;i<4;i++)line(ax[i],ay[i],ax[(i+1)%4],ay[(i+1)%4],mix(color,DARK,i==0?2:5));
- /* Sample the cabin in car space so diagonal windshields stay filled.
-  * Cabin length, glazing and trim distinguish the five garage models. */
- static const int rear[]={-8,-7,-11,-6,-13},front[]={4,5,6,1,7};
- int back=rear[c->type],nose=front[c->type];
- for(int py=-16;py<=16;py++)for(int px=-16;px<=16;px++){
-  float u=px*ca+py*sa,v=absf(py*ca-px*sa);
-  if(u<back||u>nose||v>5.6f)continue;
-  U fill=mix(color,0x203041,2);
-  if(v>4.6f)fill=0x233941;
-  else if(u>nose-3.f)fill=v<3?0x9bbfc6:0x7095a4;
-  else if(c->type==4&&u<-1)fill=((int)(u+14)%4)?0xa5af89:0x6f805f;
-  else if(u<back+2)fill=0x58717d;
-  else if(c->type==3&&v<1.3f)fill=0xe7dbbe;
-  else if(c->type==2&&v>3.5f)fill=0x9ba7aa;
-  dot(x+px,y+py,fill);
- }
- for(int i=0;i<2;i++){int k=i?5:-5;int x1=x+(int)(13*ca+k*sa),y1=y+(int)(13*sa-k*ca),x2=x-(int)(14*ca+k*sa),y2=y-(int)(14*sa-k*ca);
-  disc(x1,y1,2,c->cond?0xffe0a3:0x656764);if(c->cond)dot(x1,y1,0xffebbf);
-  int bulbs=road_lamps(c);
-  disc(x2,y2,bulbs&1?2:1,bulbs&1?0xff5148:c->cond?0xa33e42:0x60383c);
-  if(bulbs&2)dot(x-(int)(14*ca+(k>0?3:-3)*sa),y-(int)(14*sa-(k>0?3:-3)*ca),0xe2faff);
- }
- if(c->cond>0&&c->cond<45){disc(x-2,y-3,3,0x303640);if(c->cond<23){disc(x-3-(int)(anim*8)%7,y-8,3,0x4a535b);}}
- if(c->owner==1&&p.car<0){line(x-4,y-18,x,y-14,LIME);line(x,y-14,x+4,y-18,LIME);}
-}
+#include "model_vehicle.inc"
 typedef struct{int x,y;}Pt;
 static int previewRig;
 /* Keep the gameplay feet on the same world point. Scale the articulated
@@ -1216,8 +1226,12 @@ static Pt rig(int x,int y,float co,float si,int u,int v,int z){
 }
 static void rod(Pt a,Pt b,int r,U c){for(int off=-r;off<=r;off++){line(a.x+off,a.y,b.x+off,b.y,c);if(off)line(a.x,a.y+off,b.x,b.y+off,c);}}
 static void quad(Pt a,Pt b,Pt c,Pt d,U col){tri(a.x,a.y,b.x,b.y,c.x,c.y,col);tri(a.x,a.y,c.x,c.y,d.x,d.y,col);}
-static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const Look*look){
- float co=cs(a),si=sn(a);int hero=style==4,top=0,legs=0,wide=0,face=0,hs=-1;U ink=0x111a27;
+typedef struct {Pt muzzle,slide,grip,support;float co,si;int hand;} PulseSprite;
+static float modelExtraPunch;
+#include "model_person.inc"
+#include "pulse_sprite.inc"
+static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,const Look*look,const PulseSprite*gun){
+ float co=cs(a),si=sn(a);int hero=style==MODEL_PLAYER,top=0,legs=0,wide=0,face=0,hs=-1;U ink=0x111a27;
  static const U skins[]={0xdeb291,0xa16352,0x805248,0xe3c3a7,0xbd8571};
  static const U hairs[]={0x29323c,0x201720,0x45403f,0x66433f,0x34263b};
  U skin=skins[hue%5],hair=hairs[hue%5],pants=0x42546b,shoe=0x111b26;
@@ -1226,12 +1240,25 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
   face=k[DETAIL];top=k[TOP];legs=k[LEGS];pants=charLeg[k[LEG_TONE]];shoe=charShoe[k[SHOES]];
   if(!hero||jacket!=PINK)jacket=charTop[k[TOP_TONE]];
  }
+ if(!look&&!previewRig){
+  if(style==MODEL_OFFICER||style==MODEL_DISPATCH)pants=0x394a63;
+  else if(style==MODEL_RIVAL)pants=0x463946;
+  else if(style==MODEL_STAFF)pants=0x3f5260;
+  else if(style==MODEL_WORKER)pants=0x5b5147;
+  else{
+   static const U fabric[]={0x43556b,0x615568,0x455a5a,0x565261,0x4d4f65};
+   pants=fabric[hue%LEN(fabric)];
+  }
+ }
  U seam=mix(jacket,ink,4),rim=mix(jacket,PAPER,3);
  if(previewRig)rect(x-6,y+2,13,2,0x151d27);
  else for(int dy=-3;dy<=3;dy++){
   int half=person_offset(7-(dy<0?-dy:dy)),row=y+person_offset(3+dy);
   line(x+2-half,row,x+2+half,row,0x19232b);
  }
+ int w=7+wide+(top==2||top==3);
+ if(!previewRig)model_live_body(x,y,co,si,step,w,wide,top,legs,style,look!=0,hero,jacket,skin,pants,shoe,ink,gun);
+ else {
  for(int side=-1;side<=1;side+=2){
   Pt hip=rig(x,y,co,si,-2,side*3,5),boot=rig(x,y,co,si,-2+step*side,side*4,0);
   Pt knee={(hip.x+boot.x)/2,(hip.y+boot.y)/2};
@@ -1241,8 +1268,7 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
   if(legs==3)dot(boot.x,boot.y-2,mix(pants,ink,4));
   disc(boot.x,boot.y,2,shoe);dot(boot.x,boot.y-1,look?mix(shoe,PAPER,4):0x829aab);
  }
- int w=7+wide+(top==2||top==3);
- int chest=previewRig?1:3;
+ const int chest=1;
  Pt lt=rig(x,y,co,si,chest,-w,10),rt=rig(x,y,co,si,chest,w,10),rb=rig(x,y,co,si,-4,4+wide,5),lb=rig(x,y,co,si,-4,-4-wide,5);
  quad(lt,rt,rb,lb,ink);
  quad(rig(x,y,co,si,chest,2-w,10),rig(x,y,co,si,chest,w-2,10),rig(x,y,co,si,-4,3+wide,6),rig(x,y,co,si,-4,-3-wide,6),jacket);
@@ -1258,15 +1284,28 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
   if(top==5)dot(shoulder.x-side,shoulder.y+2,0xffdd8d);
   disc(hand.x,hand.y,1,skin);
  }
+ }
+ /* Facing away, the shoulder grip can tuck behind the silhouette
+    but must never overwrite hair and face. The muzzle geometry stays
+    off to the side so its cap and flash remain readable. */
+ int gunBehind=gun&&!gun->hand&&si<-.38f;
+ if(gunBehind)pulse_pistol_paint(gun);
  Pt head=rig(x,y,co,si,1,0,14);int hx=head.x,hy=head.y;
  rod((Pt){hx,hy+3},rig(x,y,co,si,1,0,10),1,mix(skin,ink,2));
- if(top==3)disc(hx,hy+3,5,seam);
+ if(top==3||(!previewRig&&style==MODEL_RIVAL))disc(hx,hy+3,5,seam);
  if(hs==8){disc(hx-(int)(co*4),hy-(int)(si*4)+2,2,hair);}
  if(hs==9){rect(hx-4,hy-3,9,8,hair);rect(hx-3,hy+4,7,2,mix(hair,ink,2));}
  disc(hx,hy,4,ink);disc(hx,hy,3,skin);
+ if(!previewRig)model_head_lights(hx,hy,co,si,ink,skin,hair,style,hue,face);
  if(!look){
-  U cap=(style==1||style==3)?seam:hair;rect(hx-2,hy-3,5,2,cap);dot(hx-2,hy-1,cap);
-  if(style==1||style==3)line(hx-3,hy-2,hx+3,hy-2,rim);
+  int capStyle=style==MODEL_OFFICER||style==MODEL_DISPATCH||style==MODEL_WORKER;
+  U cap=capStyle?seam:hair;rect(hx-2,hy-3,5,2,cap);dot(hx-2,hy-1,cap);
+  if(capStyle){
+   line(hx-3,hy-2,hx+3,hy-2,rim);
+   if(!previewRig&&si>-.25f)dot(hx+(co<-.3f?-1:co>.3f?1:0),hy-2,style==MODEL_WORKER?0xe3bd73:0xbecfdb);
+  }else if(!previewRig&&hue%3==1){
+   dot(hx-2,hy-3,mix(hair,PAPER,2));dot(hx+2,hy-2,hair);
+  }else if(!previewRig&&hue%3==2){dot(hx+2,hy-3,mix(hair,PAPER,2));dot(hx+2,hy-1,hair);}
  }else{
   int to=co<-.15f?-1:1;
   switch(hs){
@@ -1282,14 +1321,16 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
   case 9:rect(hx-3,hy-4,7,2,hair);line(hx-4,hy-2,hx-4,hy+4,hair);line(hx+4,hy-2,hx+4,hy+4,hair);break;
   }
   if(si>-.58f){
-   dot(hx-1,hy,ink);dot(hx+1,hy,ink);
+   if(previewRig||absf(co)<.65f){dot(hx-1,hy,ink);dot(hx+1,hy,ink);}
+   else dot(hx+(co>0?2:-2),hy,ink);
    if(face==1||face==2){line(hx-3,hy-1,hx+3,hy-1,ink);dot(hx-2,hy,face==1?TEAL:ink);dot(hx+2,hy,face==1?TEAL:ink);}
    if(face==3||face==4){line(hx-2,hy+1,hx+2,hy+1,mix(skin,hair,face==3?4:7));if(face==4)rect(hx-1,hy+2,3,2,hair);}
    if(face==5){rect(hx-2,hy+1,5,2,0x8aa3ab);dot(hx,hy+2,0x526878);}
   }
   if(face==6){dot(hx-3,hy+1,0xffdc8e);dot(hx+3,hy+1,0xffdc8e);}
  }
- if(hero){
+ if(gun&&!gunBehind)pulse_pistol_paint(gun);
+ if(hero&&!gun){
     /* Keep the direction arrow at the existing world size and offset.
        The highest hairstyle still needs clearance when facing north. */
     const int start=max(17,(int)(13.f-22.f*si));
@@ -1300,7 +1341,17 @@ static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const
     quad(sl,il,ir,sr,0xffffff);tri(tip.x,tip.y,el.x,el.y,er.x,er.y,0xffffff);
  }
 }
-static void person(int x,int y,U jacket,int step,float a,int style,int hue){figure(x,y,jacket,step,a,style,hue,style==4?&sv.look:0);}
+static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const Look*look){
+ figure_held(x,y,jacket,step,a,style,hue,look,0);
+}
+static void person(int x,int y,U jacket,int step,float a,int style,int hue){figure(x,y,jacket,step,a,style,hue,style==MODEL_PLAYER?&sv.look:0);}
+static PulsePose npc_room_pulse(float x,float y,float a,int step,PulseRoomSolid room);
+static void player_in_room(float x,float y,int dx,int dy,U jacket,int step,float a,int hue,int (*solid_room)(float,float)){
+ if(pistol_equipped()&&p.car<0&&!p.dead){
+  PulseSprite gun=pulse_project(npc_room_pulse(x,y,a,step,solid_room),dx,dy);
+  figure_held((int)x-dx,(int)y-dy,jacket,step,a,MODEL_PLAYER,hue,&sv.look,&gun);
+ }else person((int)x-dx,(int)y-dy,jacket,step,a,MODEL_PLAYER,hue);
+}
 static const char* storefront_sign(int i);
 static void building(Building*b){
  int x=b->x,y=b->y,w=b->w,h=b->h,r=b->ht,f=y+h-r;int id=(x*13+y*29)%7;
@@ -1492,7 +1543,7 @@ static void hud(void){
  box(650,16,294,79,DARK,0x415766);
  draw_wallet(650,16,294);
  rect(845,70,82,6,0x34434b);rect(845,70,p.hp*82/100,6,0x6ea7ee);
- if(p.car>=0){fmt(v,"CAR ",cars[p.car].cond);textat(670,64,v,cars[p.car].cond<40?GOLD:MUTED,0);}else textat(670,64,sv.gear<0?"FISTS":"PULSE",MUTED,0);
+ if(p.car>=0){fmt(v,"CAR ",cars[p.car].cond);textat(670,64,v,cars[p.car].cond<40?GOLD:MUTED,0);}else textat(670,64,pistol_equipped()?"PULSE":"FISTS",MUTED,0);
  int h=(p.heat>15)+(p.heat>80)+(p.heat>150);
  if(h>0){textat(761,64,"HEAT",PINK,0);for(int i=0;i<h;i++)diamond(813+i*9,76,3,PINK);}
  else if(p.heat>0)textat(761,64,"CLEARING",PINK,0);
@@ -1514,6 +1565,7 @@ static void hud(void){
   case STREET_USE_VENUE:a=append(v,"E  ENTER ");append(a,loc[target.id].label);use=v;break;
   case STREET_USE_SHOP:a=append(v,"E  ENTER ");a=append(a,walkin_name(target.id));a=append(a,"   /   ");append(a,venue_address(target.id));use=v;break;
   case STREET_USE_ATM:use="E  USE ATM";break;
+  case STREET_USE_NONE:use=npc_prompt();break;
   case STREET_USE_CAR:{
    const Car*c=cars+target.id;
    use=absf(c->s)>STREET_BOARD_SPEED?"WAIT FOR CAR TO SLOW":
@@ -1530,9 +1582,10 @@ static void modal(int x,int y,int w,int h,U c){for(int i=0;i<W*H;i++)pixels[i]=(
 typedef struct{const char *key,*action;} GuideBinding;
 static const GuideBinding guideStreet[]={
  {"WASD/ARROWS","Move or steer"},{"SHIFT","Sprint / handbrake"},
- {"E","Use / board / exit car"},{"ENTER","Confirm / ride tram"},
+ {"E","Use / talk / board"},{"ENTER","Confirm / ride tram"},
  {"HOLD E","Brake to exit at speed"},{"X / SPACE","Punch / attack"},
- {"T","Accept next taxi fare"}
+ {"T","Accept next taxi fare"},{"TAB / V","Wheel / med patch"},
+ {"SHIFT + E","Talk at shared prompt"}
 },guideCareer[]={
  {"M","Open / close atlas"},{"LMB / RMB","Set / clear GPS pin"},
  {"F1","Field guide"},{"F2","Toggle low FX"},
@@ -1541,9 +1594,10 @@ static const GuideBinding guideStreet[]={
 };
 static void guide_column(int x,const char*title,const GuideBinding *rows,int count,int keyw){
  textat(x,153,title,TEAL,0);rect(x,177,367,1,0x39545e);
+ int step=count>8?23:26;
  for(int i=0;i<count;i++){
-  int y=183+i*26;
-  if(!(i&1))rect(x,y,367,23,0x162931);
+  int y=183+i*step;
+  if(!(i&1))rect(x,y,367,step-3,0x162931);
   textat(x+7,y+1,rows[i].key,GOLD,0);textat(x+keyw,y+1,rows[i].action,PAPER,0);
  }
 }
@@ -1553,10 +1607,10 @@ static void field_guide(void){
  textat(92,83,"FIELD GUIDE",PAPER,1);
  guide_column(92,"STREET CONTROLS",guideStreet,LEN(guideStreet),141);
  guide_column(500,"ATLAS & CAREER",guideCareer,LEN(guideCareer),113);
- rect(92,376,775,1,0x39545e);
- textat(92,389,"TEAL",TEAL,0);textat(151,389,"Legal work",PAPER,0);
- textat(314,389,"PINK",PINK,0);textat(373,389,"Street contracts",PAPER,0);
- textat(92,419,"Cases: pay Revenue or finish three courier or recovery shifts.",MUTED,0);
+ rect(92,395,775,1,0x39545e);
+ textat(92,401,"TEAL",TEAL,0);textat(151,401,"Legal work",PAPER,0);
+ textat(314,401,"PINK",PINK,0);textat(373,401,"Street contracts",PAPER,0);
+ textat(92,429,"Cases: pay Revenue or finish three courier or recovery shifts.",MUTED,0);
  textat(92,463,"ENTER / ESC   RETURN",TEAL,0);
 }
 #include "interiors.inc"
@@ -1612,15 +1666,28 @@ static void draw_street_actors(void){
   case SPRITE_TREE:tree_crown(x,y-7,v.id);break;
   case SPRITE_ATM:atm_kiosk(x,y);break;
   case SPRITE_CAR:carbody(cars+v.id,x,y);break;
-  case SPRITE_HERO:person(x,y,p.hit>0&&((int)(anim*20)&1)?PINK:0xc6d979,walking?(int)(sn(footcycle)*5):0,p.a,4,3);break;
-  case SPRITE_RIDER:
-   person(x,y,riders[taxi.rider].outfit,taxi.phase==TAXI_WAIT?0:(int)(sn(anim*(15.f*FOOT_PACE))*5),taxi.a,0,riders[taxi.rider].face);
-   if(job.kind==JOB_TAXI){center(x,y-36,riders[taxi.rider].name,0xe2b3ff,0);diamond(x,y+5,8,0xb988f2);}break;
+  case SPRITE_HERO:{
+   U jacket=p.hit>0&&((int)(anim*20)&1)?PINK:0xc6d979;
+   if(pistol_equipped()){
+    PulseSprite gun=pulse_project(pulse_visible_pose(),cx,cy);
+    figure_held(x,y,jacket,player_gait(),p.a,MODEL_PLAYER,3,&sv.look,&gun);
+   }else person(x,y,jacket,player_gait(),p.a,MODEL_PLAYER,3);
+   break;}
+  case SPRITE_RIDER:{
+   if(npc_replaces(N_ACT_RIDER+taxi.rider))break;
+   float px=taxi.x,py=taxi.y,a=taxi.a;
+   int step=taxi.phase==TAXI_WAIT?0:(int)(sn(anim*(15.f*FOOT_PACE))*5);
+   npc_present_pose(N_ACT_RIDER+taxi.rider,&px,&py,&a,&step);
+   person((int)px-cx,(int)py-cy,riders[taxi.rider].outfit,step,a,0,riders[taxi.rider].face);
+   if(job.kind==JOB_TAXI){center(x,y-36,riders[taxi.rider].name,0xe2b3ff,0);diamond(x,y+5,8,0xb988f2);}break;}
   case SPRITE_PED:{
-   int i=v.id;Ped*q=peds+i;
+   int i=v.id;Ped*q=peds+i;if(npc_replaces(N_ACT_STREET+i))break;
    if(q->hp<=0){line(x-6,y-3,x+6,y+3,0x815763);disc(x-7,y-4,3,0x85757b);break;}
    U c=pedHit[i]>0?0xffdfbc:q->role==1?(dispatch_posted(i)?0x668df0:(((int)(anim*9)&1)?0x668df0:PINK)):q->role==2?PINK:(i%2)?0x92b7b4:0xca8c71;
-   person(x,y,c,q->s<=2?0:(int)(sn(anim*FOOT_PACE*(q->role?16.f:11.f)+i)*4),q->a,q->role,i);break;}
+   float px=q->x,py=q->y,a=q->a;
+   int step=q->s<=2?0:(int)(sn(anim*FOOT_PACE*(q->role?16.f:11.f)+i)*4);
+   if(npc_present_pose(N_ACT_STREET+i,&px,&py,&a,&step)&&q->role==1)c=0x668df0;
+   person((int)px-cx,(int)py-cy,c,step,a,q->role,i);break;}
   }
   if(v.kind!=SPRITE_TREE&&v.kind!=SPRITE_ATM)cover_behind_buildings(v.x,v.y);
  }
@@ -1646,11 +1713,20 @@ static void paint_world(int view){
  }
  if(introVenue>=0){int tx=sx(loc[introVenue].x),ty=sy(loc[introVenue].y);mark(cl(tx,27,W-27),cl(ty,150,H-70),16+(int)(sn(anim*4)*3),LIME);}
  for(int i=0;i<nc;i++)if(i==p.car||absf(cars[i].s)>9)projectLights(cars+i);
- draw_street_actors();vd_world();
+ draw_street_actors();npc_body_paint(cx,cy);vd_world();
  atm_kiosk_hint();
  int x=sx(p.x),y=sy(p.y);
- if(p.trail>0)line(sx(trailX),sy(trailY),sx(trailEndX),sy(trailEndY),GOLD);
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0)disc(sx(fx[i].x),sy(fx[i].y),2,fx[i].c);
+ if(p.trail>0){
+  int mx=sx(trailX),my=sy(trailY),ex=sx(trailEndX),ey=sy(trailEndY);
+  line(mx,my,ex,ey,GOLD);
+  if(p.trail>.064f){
+   float m=sq(d2((float)(ex-mx),(float)(ey-my)));
+   /* The flash brightens the muzzle, not the far side of a contact. */
+   dot(mx,my,0xfff2bd);
+   if(m>3.f)line(mx,my,mx+(int)((ex-mx)*3.f/m),my+(int)((ey-my)*3.f/m),0xfff2bd);
+  }
+ }
  if(job.kind==JOB_RIVALS&&job.step==0&&rivalsDeployed){
   int x=sx(job.xs[0]),y=sy(job.ys[0]);
   box(x-10,y-7,20,14,0x594537,0x9e8163);
@@ -1694,11 +1770,15 @@ static void paint_world(int view){
  if(menu>=0){paint_active_menu();draw_wallet(650,16,294);}
  if(atmOpen>=0)atm_draw();
 }
+#include "weapon_wheel.inc"
 void paint(void){
  if(scene==0||scene==5){profiles_paint();return;}
  if(scene==2){paint_world(helpBack);field_guide();return;}
  paint_world(scene);vd_draw();
  bank_warning_draw();
+ npc_panel_paint();
+ if(wheelOpen)wheel_paint();
 }
 
 #include "verdict_activities.inc"
+#include "npc_encounter.inc"

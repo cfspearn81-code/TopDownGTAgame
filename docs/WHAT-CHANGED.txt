@@ -1,3 +1,115 @@
+CONVERSATION HOLD HOTFIX
+
+- The person you selected stops and faces you while the NPC choices
+  are open. Everyone else keeps moving. Close the choices or respond,
+  and they go back to what they were doing.
+- After Rob, the same person transitions into the existing encounter.
+  Jobs, odds, controls and saves are unchanged.
+
+Previous release:
+PORT VANTA ENCOUNTERS GUIDE HOTFIX
+
+- F1 now fits the Shift+E tip and the other street controls above the
+  field guide legend without crowding either column.
+- The NPC choices, odds, controls and save compatibility are unchanged.
+
+Previous release:
+PORT VANTA ENCOUNTERS
+
+- Press E near a person to say hello, stay quiet, or choose Rob.
+  50 non-repeating greetings per person. Shop/counter/mission actions
+  keep E as before; Shift+E or Personal Interaction reaches the person.
+- Rob requires an owned pistol and room to draw. 35% surrender; 65%
+  fight. They carry $15-$155 dirty cash. On a refusal, fight them to
+  collect dropped cash, or run away. Drawing never fires by itself.
+- Returning contacts keep jobs available; saves, the compact pistol
+  and wall carry are preserved. No new venues are included.
+
+Previous release:
+PISTOL DEPTH FIX
+
+- Facing up no longer draws the pistol across your character's head.
+  The grip stays off to the shoulder as you walk, sprint or fire.
+- The flash and trace still start at the visible tip. Bent elbows,
+  barrel width, wall carry, controls and existing saves are unchanged.
+- No venue or story content was added in this update.
+
+Previous release:
+COMPACT PISTOL STANCE
+
+- The pistol is held close with bent elbows and thicker sleeves, not
+  straight or spindly arms. Walking, sprinting and recoil still move it.
+- The barrel keeps its shape when facing up, down or diagonally. The
+  flash and trace come from the same visible tip. No changes to weapon
+  controls, range, cooldown or damage.
+- At a wall, car or indoor fixture, the pistol lowers to the hip
+  instead of pushing back through your character. Step clear and it
+  raises on its own. It does not fire while lowered.
+- Existing saves, med patches, Vault 39 and the Windows repaint fix
+  carry forward.
+
+Previous release:
+PULSE PISTOL POSE
+
+- Selecting your pistol shows it in your hands on foot. The
+  arms follow your facing, stride and recoil. Picking fists hides it.
+- The flash and visible trace now start at the drawn muzzle, not behind
+  or under the player. The muzzle tucks up near cover; walls and cars
+  still block the shot. Original range, cooldown, damage and inputs
+  are unchanged. This remains a quick arcade trace, not a new gun system.
+- Career files, med patches, the wheel, Vault 39 and Windows repaint
+  compatibility are retained.
+
+Previous release:
+MED PATCH UTILITY
+
+- Med patches are now a separate disk just outside the lower-right weapon
+  ring, where the parachute appears in the layout reference. The disk and
+  count do not highlight or select weapons. The old inner slot is empty.
+- V still heals one patch per press with the wheel open, only when injured.
+  The Windows display fix, controls, purchase behavior and saves are intact.
+
+Previous release:
+DISPLAY HOTFIX
+
+- On Windows, moving the mouse or repainting a letterboxed window no
+  longer clears the game view to black before drawing. Only unused
+  borders are filled, and only on size or repaint damage.
+- Wheel background dimming remains intentional while Tab is held.
+  Input, simulation, Linux presentation and both save encodings are
+  unchanged. Existing careers and stocked med patches still load.
+
+Previous release:
+WEAPON WHEEL
+
+- Hold Tab to open an eight-slice wheel. The mouse highlights your nearest
+  owned weapon. Releasing Tab equips it. Fists are at the bottom; the pulse
+  pistol appears at the top once purchased. The tool already owned, any
+  existing pulse amp and Space to attack are retained.
+- Med patches are at lower left with your count. Press V once inside the
+  wheel to heal by up to 50 HP. At full health, $25 market purchases stock
+  patches. Wounded purchases still use a patch on the spot. No med patch is
+  consumed if you are already at full HP.
+- Wheel holds the game clock, cancels on focus loss and doesn't fire from
+  a combat key that was held through its closing.
+- Empty patch stock preserves the old Rev10 encoding. Stocked saves use a
+  validated Rev11 byte; old Rev2-10 careers still load.
+
+Previous release:
+VAULT 39 AFTER HOURS
+
+- Vault 39 is a nightclub with a DJ, an occupied dance floor, a working
+  side bar, a tucked-away Employees Only door and Ivo's private back room.
+- Mika moves between bar customers, pours and hands over drinks. The player
+  can order and take a free house soda; there is no new shop or economy.
+- Only Ivo talks contracts and accepts the Vault Run lockbox. The Atlas
+  still gets you to Vault 39, and pursuit must still clear outdoors.
+- Character clothing, faces and uniforms and vehicle bodies, cabins and
+  trim are redrawn across the game. Existing saved looks, handling, lights,
+  collision, camera controls and story systems are preserved.
+- All Port Vanta Sessions activities and Rev10 career files are retained.
+
+Previous release:
 PORT VANTA SESSIONS
 
 - 17 optional city listings. Two records, a legal radio slot, parking and

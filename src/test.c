@@ -20,8 +20,11 @@ static void approach_car(int id){
 }
 static void frame(const char*name){paint();FILE*f=fopen(name,"wb");assert(f);fprintf(f,"P6\n%d %d\n255\n",W,H);for(int j=0;j<W*H;j++){U v=pixels[j];fputc(v>>16,f);fputc(v>>8,f);fputc(v,f);}fclose(f);}
 static void visit(int i){assert(scene==1&&p.car<0);move_to(loc[i].x,loc[i].y);press(USE);assert(scene==3&&interior_active_loc==i);}
+static void ivo_backroom(void){assert(scene==3&&interior_active_loc==1&&!interior_subroom);interior_x=V39_STAFF_X;interior_y=V39_STAFF_Y;press(USE);assert(interior_subroom);}
 static void counter(void){interior_x=interior_desk_x;interior_y=interior_desk_y;press(USE);}
-static void leave(void){if(menu>=0)press(ESC);interior_x=W/2;interior_y=418;press(USE);assert(scene==1);}
+static void leave(void){if(menu>=0)press(ESC);interior_x=W/2;interior_y=418;press(USE);
+ if(scene==3&&interior_active_loc==1&&!interior_subroom){interior_x=W/2;interior_y=418;press(USE);}
+ assert(scene==1);}
 static void dropoff(int i){visit(i);counter();assert(menu<0);leave();}
 static int count_ink(U color,int xa,int ya,int xb,int yb){
  int n=0;for(int y=ya;y<yb;y++)for(int x=xa;x<xb;x++)n+=pixels[y*W+x]==color;
@@ -353,7 +356,7 @@ int main(void){
 
  /* Only keying the assigned Vectra can start the delivery leg. */
  init_city();scene=1;sv.intro=4;sv.owned=1;cars[0].cond=100;
- visit(1);counter();press(DOWN);press(ENTER);assert(job.kind==JOB_HOT);leave();
+ visit(1);ivo_backroom();counter();press(DOWN);press(ENTER);assert(job.kind==JOB_HOT);leave();
  int target=jobRide;
  paint();assert(navGoalKind==4&&navGoal.x==(int)cars[target].x);
  approach_car(1);press(USE);
@@ -371,28 +374,31 @@ int main(void){
 
  /* The vault and signal jobs use the interactive fixture inside the right room. */
  init_city();scene=1;sv.intro=4;sv.gear=1;
- visit(1);counter();press(ENTER);assert(job.kind==JOB_VAULT);leave();
+ visit(1);ivo_backroom();counter();press(ENTER);assert(job.kind==JOB_VAULT);leave();
  move_to(job.xs[0],job.ys[0]);assert(job.step==0&&p.heat==0);
  visit_job_room();
  assert(job.step==1&&p.heat>0&&sv.dirty==0);
- visit(1);counter();assert(job.step==1&&menu<0&&sv.dirty==0);leave();
- p.heat=0;visit(1);counter();assert(job.kind<0&&sv.dirty==260);leave();
+ visit(1);ivo_backroom();counter();assert(job.step==1&&menu<0&&sv.dirty==0);leave();
+ p.heat=0;visit(1);ivo_backroom();counter();assert(job.kind<0&&sv.dirty==260);leave();
 
- visit(1);counter();press(DOWN);press(DOWN);press(ENTER);
+ visit(1);ivo_backroom();counter();press(DOWN);press(DOWN);press(ENTER);
  assert(job.kind==JOB_SIGNAL&&jobBuildings[0]!=jobBuildings[1]);leave();
  visit_job_room();assert(job.kind==JOB_SIGNAL&&job.step==1);
  move_to(job.xs[1],job.ys[1]);assert(job.step==1&&sv.dirty==260);
  visit_job_room();assert(job.kind<0&&sv.dirty==560);
 
  /* The crew guards a physical cache. Use the armory weapon to get to it. */
- visit(1);counter();press(DOWN);press(DOWN);press(DOWN);press(ENTER);
+ visit(1);ivo_backroom();counter();press(DOWN);press(DOWN);press(DOWN);press(ENTER);
  assert(job.kind==JOB_RIVALS);leave();
  move_to(job.xs[0],job.ys[0]);assert(rivalsDeployed&&job_rivals_active());
  press(USE);assert(job.step==0&&sv.dirty==560);
  for(int i=JOB_RIVAL_FIRST;i<JOB_RIVAL_FIRST+JOB_RIVAL_COUNT;i++){
   Ped *guard=peds+i;
   if(guard->hp<=0)continue;
-  p.x=guard->x-35;p.y=guard->y;p.a=0;p.shot=0;
+  p.x=guard->x-35;p.y=guard->y;p.a=0;
+  /* Wait for the current cover carry to release, just as in the live
+     game. The synthetic reposition itself must not imply instant aim. */
+  walk(0,PULSE_CLEAR_TICKS);p.a=look(guard->x-p.x,guard->y-p.y);p.shot=0;
   press(FIRE);assert(guard->hp<=0);
  }
  move_to(job.xs[0],job.ys[0]);press(USE);assert(job.step==1&&sv.dirty==560);

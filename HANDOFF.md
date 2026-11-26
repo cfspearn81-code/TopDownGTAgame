@@ -1,5 +1,181 @@
 # Dead Channel | Project handoff
 
+## Current release: Conversation Hold Hotfix
+
+Downloads: [Windows 11 x64](downloads/Dead-Channel-Conversation-Hold-Hotfix-Windows-11-x64.zip) ·
+[Linux x86-64](downloads/Dead-Channel-Conversation-Hold-Hotfix-Linux-x64.tar.gz) ·
+[SHA-256 checksums](downloads/SHA256SUMS.txt).
+
+These files are the exact tested archives delivered in chat. Each contains
+the runnable game, rebuildable source, and player guides. Intermediate chat
+archives are not part of this repository update; previous published downloads
+remain available. This is cumulative from the last published Port Vanta
+Sessions release, with Vault 39 After Hours, the weapon wheel and med-patch
+utility, Windows display fix, pistol pose and depth fixes, NPC encounters,
+and the Field Guide and Conversation Hold hotfixes. No venue was added
+or removed in this latest hotfix.
+
+
+Based on exact delivered Guide Hotfix commit 11c25ee. The NPC choice
+panel pins one identity and pose. The selected pedestrian, patrol,
+rival, rider or crossing worker pauses their own path and faces the
+player without altering their resume heading. Procedural Vault and
+greenhouse actors freeze their rendered pose and rejoin their schedule
+when the choice closes. Their unrelated venue timers continue; only
+the selected person's hands and movement pause. Other actors remain
+independent.
+
+Esc, Say Hello, and Say Nothing release the hold on that input tick.
+Rob passes the same pinned identity/pose to the existing covered draw
+and fight transaction. This changes no bindings, payouts, production,
+save fields or venues. See docs/QA-REPORT.txt for native launch evidence.
+
+## Port Vanta Encounters Guide Hotfix (local delivery)
+
+The added Shift+E entry made the nine-row street column touch the legend,
+and longer labels exceeded its width. Keep the eight-or-fewer-row
+column spacing and use a compact row step for nine rows, with short
+labels. All rows now pass fit checks above the unchanged guide legend.
+Only the guide, release title and tests changed; the NPC encounter code,
+controls, economy and save bytes didn't. See docs/QA-REPORT.txt.
+
+## Port Vanta Encounters (local delivery)
+
+Based on exact Pistol Depth Fix commit a937a34. No withdrawn venues
+were added. Visible physical NPCs have stable session identities in
+`npc_encounter.inc`; video/photo preview sprites aren't world actors.
+`npc_greetings.inc` contains the authored archetype pools and produces
+a nonrepeating 50-line deck per identity. The dialogue doesn't pause
+traffic or production. Normal E service/door/quest priority is retained;
+counter menus and Shift+E provide explicit person interaction at shared
+hotspots.
+
+An explicit Rob selection equips the owned pistol without firing.
+Its separate bounded RNG fixes the 35% branch and uniform $15-$155
+amount once per target per session. Surrender credits dirty cash once.
+Refusal uses the same weapon/punch range, cooldown and hit geometry,
+with room or street collision checked from the body and muzzle. Regular
+pedestrians, guards and officers follow their existing down/respawn
+behavior; protected contacts/passengers reappear with native duties intact.
+Fight, greeting and cooldown data are not serialized; the original wallet
+and Rev2 through Rev11 migration remain unchanged. See docs/QA-REPORT.txt.
+No remote publication.
+
+## Pistol Depth Fix (local delivery)
+
+Based on the exact Compact Pistol Stance commit 738155a. No venue or
+story changes. Aiming straight up previously placed the barrel on the
+head's centerline and painted it over the hair. `pulse_pose.inc` now
+puts the near-north grip beside the shoulder, `pulse_sprite.inc` keeps
+the hands compact, and `figure_held` paints upward aim behind the head.
+
+The muzzle remains the shared world firing point even during recoil
+and point-blank tuck. There is no added forward range or through-cover
+exception. Keep both the original forward and offset muzzle collision
+checks. Wall carry, wheel, presentation and both save encodings remain
+unchanged. See docs/QA-REPORT.txt for verified files. No GitHub push.
+
+## Compact Pistol Stance (local delivery)
+
+Based on Pulse Pistol Pose. The old rig reached nearly the player's full
+height and used a fixed upward slide highlight, which read as a narrow
+line on a north/south barrel. `pulse_pose.inc` shortens the shared reach;
+`model_person.inc` drops the upper arms near the ribs and fills the bent
+sleeves. `pulse_sprite.inc` draws a colored barrel and outline across a
+perpendicular screen-space axis so the volume survives diagonal turns.
+
+A separate single-hand side carry replaces the solid-cover muzzle clamp.
+Street collision queries and both interior colliders feed a five-clear-
+tick latch. Side selection favors open space, the barrel points down,
+and the hands and barrel sway with gait. The release rise avoids contact
+flicker. The pistol won't fire or start a heat/cooldown event in carry.
+Point-blank actors still use the existing shot cone; obstacles beyond
+the raised weapon still stop the ray at the first obstruction.
+
+Keep the muzzle pixel, stored firing anchor, flash and trace together
+if editing this pose. The movement inputs, range, cooldown, damage,
+cover guards, wheel, display fix and save format did not change. See
+docs/QA-REPORT.txt for actual launcher and raster proof. No remote
+publication.
+
+## Pulse Pistol Pose (local delivery)
+
+Based on Med Patch Utility. The outfit rig now blends a held pistol
+with step and aim, keeps the item visible when equipped on foot, and
+hides it after selecting fists or entering a car. Indoor pose is visual
+only. The street trace and flash use a shared world muzzle, checked
+from the feet and again along the shot so it cannot bypass cover.
+
+Range, cooldown, damage, and controls are unchanged. The synthetic
+302-frame keyboard replay passed all 16 corners of the firing pose test
+with matching bytes across both platform entry points. See docs/QA-REPORT.txt
+for tested builds and limits. No remote publication.
+
+## Med Patch Utility (local delivery)
+
+Based on Display Hotfix. The reference's parachute position is the
+detached lower-right accessory at 4:30, not the inner bottom-left wedge.
+The med badge now matches that position relative to the ring. It shows
+the existing count and V action without affecting weapon hover. The
+old medic sector is neutral. Both keyboard/mouse hosts passed their
+stocked-saves replay and the Windows hotfix still clears only margins.
+Save layout, healing, price, and world behavior are unchanged.
+Verification and executable hashes are in docs/QA-REPORT.txt.
+No remote publication.
+
+## Display Hotfix (local delivery)
+
+Based on Weapon Wheel. The Windows host now confines GDI black fills to
+the bars outside the logical viewport and coalesces pointer updates into
+the next normal frame. The old Wheel build repainted the entire client
+black ahead of each pointer-driven letterboxed blit; a 75-frame exact PE
+test reproduced 34 such fills. The new build made no black fill touching
+the game view, still drew seven wheel frames and wrote the same save.
+
+The native game, wheel selection, background dim, save format and SDL
+rendering are unchanged; Linux gets only the cumulative window title.
+Existing careers and any stored patches survive the update. See
+docs/QA-REPORT.txt for binary and test details. No remote publication.
+
+## Weapon Wheel (local delivery)
+
+Based on Vault 39 After Hours. Hold Tab to choose an owned weapon by mouse proximity; release to equip. The wheel also shows stocked med patches and accepts V for one patch per press. Old saves load without losing career data. The actual in-game equipment changes only on Tab release; focus loss
+cancels the preview. The wheel consumes input and holds the simulation
+without opening over another menu. The radial art is drawn by the engine
+and does not embed the reference image.
+
+Ferry Market's $25 purchase stocks a patch at full HP and still treats an
+injury immediately, up to 50 HP. The game saves 1–99 patches using the
+formerly reserved byte at offset 267 only under Rev11. History through
+Rev10 still loads; an empty inventory still writes original Rev10. An older
+executable cannot read a presently stocked Rev11 career. Weapon preference
+is session-only; on load, the pistol is the default if owned.
+
+Both exact executable hashes and native input routes are in
+docs/QA-REPORT.txt. No physical Windows test or remote publication.
+
+## Vault 39 After Hours (local delivery)
+
+Built from the exact Port Vanta Sessions tree published as dc3f2e6f6ca6ac50586c95994e76afce0f69fecb. Vault 39 gameplay is isolated to its named interior. The nightclub reuses gameplay collision footprints with new procedurally
+drawn clublights, DJ equipment, bar furniture and hideout dressing. Mika's
+small deterministic serving loop is independent of street actors and funds.
+The staff door leads to an isolated layout in the same venue. Ivo listens,
+offers the four existing contracts and accepts the old lockbox handoff only
+backstage and when pursuit has cleared. See docs/START-HERE.txt.
+The approved shared procedural art pass in src/model_person.inc and
+src/model_vehicle.inc updates live people and cars without new asset
+downloads, saved look fields or vehicle behavior changes. No remote
+publication.
+
+- Builds: Dead-Channel-Vault-39-After-Hours-Windows-11-x64.zip and
+  Dead-Channel-Vault-39-After-Hours-Linux-x64.tar.gz; checksums under downloads.
+- Exact unmodified executables both replayed the 3,351-keyboard-frame Vault
+  Run and matched all 12 staged captures and 304 save bytes (11fd06d2).
+  Confirmed continuing compatibility with the 3,664-frame opening
+  (a6727845). See docs/QA-REPORT.txt for build hashes and scope. The Windows
+  entry was simulated; no claim of a hardware Windows run.
+
+
 ## Current release: Port Vanta Sessions
 
 Downloads: [Windows 11 x64](downloads/Dead-Channel-Port-Vanta-Sessions-Windows-11-x64.zip) ·

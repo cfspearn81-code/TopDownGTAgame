@@ -11,11 +11,14 @@ for p in [root/x for x in ['AGENTS.md','README.md','HANDOFF.md']]+[p for d in ['
 for x in ['START-HERE.txt','WHAT-CHANGED.txt','CITY-LISTINGS.txt','QA-REPORT.txt','FONT-LICENSE.txt']:
  common['Dead-Channel/'+x]=root/'docs'/x
 manifest=[]
+manifest_file=out/'SHA256SUMS.txt'
+if manifest_file.exists():
+ manifest=[row for row in manifest_file.read_text().splitlines() if 'Dead-Channel-Conversation-Hold-Hotfix-' not in row]
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 for target in ['Windows-11-x64','Linux-x64']:
  win=target.startswith('Windows');ex='DeadChannel.exe' if win else 'DeadChannel'
  files=dict(common);files['Dead-Channel/'+ex]=root/'build'/ex
- name='Dead-Channel-Port-Vanta-Sessions-'+target+('.zip' if win else '.tar.gz');path=out/name
+ name='Dead-Channel-Conversation-Hold-Hotfix-'+target+('.zip' if win else '.tar.gz');path=out/name
  def mode(p):return 0o755 if p==root/'build'/ex or (p.stat().st_mode&0o111 and p.suffix in ('.sh','.py')) else 0o644
  if win:
   with zipfile.ZipFile(path,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as archive:
@@ -32,5 +35,5 @@ for target in ['Windows-11-x64','Linux-x64']:
    assert set(a.getnames())==set(files) and a.getmember('Dead-Channel/'+ex).mode&0o111
    for k,p in files.items():assert a.extractfile(k).read()==p.read_bytes(),k
  manifest.append(sha(path)+'  '+name)
-(out/'SHA256SUMS.txt').write_text('\n'.join(manifest)+'\n')
+manifest_file.write_text('\n'.join(manifest)+'\n')
 print('\n'.join(manifest))

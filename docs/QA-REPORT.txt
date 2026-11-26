@@ -1,3 +1,382 @@
+CONVERSATION HOLD HOTFIX | VERIFICATION
+======================================
+
+Tested executables:
+ Windows PE x64  4a22468719e91084add7e0093dbdd10ed91a25f23400121917fef4a6be379242
+ Linux ELF x64   5bce2d4ac93639633a5f24aa9f8c6aeb4d893eaebd37d11bbdd8433cce023f7d
+
+- Replayed identical 176-frame input on the previous and current builds.
+  The original build moved the selected civilian over 17 pixels while
+  the panel was still visible. On the hotfix, the selected civilian held
+  location and stance for all 105 menu ticks, faced the player, and
+  resumed the route after Esc. Another pedestrian moved over 14 pixels
+  and the time counter advanced throughout. Exact visible coat/presence
+  crops checked both on-screen people; PE and ELF wrote save e84ff56a.
+- A 621-frame Vault 39 tape also keeps Mika in one pose for 86 menu
+  ticks while another actor and the bar clock move. The eight live
+  checks include the preserved soda order, greeting, choice, ordinary
+  draw and $28 once, and return to the original service. Both entry
+  points wrote byte-identical Rev10 3672994a.
+- ASan/UBSan checked moving street, taxi, Vault, greenhouse and
+  crossing actors, other active actors and production, no first-frame
+  position drift, stop without overwriting route heading, same-tick
+  release, smooth rejoin, and the pinned draw into refusal/fighting.
+- Prior greeting, surrender, defeat/drop, flight and guide tapes retain
+  fa213f11, 5d80252d, 619fb3d9, caf2b28f and 5f1d7bc9. The stock
+  opening remains a6727845. Original Vault, gun pose/wall carry, wheel
+  and med patches, and Windows bars-only repaint remain verified.
+  No new save fields, bindings, or venues.
+
+Linux used actual SDL2 with dummy video. Windows was tested through the
+exact x64 executable under simulated Win32. No physical Windows test or
+GitHub publication. See BUILD.txt to reproduce.
+
+Earlier release verification follows.
+
+PORT VANTA ENCOUNTERS GUIDE HOTFIX | VERIFICATION
+================================================
+
+Tested executables:
+ Windows PE x64  e6ddb66fb4437422d27d1638e214e00e73baca6e88700b896a41d047a8e532fc
+ Linux ELF x64   5eabdb36bf797a2fd5f45d025472e73ebbd3cd7cc49a34eb870b118ef596a5c8
+
+- Actual F1 input opened the guide. Both launchers passed 3 RGB crops
+  (whole guide, Shift+E row, separate legend), and Esc returned to the
+  same scene. The 20-frame tape saved byte-identical Rev10 5f1d7bc9.
+  Separate source assertions measure every guide line and ensure that
+  all nine street entries fit above the legend.
+- On these exact executables, all four NPC street tapes still pass
+  their 29 checkpoints and write fa213f11, 5d80252d, 619fb3d9 and
+  caf2b28f. The 535-frame Mika tape still writes 8981e6e9 and matches
+  seven check crops. The stock opening still writes a6727845. Windows
+  bars-only repaint and Linux input/legacy save checks also pass.
+- Linux is actual SDL2 with dummy video. Windows is the exact x64
+  executable under simulated Win32; no physical Windows test.
+
+Earlier release verification follows.
+
+PORT VANTA ENCOUNTERS | RELEASE VERIFICATION
+=============================================
+
+Tested executables:
+ Windows PE x64  b35d2460d6c8b738ac107c22b4d46792e05de8f7d1a55c16f48120b1ad14fac5
+ Linux ELF x64   38b64d5743536b7428a282dd1dcf0105993798c4ee55528ec9739a22af02539a
+
+Verified through both actual launcher entry points:
+
+ Keyboard tape          Frames  Rev10 digest  Dirty cash  End health
+ Hello, quiet, cancel       51  fa213f11          $0          100
+ Surrender + save           95  5d80252d         $36          100
+ Refusal, fight and loot   235  619fb3d9         $17           84
+ Refusal, run away         127  caf2b28f          $0          100
+ Mika + normal bar service 535  8981e6e9         $28          100
+
+- The four street tapes start with disposable careers and walk to an
+  actual civilian before pressing E. The 29 rendered checkpoints include
+  the dialogue, quiet default and greeting, equipped muzzle without a
+  shot, surrender, a hostile swing, flash, cash drop, collected label,
+  and a clean escape. PE and ELF saved identical bytes on every tape.
+- Seven live indoor checkpoints check default E bar service, Shift+E
+  person selection, greeting, the drawn muzzle, surrender, taking the
+  original soda, and denial of a second payment. Both launchers returned
+  to the saved street entrance with clean $70 and a single $28 gain.
+- 410 globally distinct authored lines, at most 62 supported characters.
+  A separate sanitizer test cycled 6,000 role/ID combinations without a
+  repeated greeting within any person's 50-line deck. Forty thousand
+  bounded outcomes yielded 14,065 surrenders (35.163%), with all 141
+  integer amounts present from $15 through $155. Actual weapon ownership,
+  repeated/hanging input, health loss, one-time loot, death/vehicle/save
+  cleanup, and normal contact recovery were tested separately.
+- Covered physical pedestrians, rivals, post/response officers, cab
+  passengers, indoor clerks and named contacts, Vault dancers, bar
+  patrons, DJ and Mika, HQ staff, the grow operator and crossing crew.
+  Video/photo preview people and empty fixture graphics aren't NPCs.
+- The 3,664-frame stock save remains a6727845. Existing Vault service
+  and handoff, wheel and med-patch, and pistol depth/wall carry tapes
+  retain prior digests. The Windows display trace has zero viewport fills.
+  No career field or format changed and no withdrawn venue is present.
+
+Linux used actual SDL2 with dummy video; Windows used the exact PE under
+simulated Win32 on Linux. No physical Windows/display/controller test.
+See BUILD.txt to reproduce. No GitHub publication.
+
+Earlier release verification follows.
+
+PISTOL DEPTH FIX | RELEASE VERIFICATION
+======================================
+
+Tested executables:
+ Windows PE x64  6e5f964c6a4fe7c1b004ba3214955d6ae7cf27efe8f99e63db8d3525d478bba4
+ Linux ELF x64   44eafda0156f8f02f0c12ce9b4ca3f4d453c99f94895b7d616f92e6e4eaabe53
+
+- Reproduced the upward overlap on the previous shipped binaries using
+  the same 94-frame actual keyboard inputs as the fix. The before/after
+  capture checks north idle, two stride phases, sprint, firing, northwest
+  and northeast. Both current executables pass seven pixel checkpoints
+  (muzzle and three head pixels) and save byte-identical Rev10 careers
+  (3c967a58), matching the earlier build's digest on the same tape.
+- ASan/UBSan exercised 1,080 north and diagonal head/hair comparisons
+  with all ten hairstyles, with and without a hood, nine gait phases,
+  and recoil. The head mask matches fists and the muzzle stays exposed.
+  Another 768 compass renders check solid barrel width. Point-blank
+  north fire, first flash, movement, muzzle clearance, and shot limits
+  were also checked. There is no range, damage, cooldown or input change.
+- The 302-frame compass tape (5e964522) and the 71-frame wall carry tape
+  (3d6060bf) keep the same outcomes, including no shot at wall contact.
+  The stock opening remains a6727845. Vault 39 still verifies all
+  twelve interaction/lighting crops (11fd06d2), wheel/patch save checks
+  match, and the Windows presentation trace has zero viewport fills.
+- Linux used actual SDL2 with dummy video; Windows used the exact PE
+  through simulated Win32, not a physical Windows or display test.
+  No venues added, no save schema change and no remote publication.
+
+See BUILD.txt to reproduce.
+
+Earlier release verification follows.
+
+COMPACT PISTOL STANCE | RELEASE VERIFICATION
+==========================================
+
+Tested executables:
+ Windows PE x64  a42bee1966c886cb2497ca6c40b1a5edf0b4d3f43737142d7e21ad83bf67b098
+ Linux ELF x64   b84bb3f28d8d1675255ab0e08321e28b7e7e9b96a6a95004c13c73d8a2ecff87
+
+- Replayed the same 302-frame disposable career on the previous and
+  current builds and inspected actual before/after pixels in all eight
+  facings. The shorter reach, fuller bent arms and readable slide are
+  visible while idle and moving. The current builds each passed 16 sets
+  of buffer checks for the muzzle, opposite slide rails and the flash
+  and nearby trace. Exact Linux/Windows save bytes matched, with the
+  same Rev10 digest (5e964522) as the previous build on that tape.
+- ASan/UBSan covered 768 renders: 128 angles, idle and two stride
+  phases, each with and without recoil. Actual pixels on both sides of
+  the barrel plus the face, glint and muzzle were checked. The first
+  flash still lands on the exact muzzle; turning does not drag the trace.
+  Fists and cars hide the pistol; interiors show it but do not fire.
+- A separate 71-frame live input tape drove into a real street wall
+  and held Space at contact, then backed away, raised and fired from the
+  barrel. Both executables passed all four color checkpoints: hip carry,
+  blocked shot, raised pose, and flash/trace. They wrote identical Rev10
+  careers (3d6060bf). ASan/UBSan additionally tested cover in all four
+  cardinal directions, a close car, five stable clear ticks, and indoor
+  wall and fixture movement without allowing indoor fire.
+- The original cooldown (.33/.21 seconds), range (112/165), damage
+  (1/2) and cover guards remain. Tests include blocked near shots,
+  point-blank tuck and a range boundary. The shot origin changes with
+  the compact stance; shots remain blocked by walls and cars. Lowered
+  carry at immediate cover does not create a shot, cooldown or heat.
+- The stock 3,664-frame tour saves a6727845 on both executables.
+  Wheel/Ferry patch runs retain 83d78429, d209a65d and 5895b9d1.
+  The 75-frame Windows presentation run paints only 8 margin fills,
+  none over the viewport, and shows 7 wheel frames. Vault 39 still reaches
+  all 12 interaction and lighting checks, with save digest 11fd06d2.
+- No bindings, content, purchase rules or save fields changed. Tests
+  used real Linux SDL2 with dummy video and the actual Windows binary
+  under simulated Win32. No physical Windows or hardware display test.
+  No GitHub publication.
+
+See BUILD.txt to reproduce the exact launcher tests and capture crops.
+
+Earlier release verification follows.
+
+PULSE PISTOL POSE | RELEASE VERIFICATION
+==========================================
+
+Tested executables:
+ Windows PE x64  6fc88bee6c20e06b1ef5f2fe709dfab751260d9ff5e9da9685f85bad91eb1ab7
+ Linux ELF x64   dffd6db93d7b3699f225110a2bc5e729b1b4f90d1c0da044d9f15cab1ded6dfb
+
+- Focused geometry tests drew 384 actual sprite poses: 128 compass
+  angles in three stride states. Tests exercised the visible muzzle,
+  slide/wrists, facing changes, recoil and the first visible flash at
+  exactly the drawn barrel. The trace retains its fired world position
+  if the player turns before it fades.
+- Range, rating and cadence still use the original 112/165 unit bands,
+  one/two damage and .33/.21 second cooldown. Both the player-to-muzzle
+  and muzzle-to-target cover checks must be clear. Nearby walls, cars
+  and point-blank actors were exercised. Tucking does not skip cover.
+  Fists and cars never show the held pistol. Named and shop interiors
+  show the item when equipped on foot without enabling indoor fire.
+- A 302-frame actual-input replay checked the rendered muzzle plus
+  slide/trace points in all eight gameplay facings. Native SDL and
+  simulated Win32 matched all 16 pose/flash checkpoints and saved
+  byte-identical Rev10 careers (cb410095). Captures used controlled
+  starting profiles, not a real player's career.
+- The untouched 3,664-frame opening still writes a6727845 on both.
+  Existing Wheel/med-patch stock and Windows display regression tests
+  remain active. This changes no save fields, bindings or venue layout.
+
+To reproduce, run the commands in BUILD.txt. Linux used its real SDL2
+entry point with a dummy renderer; Windows used the exact PE under
+simulated Win32 services. No hardware display, controller, or physical
+Windows session was used. No remote publication.
+
+Earlier release verification follows.
+
+MED PATCH UTILITY | RELEASE VERIFICATION
+==========================================
+
+Current cumulative executables:
+ Windows PE x64   aa73fbf6c9746e05ac81373791c83b34d679274470d80ae8abf3a9cf117b005c
+ Linux ELF x64    b82f0a04e7d4898c72058bf9d6f9bd45a6d83843b2c68a9f0134d1a80fc095df
+
+The supplied layout showed an accessory circle centered near (413,441)
+outside a ring centered at (239,267.5), radius 210.5. Normalizing this
+offset to the in-game wheel's radius 202 puts the med badge at (647,434)
+on the 960×540 canvas. The 26px badge and adjacent readout do not touch
+the weapon ring. Both diagonal bottom wedges are now neutral.
+
+Focused tests inspect the disconnected badge, both neutral wedges, text
+fit at full health, and hovering/clicking the icon/count without changing
+or consuming weapon or med state. V remains the one-at-a-time shortcut.
+The 154-frame shop replay still wrote 83d78429. The two 166-frame
+purchase/reload/selection runs each matched 14 actual frame checkpoints on
+the native Linux ELF and the simulated Win32 PE, including moving the
+mouse onto the badge without switching the highlighted pistol. Stocked
+save digests d209a65d and 5895b9d1 were unchanged.
+
+The 75-frame Windows display test still found zero black fills touching
+the viewport. The original 3,664-frame opening remains a6727845 on both.
+No save schema or purchase changes. Dynamic player weapon state is the
+same when hovering weapon positions; the accessory is never a weapon.
+The Windows test uses simulated Win32 services, not physical Windows.
+SDL was run with dummy video. These are local builds, not a GitHub update.
+
+Earlier release verification follows.
+
+DISPLAY HOTFIX | RELEASE VERIFICATION
+=======================================
+
+Tested cumulative executables:
+ Windows PE x64  9b32e1cb4d0226ac287a5bbc147bec46efafcc6e4ef6cc592b2ac1f77a0b151e
+ Linux ELF x64   0fa6834db8e68158c864c3eded93f8552dbe0b21158eb3b98ced6ba4ff2443d1
+
+On Windows the Weapon Wheel build requested a redraw for each mouse
+event. Its letterbox path filled the entire visible client with BLACKNESS
+before stretching out the game frame. A separate black fill can be visible
+before the game blit. The hotfix draws margins only, on window paint/size
+damage, and paints pointer changes on the normal render cadence. No
+change was made to the gameplay renderer or intentional wheel dimming.
+
+The GDI call trace replays 75 frames on the exact PE from each build,
+with letterbox, pillarbox, exact 16:9, odd resizing, motion, focus, and
+Tab. The old Weapon Wheel executable made 34 black fills covering the
+viewport; Vault 39 made four. The hotfix made eight border-only fills,
+zero overlapping the viewport, and still rendered all seven wheel frames.
+The new and previous Weapon Wheel builds wrote byte-identical 304-byte
+career data (41ab5ab8) from that trace. The old executables used in this
+comparison matched the entries from their delivered ZIPs.
+
+The stock 3,664-frame opening still matches a6727845 on Linux and
+simulated Win32. Both hosts passed the Wheel purchase/reload/aim/focus
+replay (13 rendered checkpoints on each with and without a pistol)
+with unchanged ending save digests 83d78429, d209a65d and 5895b9d1.
+The 3,351-frame Vault 39 replay still matched all 12 original crops
+and its explicit save 11fd06d2 on both hosts. Linux SDL rendering behavior is unchanged. Existing
+304-byte save files, including Rev11 patch stock, are compatible.
+
+Reproduce using the commands in BUILD.txt. The Win32 harness checks
+actual PE paint calls and rectangle bounds under simulated services. It
+cannot measure visible flicker on the user's physical Windows display.
+The Linux entry point was driven via SDL's dummy renderer. No GitHub
+publication was requested.
+
+Earlier release verification follows.
+
+WEAPON WHEEL | RELEASE VERIFICATION
+=====================================
+This is cumulative over Vault 39 After Hours and Port Vanta Sessions.
+
+TESTED NATIVE EXECUTABLES
+ Windows PE x64  7e5c7b7c64ec23570b211c00a2bf94e83ab5edfc55e0fbadd269daee62ca1495
+ Linux ELF x64   c7496409089214b8d914c3cd462c021320ac2912840f8e6b409110fbcb009cca
+
+- Source tests cover nearest-owned selection, pistol purchase and active
+  weapon controls, press-and-hold versus release, no accidental shot or
+  punch when closing, focus cancel, and ignoring V outside the wheel.
+  The wheel pauses the city and keeps other menus from opening beneath it.
+- Source durability tests checked paid full-HP stock, wounded immediate
+  treatment, clinic behavior, inventory cap, one patch per press, no cost
+  at full health, and correct atomic save/load. The writer keeps 304-byte
+  Rev10 when empty; a nonempty inventory is 304-byte Rev11. Corrupt or
+  noncanonical inventory/version pairings are rejected. Legacy migration
+  fixtures remain explicit rather than being rewritten as new saves.
+- Both actual hosts walked to the real Ferry Market counter and purchased
+  two med patches. Released-save bytes matched at 83d78429 after 154 frames:
+  HP100, two patches on hand, $100 clean after spending $50, other balances
+  unchanged. Pressing V at full health did not discard a patch.
+- Both actual hosts reloaded the stocked career, with and without a
+  purchased pistol, and exercised the wheel with true native pointer and
+  key inputs. Each 166-frame run matched 13 rendered checkpoints on each
+  host, including letterboxing, focus-loss cancellation, selected-state
+  restoration, and Tab release commit. Held V repaired HP22 to HP72 and
+  left one patch on disk. The two save digests were d209a65d (no pistol)
+  and 5895b9d1 (pistol owned).
+- Vault 39: the original 3,351-frame walk-up bar and Ivo contract
+  replay still matched all 12 RGB checkpoints and save 11fd06d2 across
+  both entry points. The unchanged 3,664-frame original opening also
+  matched a6727845, and 259 real indoor routes still passed.
+
+Run the commands in BUILD.txt. These checks used Linux SDL dummy video
+and the actual Windows executable with simulated Win32 services on Linux.
+No physical Windows, hardware mouse-feel or controller assessment.
+The archives are local deliverables; no GitHub update was requested.
+
+Earlier releases follow.
+
+VAULT 39 AFTER HOURS | RELEASE VERIFICATION
+============================================
+
+Tested from the exact Port Vanta Sessions tree published on GitHub as
+dc3f2e6f6ca6ac50586c95994e76afce0f69fecb. Test careers are disposable
+fixtures. No save migration or in-progress activity format changed.
+
+TESTED NATIVE EXECUTABLES
+ Windows 11 x64 PE  b15f41cd921e6586dee51fe82e2828913151d685b515e92da33329d8c5f0c305
+ Linux x86-64 ELF  033ac8389ef718252393b8050f3fe49cd4d200b1846b5a775d033efdfaf9f895
+
+- Vault 39: 3,351 actual keyboard frames on both clients. Both matched
+  all 12 suite framebuffer checkpoints, from public bar and pour through
+  the staff door, Ivo's menu, outdoor cooldown and successful return.
+  The public bartender never opens Ivo's menu, accepts cargo or charges the
+  player. Mika serves two patrons, then handles and hands off the requested
+  free soda. The player can take the ready drink by pressing E. Repeating E
+  before readiness does not queue another order. The order caption does not
+  spill into Ivo's room. The service loop pauses during the guide and pause
+  menu. Both clients wrote byte-identical 304-byte Rev10 save 11fd06d2:
+  $70 clean, $260 dirty, HP 83, one extra street contract. The hot handoff
+  could not pay and waiting indoors did not lose pursuit. Duplicate handoff
+  input could not pay a second time. Hold E does not double-transition.
+- Collision: the deterministic input suite walked 259 interaction routes
+  over 18,369 movement ticks across 15 public named venues, 5 rear rooms
+  and 63 street addresses; both doors in Vault 39 and Ivo's original job
+  interactions were exercised. The rear exit keeps the player indoors,
+  then the public front exit returns to the original world coordinates.
+- Models: the shared renderer changes live people and cars, not actor
+  footprint, licensed vehicle properties, garage values, controls, light
+  states, portrait art or the saved Look fields. The raster suite checked
+  768 live animation poses, fixed foot anchors, original 128-facing atlas
+  arrow masks and pixel-identical career portraits.
+- Stock opening: original 3,664-frame courier/taxi tape yields a6727845
+  on the new Linux executable and simulated Win32. Existing career loads
+  retain Rev10 and Rev2–9 import. The older bank, room, clock and guide
+  suites remain active. All 17 previous city listings remain present.
+
+REPRODUCTION
+  bash scripts/test.sh --tour
+  bash scripts/test-linux.sh
+  bash scripts/test-city-listings.sh
+  python3 scripts/qa/vault_keyboard_replay.py
+The last command uses built executables, generated input and a synthetic
+save. Linux was exercised through its SDL2 native entry and dummy renderer.
+Windows exercised the shipped PE with simulated Win32 on Linux. Physical
+Windows, controllers and hands-on performance were not tested. The club's
+DJ, floor and service are visual; no new nightclub soundtrack is bundled.
+Both archives contain that exact tested executable and rebuildable source.
+This is a local delivery; it does not update the GitHub release.
+
+Past release verification follows.
+
 PORT VANTA SESSIONS | RELEASE VERIFICATION
 ==========================================
 Test careers were generated in temporary directories, not real player saves.

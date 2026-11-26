@@ -30,7 +30,7 @@ static int matches(enum Goal g){
   return g==EXIT_G?wi_at_door():wi_at_station()&&!wi_at_door();
  }
  int hasgate=g_kind==4||legal_index_for_kind(g_kind)>=0;
- int atdoor=int_at_door(),atgate=hasgate&&int_at_staff_gate();
+ int atdoor=int_at_door(),atgate=g_kind==1?v39_staff_near():hasgate&&int_at_staff_gate();
  if(g==EXIT_G)return atdoor;
  if(atdoor)return 0;
  if(g==GATE_G)return atgate;
@@ -122,7 +122,7 @@ static void check_ivo_sprite(void){
  /* Compare the unobstructed NPC with the baked scene. The couch used to
     repaint Ivo's head and torso after this same sprite had been drawn. */
  rect(x-12,y-20,25,28,0);
- person(x,y,mix(interior_theme(1)->neon,0x55738a,3),0,1.570796f,0,1);
+ person(x,y,mix(interior_theme(1)->neon,0x55738a,3),0,1.570796f,MODEL_STAFF,1);
  int drawn=0;
  for(int v=y-20;v<y+8;v++)for(int u=x-12;u<x+13;u++){
   U ink=pixels[v*W+u];if(!ink)continue;
@@ -136,9 +136,15 @@ static void visit_named(int i){
  p.x=loc[i].x;p.y=loc[i].y;tick(0);press_key(USE);
  ck(scene==3&&interior_active_loc==i&&!interior_subroom,"front door opened wrong room");
  const InteriorTheme*t=interior_theme(g_kind);frame("venue",i,room_name,t->line);
- if(g_kind==1)check_ivo_sprite();
  go(FEATURE_G);press_key(USE);ck(interior_inspection==g_kind+1,"signature fixture did not react");
- check_counter(0);
+ if(g_kind==1){
+  go(DESK_G);press_key(USE);ck(v39.requested&&menu<0,"bar opens wrong interaction");
+  for(int t=0;t<V39_CYCLE+97;t++)tick(0);
+  ck(v39.playerServed&&v39.serves>=1,"bar did not serve customer and player");
+  go(GATE_G);press_key(USE);ck(scene==3&&interior_subroom,"Vault rear did not open");
+  check_ivo_sprite();frame("rear",i,room_name,interior_theme(g_kind)->banner);check_counter(1);
+  go(EXIT_G);press_key(USE);ck(scene==3&&!interior_subroom,"Vault rear return");rears_seen++;
+ }else check_counter(0);
  if(g_kind==15){
   go(CHIEF_G);press_key(USE);ck(strstr(notice,"Rivas")!=NULL,"chief failed to respond");
   go(CELLS_G);press_key(USE);ck(strstr(notice,"Custody")!=NULL,"cell inspection failed");
@@ -321,10 +327,10 @@ int main(int argc,char**argv){
 #endif
   visit_shop(i);
  }
- ck(doors_seen==15&&rears_seen==4&&walkins_seen==63,"unexpected room count; inspect world inventory");
+ ck(doors_seen==15&&rears_seen==5&&walkins_seen==63,"unexpected room count; inspect world inventory");
  if(manifest)ck(!fclose(manifest),"manifest close failed");
  check_grow_operator();
  printf("Passed %d public venues, %d gated rear rooms, %d street addresses; %d interaction routes, %d actual movement ticks.%s\n",
-  doors_seen,rears_seen,walkins_seen,route_count,steps_taken,manifest?" Exported 82 native raster frames.":"");
+  doors_seen,rears_seen,walkins_seen,route_count,steps_taken,manifest?" Exported 83 native raster frames.":"");
  return 0;
 }

@@ -1,16 +1,71 @@
 DEAD CHANNEL / PORT VANTA
-Port Vanta Sessions for Windows 11 x64 and Linux x86-64
+Conversation Hold Hotfix for Windows 11 x64 and Linux x86-64
 
 1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
    Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
    from the extracted Dead-Channel directory. If your extractor did not
    preserve execute permission, run chmod +x DeadChannel first.
-   Look for "Dead Channel | Port Vanta Sessions" in the window title.
+   Look for "Dead Channel | Conversation Hold Hotfix" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
    to the teal door and press E. Mara's first job at Mercury Dispatch
    introduces the city and pays for your next move.
+
+IF YOU ARE UPDATING
+Close the older game, extract this build to a new folder and run the new
+executable. The saved careers are stored separately; no transfer, reset
+or new career is required. The weapon wheel still intentionally dims the
+background while Tab is held.
+
+PEOPLE IN PORT VANTA
+Walk close to someone and press E. Up/Down picks Say Hello, Say Nothing,
+or Rob. E or Enter confirms; Escape closes. If E has a work, shop, fare,
+or door prompt, Shift+E is the person shortcut. Named counters also have
+a Personal Interaction menu item. Only the selected NPC stops for the
+conversation. Other people, time, traffic, and venue service keep moving.
+Each person has a 50-greeting deck before a line repeats.
+
+Rob requires an owned pistol and a clear line. You draw the pistol but
+no shot fires until you press Space. Each person has a 35% surrender
+chance and carries $15-$155 dirty cash. On refusal, fight with Space/X
+or run away. If they fall, walk over the marked cash to collect it once.
+Leaving the area forfeits the attempt; no repeat payouts from the same
+person in a session. Clerks and other contacts recover so jobs stay
+available. Indoor firing only works during a refusal from this feature.
+
+WEAPON WHEEL AND MED PATCHES
+Hold Tab during play. Move the mouse toward fists (bottom) or the pulse
+pistol (top, when owned). The nearest owned weapon highlights. Release Tab
+to equip it. Space uses the equipped weapon; X is still a quick punch.
+On foot, the held pistol follows your facing with a tighter bent-elbow
+stance and a readable barrel in every direction. When you face up, it
+stays beside your shoulder, clear of your head through stride and recoil. The street shot still starts at the visible tip.
+If you press into a wall, the pistol lowers beside your hip instead of
+clipping into your character. Step clear to raise it automatically;
+Space won't fire while lowered. Cars and rooms remain non-firing.
+The city pauses while the wheel is open, and switching away from the game
+closes the wheel without equipping the hover. It does not replace the atlas,
+field guide, save menus or other open interactions.
+
+At full HP, a $25 med patch from Ferry Market goes into your pocket.
+Your patch count is in the round utility just outside the wheel at the
+lower right. It is not a weapon slot. While holding Tab, press V to use one patch and restore up to 50 HP. Full health never uses a
+patch. If you buy one while injured, the market still uses it immediately.
+Tideway Clinic's full treatment still works separately.
+
+VAULT 39 / TIDE MARKET
+Look for Vault 39 in the atlas. The left side is the DJ and dance floor;
+Mika works the small bar on the right. At the counter, E orders a free
+house soda. Mika serves the waiting guests first. E takes your soda once
+it is ready. The bar cannot accept contract cargo.
+For Ivo, use the narrow aisle to the right of the bar. E opens the
+Employees Only door in the recess. In the back, E at Ivo's booth opens
+the four original contracts or lets you talk. Return through the same
+back-room exit, then use the front exit to reach the street.
+If you are bringing Ivo the lockbox and police are still looking for you,
+go back outside and lose pursuit before returning. The nightclub does
+not clear it. Bartender orders and room state are local to the visit.
 
 LINUX REQUIREMENTS
 A 64-bit x86-64 glibc desktop (glibc 2.34+) and the SDL2 runtime providing
@@ -28,7 +83,10 @@ Windows: %LOCALAPPDATA%/DeadChannel.
 Linux: $XDG_DATA_HOME/DeadChannel when XDG_DATA_HOME is absolute;
        otherwise ~/.local/share/DeadChannel.
 Both use the same career.dat, opening.dat and fresh-NNN.dat slots, with
-the same historical Rev2-9 import and Rev10 format. The package does
+the same historical Rev2-9 import and Rev10 format when no patches are
+stocked. A career with a stocked patch uses Rev11 (also 304 bytes). Only
+this edition and later compatible builds can open those stocked files.
+Using your last patch saves the career in compatible Rev10 again. The package does
 not migrate folders or sync devices. Close both copies and back up
 existing saves before copying the specific slots you want to transfer.
 The Linux save folder must be writable and support normal POSIX file

@@ -17,7 +17,8 @@ static void road_cover(void){
  int target=JOB_RIVAL_FIRST;
  peds[target]=(Ped){1024,1071,0,0,3,2,0,0,0};
  tick(FIRE);assert(peds[target].hp==3&&p.hp==100);
- assert(trailY==1024&&trailEndY>1036&&trailEndY<1046);
+ assert(trailY==firedPulse.my&&trailY>1024&&trailEndY>1036&&trailEndY<1046);
+ assert(trailX==firedPulse.mx&&trailEndY>=trailY);
  /* The visible trace stays where the shot happened even if we turn. */
  float tx=trailEndX,ty=trailEndY;tick(RIGHT);assert(tx==trailEndX&&ty==trailEndY);
  play(0,80);assert(p.hp==100&&street_foot_car_depth(cars+1,peds[target].x,peds[target].y,7)<.001f);

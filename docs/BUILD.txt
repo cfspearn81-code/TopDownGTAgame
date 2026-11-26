@@ -1,3 +1,55 @@
+Conversation hold verification: after building both hosts, run
+  DC_NPC_CASE=hold python3 scripts/qa/npc_keyboard_replay.py
+  python3 scripts/qa/npc_indoor_replay.py
+An optional DC_NPC_BITMAPS folder retains exact launcher crop captures.
+To reproduce the original bug, set DC_NPC_HOLD_BASELINE=1 and supply the
+previous Guide Hotfix source root as an argument to the hold replay.
+The sanitizer suite also runs src/npc_hold_test.c for stationary pose,
+release, in-place work and transit clocks, and unaffected other actors.
+
+Port Vanta Encounters verification: build both hosts, then run
+  python3 scripts/qa/npc_keyboard_replay.py
+  python3 scripts/qa/npc_indoor_replay.py
+The first replays the street dialogue, surrender, fight/drop and flight
+with actual keyboard input. Set DC_NPC_BITMAPS to retain RGB crops or
+DC_NPC_CASE to select one case (including guide). The second keeps the Vault 39 bar and its
+person interaction on the same route. scripts/test.sh runs independent
+greeting, distribution, room and gameplay sanitizer cases.
+
+Pistol depth and carry verification: build both hosts, then run
+  python3 scripts/qa/pulse_keyboard_replay.py
+These keyboard tapes exercise all eight facings, moving into a real
+wall and raising again, and the north-facing stride/recoil regression.
+Set DC_PULSE_CASE=north to run just the depth tape, and DC_PULSE_BITMAPS
+to a local directory for both clients' actual rendered crops. The
+sanitizer suite's src/pulse_pose_test.c also checks 1,080 head/hair
+comparisons and 768 separate direction/stride/recoil barrel renders.
+
+Med Patch Utility: run python3 scripts/qa/wheel_replay.py after both
+builds for native accessory placement, pointer and save verification.
+src/weapon_wheel_test.c adds geometry, label width and non-selection tests.
+
+Display hotfix verification:
+  bash scripts/build.sh
+  python3 scripts/qa/win_presentation.py
+The test executes the real PE entry point and records black-fill geometry
+at GDI calls. To compare with the original Weapon Wheel binary and its
+save outcome, append these three arguments: current.exe verify prior.exe.
+
+Weapon Wheel release verification:
+  bash scripts/build.sh
+  bash scripts/build-linux.sh
+  python3 scripts/qa/wheel_replay.py
+The test verifies actual wheel rendering, keyboard/mouse events, shop
+purchases and reloaded inventories on each host. The main sanitizer suite
+also runs src/weapon_wheel_test.c.
+
+Vault 39 release: after building both hosts, run
+  python3 scripts/qa/vault_keyboard_replay.py
+This drives both clients from matching disposable careers and validates
+gameplay and rendered stage crops. The stock sanitizer suite also runs
+src/vault39_test.c and the five rear room route checks.
+
 Dead Channel: build on x86-64 Linux
 
 Native Linux:

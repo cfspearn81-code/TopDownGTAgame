@@ -22,7 +22,9 @@ static void test_cards(void){
  assert(!touched(DAY_BADGE_X,16,DAY_BADGE_X+DAY_BADGE_W,16+DAY_BADGE_H,base));
  for(int col=0;col<2;col++){
   const GuideBinding*g=col?guideCareer:guideStreet;int keyw=col?113:141;
-  for(int i=0;i<7;i++){
+  int n=col?LEN(guideCareer):LEN(guideStreet),step=n>8?23:26;
+  assert(183+(n-1)*step+21<395); /* all rows finish above the legend */
+  for(int i=0;i<n;i++){
    assert(7+textw(g[i].key,0)+5<=keyw);
    assert(keyw+textw(g[i].action,0)<=367);
   }

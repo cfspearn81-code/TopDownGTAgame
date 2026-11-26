@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ ${DC_QA_BUILT:-0} == 1 ]] || bash scripts/build.sh
-for t in test profiles_test economy_test road_test visual_test interior_routes_test bank_ui_test; do
+for t in test profiles_test economy_test road_test visual_test interior_routes_test vault39_test weapon_wheel_test pulse_pose_test bank_ui_test npc_greetings_test npc_encounter_test npc_hold_test; do
   gcc -std=c11 -O1 -g -fsanitize=address,undefined,float-cast-overflow \
     -fno-omit-frame-pointer -fno-pie -no-pie "src/$t.c" -o "build/$t"
   ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 "./build/$t"

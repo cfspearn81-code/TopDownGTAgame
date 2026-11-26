@@ -11,7 +11,7 @@ typedef struct{
 } InteriorTheme;
 static const InteriorTheme int_themes[16]={
  {"MERCURY / NIGHT DESK","TIDE MARKET / 24-HOUR COURIER","Packages, fares and pay slips. Take a shift with Mara.","DISPATCH COUNTER","MRC",0x384644,0x263c49,0x82e5cb,0},
- {"VAULT 39 / LOWER LEVEL","TIDE MARKET / MEMBERS' LOUNGE","Ivo is taking meetings past the low couches.","IVO'S BOOTH","V39",0x393747,0x3b304e,0xf596c5,2},
+ {"VAULT 39","TIDE MARKET / NIGHTCLUB","DJ on the left. Mika is serving at the bar on the right.","MIKA / BAR","V39",0x393747,0x3b304e,0xf596c5,2},
  {"FERRY MARKET / TILL 02","TIDE MARKET / IMPORTS & PROVISIONS","Find June at the till for supplies and medical patches.","MARKET TILL","FRY",0x514332,0x3c4544,0xf3c97b,1},
  {"NIGHTGLASS / SHOW FLOOR","NIGHTGLASS / MOTORS & SERVICE","Shop the floor, then see Lex at the sales desk.","MOTOR SALES","NGM",0x303e5a,0x25334e,0x8fcdf5,1},
  {"LANTERN / HOUSEPLANTS","LANTERN WARD / FERN HOUSE","Talk to Nell at the register, or use the green door to the grow room.","NELL / REGISTER","LANTERN",0x6b5540,0x3b5748,0xcde7a8,0},
@@ -30,6 +30,7 @@ static const InteriorTheme int_themes[16]={
 static int interior_active_loc=-1,interior_nprop,interior_desk_x,interior_desk_y;
 static int interior_cache_loc=-2,interior_cache_status,interior_fade;
 static const InteriorTheme int_grow={"LANTERN / GROW ROOM","LANTERN WARD / PRODUCTION FLOOR","Start a batch at the terminal and watch the yield develop in the beds.","BATCH TERMINAL","GROW / 01",0x3c4d4c,0x343b53,0xbacff0,1};
+static const InteriorTheme int_vault={"IVO'S BACK ROOM","VAULT 39 / PRIVATE","Ivo is taking private meetings at the booth.","IVO'S BOOTH","V39 / REAR",0x47353d,0x373145,0xe4aeae,2};
 static const InteriorTheme int_staff[]={
  {"MERCURY / MAILROOM","MERCURY DISPATCH / STAFF ONLY","Use the settlement terminal to exchange game credits or check pending funds.","MAILROOM SETTLEMENT","RECORDS / MRC",0x495a56,0x294a52,0x83e6cc,1},
  {"FERRY / RECEIVING OFFICE","FERRY MARKET / STAFF ONLY","The till in Receiving handles settlement for this franchise.","RECEIVING SETTLEMENT","RECEIVING / FRY",0x695641,0x474b4e,0xf5ca8d,0},
@@ -52,6 +53,7 @@ static const InteriorTheme *interior_theme(int k){
   int li=legal_index_for_kind(k);
   if(li>=0&&li<LEN(int_staff))return int_staff+li;
   if(k==4)return &int_grow;
+  if(k==1)return &int_vault;
  }
  return k>=0&&k<LEN(int_themes)&&int_themes[k].banner?int_themes+k:int_themes;
 }
@@ -95,7 +97,7 @@ static int venue_limit(float y,int side){return venue_shell[venue_shell_id].edge
 typedef struct {int x,y,w,h;const char *label,*read;} Feature;
 static const Feature venue_feature[16]={
  {183,158,163,47,"CITY ROUTE BOARD","Route board: shifts start at Mara's desk. The purple GPS line leads to each stop."},
- {211,156,178,53,"DJ / TURNTABLES","The DJ drops the bass. Ivo handles private contracts in the booth across the dance floor."},
+ {211,156,178,53,"DJ / TURNTABLES","The DJ drops the bass. Mika serves house sodas at the bar."},
  {179,161,166,49,"TODAY'S CATCH","The iced catch came off the dawn ferry. June handles purchases at the till."},
  {240,151,146,54,"ENGINE CUTAWAY","Nightglass showroom: compare the display cars, then visit Lex for sales or repairs."},
  {514,297,98,40,"POTTING BENCH","Nell's potting bench is for the public shop. Follow the green staff door to the grow beds."},
@@ -116,6 +118,9 @@ static int int_feature_near(int k){
  const Feature*f=venue_feature+k;
  return d2(interior_x-f->x-f->w/2,interior_y-f->y-f->h-17)<32*32;
 }
+
+static int int_at_desk(void);
+#include "vault39.inc"
 
 static void int_layout_staff(int i,U a){
  // Desk at the head of an unblocked central aisle. Furnishings can be walked around.
@@ -141,7 +146,7 @@ static void int_layout_staff(int i,U a){
 static void int_layout(int k){
  interior_nprop=0;interior_left=k==13?237:146;interior_right=W-interior_left;
  const InteriorTheme*t=interior_theme(k);U a=t->neon;
- int li=legal_index_for_kind(k);venue_shell_id=interior_subroom?(li>=0?16+li:19):k;
+ int li=legal_index_for_kind(k);venue_shell_id=interior_subroom?(k==1?9:li>=0?16+li:19):k;
  if(interior_subroom&&li>=0){int_layout_staff(li,a);return;}
  if(!interior_subroom&&k>=0&&k<16&&venue_feature[k].label){const Feature*f=venue_feature+k;int_prop(INT_FEATURE,f->x,f->y,f->w,f->h,a);}
  switch(k){
@@ -150,13 +155,9 @@ static void int_layout(int k){
   int_prop(INT_SORTER,181,244,164,36,0x688c97);int_prop(INT_SOFA,250,312,92,40,0x86866c);
   int_prop(INT_CRATES,580,155,122,43,0xaf886d);int_prop(INT_LOCKER,646,228,60,48,0x718998);
   int_prop(INT_CRATES,593,321,146,49,0xaa8770);break;
- case 1: /* ground-level dance floor below a stepped stage and velvet booth */
-  int_counter(INT_DINER,548,222,163,40,a);
-  /* Leave a standing pocket on the booth's center line. A tall sprite
-     projects north of its feet and must not extend over the couch. */
-  int_prop(INT_SOFA,530,160,82,45,0x9e567d);
-  int_prop(INT_SOFA,198,308,127,38,0x7e5877);int_prop(INT_REEL,204,232,57,49,0xcc8dad);
-  int_prop(INT_WALL,394,152,10,58,0x826382);int_prop(INT_SOFA,556,309,114,39,0x765079);break;
+ case 1:
+  if(interior_subroom)v39_rear_plan(a);else v39_club_plan(a);
+  break;
  case 2: /* two aisles flanking the grocer's central walk, staff door behind */
   int_counter(INT_DESK,553,211,151,44,a);int_prop(INT_TRAY,176,237,166,34,0x9d9f6f);
   int_prop(INT_RACK,227,310,130,34,0xb8a273);int_prop(INT_COOLER,574,154,175,41,0x9ebeb2);
@@ -245,7 +246,7 @@ static void int_expire_fixture_notice(void){
 }
 static void open_interior(int n){
  if(n<0||n>=LEN(loc)||p.car>=0)return;
- int_expire_fixture_notice();interior_subroom=0;int_layout(loc[n].kind);interior_active_loc=n;interior_cache_loc=-2;
+ pulse_guard_reset();int_expire_fixture_notice();interior_subroom=0;if(loc[n].kind==1)v39_reset();int_layout(loc[n].kind);interior_active_loc=n;interior_cache_loc=-2;
  p.x=loc[n].x;p.y=loc[n].y;walking=0;interior_x=W/2;
  interior_y=loc[n].kind==13&&sv.intro==0?307:392;interior_a=-1.570796f;
  interior_cam_x=0;interior_cam_y=0;interior_fade=17;menu=-1;mapOn=0;scene=3;
@@ -266,17 +267,17 @@ static int lantern_terminal(void){return scene==3&&interior_active_loc==4&&inter
 static int int_at_chief(void){return d2(interior_x-CHIEF_X,interior_y-CHIEF_Y)<31*31;}
 static int int_at_custody(void){return d2(interior_x-CUSTODY_X,interior_y-CUSTODY_Y)<33*33;}
 static void int_switch_room(int k,int to){
- int_expire_fixture_notice();interior_subroom=to;int_layout(k);interior_cache_loc=-2;
+ pulse_guard_reset();int_expire_fixture_notice();if(k==1)v39_expire_caption(to?"Mika":"Ivo:");interior_subroom=to;int_layout(k);interior_cache_loc=-2;
  if(k==4){
   grow_seen_batches=sv.b[0].batches;grow_seen_stock=grow_stock_before_pack=warehouse_units(0);
   grow_pack_left=0.f;
  }
- interior_x=GROW_GATE_X;interior_y=to?393:169;
+ interior_x=k==1&&!to?V39_STAFF_X:GROW_GATE_X;interior_y=to?393:k==1?198:169;
  interior_a=to?-1.570796f:1.570796f;walking=0;
  interior_cam_x=0;interior_cam_y=0;interior_fade=12;
 }
 static void int_leave(void){
- int_expire_fixture_notice();
+ int_expire_fixture_notice();if(loc[interior_active_loc].kind==1)v39_expire_caption("Mika");
  shelterT=0;
  int intro=loc[interior_active_loc].kind==13&&sv.intro==0;
  p.a=-1.570796f;scene=1;menu=-1;interior_active_loc=-1;walking=0;
@@ -308,13 +309,24 @@ static void interior_tick(U keys,U tap){
  walking=x||y;if(walking){footcycle=wrap(footcycle+.25f*FOOT_PACE);interior_a=look(x,y);}
  if(!int_solid(interior_x+x*v,interior_y))interior_x+=x*v;
  if(!int_solid(interior_x,interior_y+y*v))interior_y+=y*v;
+ npc_stance(interior_x,interior_y,&interior_a);
+ pulse_guard_tick(3,interior_x,interior_y,interior_a,int_solid);
+ npc_attack(keys,interior_x,interior_y,interior_a);
+ npc_encounter_tick(dt);
+ if(scene!=3)return;
  interior_cam_x+=((interior_x-W/2)*.13f-interior_cam_x)*.11f;
  interior_cam_y+=((interior_y-282)*.08f-interior_cam_y)*.11f;
  p.secs+=dt;job_clock_tick(dt);
+ int k=loc[interior_active_loc].kind;
+ if((tap&USE)&&(keys&BRAKE)&&!int_at_door()&&!(k==1&&v39_staff_near())&&npc_open_near())tap&=~USE;
  if(vd_frame(keys,tap))tap&=~(USE|ENTER);
+ if(k==1&&!interior_subroom)v39_bar_tick();
+ npc_resume_room_actors();
  if(tap&USE){
-  int k=loc[interior_active_loc].kind,li=legal_index_for_kind(k);
+  int li=legal_index_for_kind(k);
   if(int_at_door()){if(interior_subroom)int_switch_room(k,0);else int_leave();return;}
+  if(k==1&&v39_staff_near()){int_switch_room(k,1);return;}
+  if(k==1&&!interior_subroom&&int_at_desk()){v39_order();return;}
   if(k==4&&int_at_grow_gate()){
    if(sv.b[0].own)int_switch_room(k,1);
    else tell("Grow room locked. Buy the property at the public counter.");
@@ -331,7 +343,9 @@ static void interior_tick(U keys,U tap){
    if(k==13){tell("Mara: Rent's due. Meet me at Mercury Dispatch for the first shift.");return;}
    if(li>=0&&interior_subroom){active(19+li);makeMenu();return;}
    if(!interior_job_drop(interior_active_loc)){active(k);makeMenu();}
+   return;
   }
+  npc_open_near();
  }
 }
 static void int_lamp(int x,int y,int rad,U color,int strength){
@@ -721,6 +735,7 @@ static void int_shell_edges(U wall,U a){
 }
 
 #include "named_sets.inc"
+#include "vault39_art.inc"
 
 static void int_static(void){
  const int n=interior_active_loc,k=loc[n].kind;
@@ -740,24 +755,25 @@ static void int_static(void){
  rect(l+7,109,ww+6,340,0x121a23);
  box(l,98,ww,348,0x25333f,0x829798);
  /* Backdrop and furniture art are baked only when this room or its ownership changes. */
- const NsFinish *finish=ns_finish+venue_shell_id;
- for(int y=145;y<433;y++)for(int x=venue_limit(y,0);x<venue_limit(y,1);x++)
-  dot(x,y,ns_floor_pixel(x,y,finish));
- ns_wall(venue_shell_id);
- int_facility_floor(k,a);
- ns_ground(venue_shell_id);
- ns_fixed_details(venue_shell_id);
+ if(k==1)vault39_backdrop(interior_subroom);
+ else{
+  const NsFinish *finish=ns_finish+venue_shell_id;
+  for(int y=145;y<433;y++)for(int x=venue_limit(y,0);x<venue_limit(y,1);x++)dot(x,y,ns_floor_pixel(x,y,finish));
+  ns_wall(venue_shell_id);int_facility_floor(k,a);ns_ground(venue_shell_id);ns_fixed_details(venue_shell_id);
+ }
  if(k==15){
-  person(CHIEF_X,175,0x8593ad,0,1.570796f,1,1);
-  person(418,162,0x75879f,0,1.570796f,1,2);
-  person(541,163,0x8697a5,0,1.570796f,1,3);
+  if(!npc_replaces(N_ACT_CHIEF))person(CHIEF_X,175,0x8593ad,0,1.570796f,1,1);
+  if(!npc_replaces(N_ACT_HQ1))person(418,162,0x75879f,0,1.570796f,1,2);
+  if(!npc_replaces(N_ACT_HQ2))person(541,163,0x8697a5,0,1.570796f,1,3);
  }
  for(int i=0;i<interior_nprop;i++){InteriorProp*f=interior_props+i;
-  if(k!=13&&!interior_subroom&&f->x+f->w/2==interior_desk_x&&f->y+f->h+25==interior_desk_y){
-    person(interior_desk_x,f->y-8,mix(a,0x55738a,3),0,1.570796f,0,k%5);
+  if(k!=13&&(k==1?interior_subroom:!interior_subroom)&&f->x+f->w/2==interior_desk_x&&f->y+f->h+25==interior_desk_y){
+    if(!npc_replaces((interior_subroom?N_ACT_REAR:N_ACT_FRONT)+n))person(interior_desk_x,f->y-8,mix(a,0x55738a,3),0,1.570796f,MODEL_STAFF,k%5);
   }
+  if(k==1&&vault39_prop(f,interior_subroom))continue;
   if(!ns_setpiece(f,k)&&!ns_furniture(f,k))int_draw_prop(f,k==4||k==5?status:-1);
  }
+ if(k==1)vault39_overlay(interior_subroom);
  /* Ambient signs are mounted on fixtures, not floating aisle text. Interaction
     hotspots, route hints and the staffed service name are retained by interior_paint. */
  if(k==5){box(338,391,139,25,0x243440,0x738696);center(408,392,status?"FACILITY ACTIVE":"LAB AVAILABLE",status?a:MUTED,0);}
@@ -847,7 +863,6 @@ static void interior_paint(void){
     if(x<interior_left-dx-2||x>interior_right-dx+5)line(x,y,x-2,y+5,0x29424c);}
   int_lamp(W/2-dx,435-dy,25,a,2+(int)(sn(anim*4.f)+1));
  }
- int x=(int)interior_x-dx,y=(int)interior_y-dy;
  int dock=W/2-dx,doorY=427-dy;
  // Cut-away roof silhouette dissolves, leaving the walls and street coordinates undisturbed.
  if(interior_fade>1&&!fastGfx){
@@ -863,7 +878,7 @@ static void interior_paint(void){
  }
  if(li>=0&&interior_subroom)int_staff_panel(li,dx,dy,a);
  mark(dock,doorY,6,int_at_door()?PAPER:a);
- center(dock,447-dy,interior_subroom?(k==4?"BACK TO STORE":"BACK TO PUBLIC COUNTER"):"EXIT TO STREET",a,0);
+ center(dock,447-dy,interior_subroom?(k==4?"BACK TO STORE":k==1?"BACK TO NIGHTCLUB":"BACK TO PUBLIC COUNTER"):"EXIT TO STREET",a,0);
  if(li>=0&&!interior_subroom){
   int own=sv.legit[li].owned;U gate=own?0x9ded83:0xff9390;
   mark(GROW_GATE_X-dx,GROW_GATE_Y-dy,6,int_at_staff_gate()?PAPER:gate);
@@ -887,22 +902,30 @@ static void interior_paint(void){
   const Feature *f=venue_feature+k;int cx=f->x+f->w/2-dx,cy=f->y+f->h-dy,lw=textw(f->label,0);
   box(cx-lw/2-4,cy,lw+8,19,0x27383e,0x68797a);center(cx,cy,f->label,a,0);
  }
- person(x,y,0xc6d979,walking?(int)(sn(footcycle)*5):0,interior_a,4,3);
+ if(k==1){vault39_live(interior_subroom,dx,dy);if(!interior_subroom)v39_actor_paint(dx,dy);}
+ npc_body_paint(dx,dy);
+ player_in_room(interior_x,interior_y,dx,dy,0xc6d979,player_gait(),interior_a,3,int_solid);
+ npc_room_trace(dx,dy);
  rect(0,0,W,81,0x111e28);rect(0,78,W,1,0x42616d);
  draw_day_clock(5);textat(DAY_BADGE_LABEL_X,10,t->line,a,0);int big=textw(t->banner,1)<610;textat(26,29,t->banner,PAPER,big);
  char v[84];
  rect(0,483,W,57,0x111e28);rect(0,483,W,1,0x456570);
- const int dropping=job.kind>=0&&job_venue()==n;
+ const int dropping=job.kind>=0&&job_venue()==n&&(k!=1||interior_subroom);
  const char *prompt="WASD / WALK   E / INTERACT   ESC / MENU";
- if(int_at_door())prompt=interior_subroom?(k==4?"E / RETURN TO STORE":"E / RETURN TO PUBLIC COUNTER"):"E / EXIT TO STREET";
+ if(int_at_door())prompt=interior_subroom?(k==4?"E / RETURN TO STORE":k==1?"E / RETURN TO NIGHTCLUB":"E / RETURN TO PUBLIC COUNTER"):"E / EXIT TO STREET";
+ else if(k==1&&v39_staff_near())prompt="E / EMPLOYEES ONLY";
+ else if(k==1&&!interior_subroom&&int_at_desk())prompt=v39.playerServed?"E / TAKE HOUSE SODA":v39.playerTick||v39.requested?"MIKA / ORDER IN PROGRESS":"E / TALK TO MIKA AT THE BAR";
  else if(k==4&&int_at_grow_gate())prompt=sv.b[0].own?"E / OPEN GROW ROOM":"GROW ROOM / OWNER ACCESS";
  else if(li>=0&&int_at_staff_gate())prompt=sv.legit[li].owned?"E / OPEN STAFF DOOR":"STAFF DOOR / FRANCHISE OWNERS ONLY";
  else if(k==15&&int_at_chief())prompt="E / SPEAK TO CHIEF RIVAS";
  else if(k==15&&int_at_custody())prompt="E / INSPECT CUSTODY GATE";
- else if(int_at_desk())prompt=k==13?"E / READ NOTE":li>=0&&interior_subroom?"E / USE ACCOUNT DESK":dropping&&job.kind==JOB_VAULT&&p.heat>0?"HANDOFF CLOSED / GO OUTSIDE AND LOSE PURSUIT":dropping?(job.kind==JOB_COURIER?"E / SIGN THE MANIFEST":"E / HAND OVER THE CARGO"):k==4&&interior_subroom?"E / OPERATE BATCH TERMINAL":"E / TALK AT THE COUNTER";
+ else if(int_at_desk())prompt=k==13?"E / READ NOTE":li>=0&&interior_subroom?"E / USE ACCOUNT DESK":dropping&&job.kind==JOB_VAULT&&p.heat>0?"HANDOFF CLOSED / GO OUTSIDE AND LOSE PURSUIT":dropping?(job.kind==JOB_COURIER?"E / SIGN THE MANIFEST":"E / HAND OVER THE CARGO"):k==4&&interior_subroom?"E / OPERATE BATCH TERMINAL":k==1?"E / TALK TO IVO":"E / TALK AT THE COUNTER";
  else if(int_feature_near(k))prompt="E / INSPECT FIXTURE";
+ else {const char*s=npc_prompt();if(s)prompt=s;}
  if(shelterT>0){fmt(v,"RESTING / SECONDS LEFT: ",(int)(shelterT+0.99f));textat(25,489,v,LIME,0);}
  else if(p.noticeT>0)textat(25,489,notice,notice_color(),0);
+ else if(job.kind==JOB_VAULT&&job.step==1&&k==1&&!interior_subroom)
+  textat(25,489,"Ivo is behind the Employees Only door past the bar.",PINK,0);
  else if(job.kind>=0){
   char*at=append(v,jobNames[job.kind]);if(!job_has_clock()){at=append(at,"  /  STOP ");at=number(at,job.step+1);at=append(at," OF ");number(at,job.total);}else{at=append(at,"  /  TIME LEFT: ");number(at,(int)job.time);}textat(25,489,v,job.kind<4?TEAL:PINK,0);
  }else textat(25,489,t->instruction,PAPER,0);

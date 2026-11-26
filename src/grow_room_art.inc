@@ -101,14 +101,18 @@ static void grow_handline(int x,int y,int handx,int handy,U sleeve){
 }
 static void grow_operator_art(const GrowBatch*v,int dx,int dy){
  const Business*b=sv.b;GrowPose a=grow_operator_pose(b,v,growth_fraction(0),grow_pack_left,anim);
- if(a.phase==GROW_OFF)return;
+ if(a.phase==GROW_OFF||npc_replaces(N_ACT_GROW))return;
  static const char*status[]={"","OPERATOR / ON STANDBY","OPERATOR / PLANTING","OPERATOR / WATERING",
   "OPERATOR / FERTILIZING","OPERATOR / HARVESTING","OPERATOR / PACKING","OPERATOR / RETURNING"};
  const U uniform=0xefad66, sleeve=0xc49263;
- int x=a.x-dx,y=a.y-dy;
+ float px=a.x,py=a.y,angle=a.angle;
+ int step=a.walk?(int)(sn(anim*(19.f*FOOT_PACE))*5):0;
+ int held=npc_present_pose(N_ACT_GROW,&px,&py,&angle,&step);
+ int x=(int)px-dx,y=(int)py-dy;
  int hands=(int)(2.f*sn(anim*8.f));
  float drop= grow_pack_left-GROW_RETURN_SECONDS;
- person(x,y,uniform,a.walk?(int)(sn(anim*(19.f*FOOT_PACE))*5):0,a.angle,1,0);
+ person(x,y,uniform,step,angle,MODEL_WORKER,0);
+ if(held)return;
  if(a.phase==GROW_PACK){
   int carryx=x+(int)(cs(a.angle)*8.f)-8,carryy=y+(int)(sn(a.angle)*5.f)-7;
   if(!a.walk&&a.angle==0.f){

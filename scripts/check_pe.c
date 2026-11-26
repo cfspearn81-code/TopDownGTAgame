@@ -31,7 +31,7 @@ static Q A key(int k){
   static const struct {int key;unsigned bit;} bindings[]={
    {'W',1},{'S',2},{'A',4},{'D',8},{'E',16},{0x20,32},{0x10,64},
    {0x1b,128},{'M',256},{0x74,512},{13,1024},{0x70,2048},{0x71,4096},
-   {0x72,8192},{0x73,16384},{'X',32768},{'T',65536},{0x2e,131072},{0x75,262144}
+   {0x72,8192},{0x73,16384},{'X',32768},{'T',65536},{0x2e,131072},{0x75,262144},{0x09,524288},{'V',1048576}
   };
   for(unsigned i=0;i<sizeof bindings/sizeof *bindings;i++)
    if(bindings[i].key==k)return (tourMask&bindings[i].bit)?0x8000:0;
@@ -58,7 +58,61 @@ static Q A ticks(void){
  }
  ms+=17;return ms;
 }
+/* Model actual GDI operations of frames drawn by the exact Windows entry.
+ * DC_PRESENT=observe exposes old full-client blanks without failing;
+ * DC_PRESENT=verify asserts all black fills are confined to the bars. */
+static int presentMode,presentOverlap,presentFills,presentCalls,presentWheels,presentArea;
+static int present_client(int *h);
+static int present_size_changed(void){return frame==19||frame==35||frame==51;}
+static int present_damage(void){return frame==37||frame==62;}
+static int present_client(int *h){
+ if(frame<19){*h=790;return 1300;}
+ if(frame<35){*h=815;return 1969;}
+ if(frame<51){*h=1080;return 1920;}
+ *h=791;return 1301;
+}
+static int present_peek(Msg*m){
+ static int sent=-1;
+ if(!presentMode||sent==frame||frame>=tourFrames)return 0;
+ int move=(frame>=6&&frame<=28)||(frame>=52&&frame<=59),msg=0;
+ if(present_size_changed())msg=5;
+ else if(present_damage())msg=15;
+ else if(frame==48)msg=0x02a3; /* Mouse left the window. */
+ else if(frame==41)msg=0x0008; /* Focus-loss message, with foreground still available. */
+ else if(move)msg=0x0200;
+ if(!msg)return 0;
+ sent=frame;memset(m,0,sizeof *m);m->w=(void*)1;m->msg=msg;
+ if(move){int h,w=present_client(&h);unsigned x=w/2+(frame%6)*7,y=frame%5?h/2:h/4;
+  m->lp=x+(y<<16);}
+ return 1;
+}
+static void present_view(int *x,int *y,int *w,int *h,int *fullw,int *fullh){
+ *fullw=present_client(fullh);*w=*fullw;*h=*fullh;
+ if(*w*540>*h*960)*w=*h*960/540;else *h=*w*540/960;
+ *x=(*fullw-*w)/2;*y=(*fullh-*h)/2;
+}
+static int A patblt(void*dc,int x,int y,int w,int h,D rop){
+ if(!presentMode)return 1;
+ int vx,vy,vw,vh,fw,fh;present_view(&vx,&vy,&vw,&vh,&fw,&fh);
+ assert(rop==0x42&&w>0&&h>0&&x>=0&&y>=0&&x+w<=fw&&y+h<=fh);
+ ++presentFills;presentArea+=w*h;
+ if(x<vx+vw&&x+w>vx&&y<vy+vh&&y+h>vy){
+  ++presentOverlap;
+  printf("GDI BLACKNESS crossed the viewport at frame %d: (%d,%d %dx%d)\n",frame,x,y,w,h);
+ }
+ return 1;
+}
+static void present_frame(int x,int y,int w,int h,const D*b){
+ int vx,vy,vw,vh,fw,fh;present_view(&vx,&vy,&vw,&vh,&fw,&fh);
+ assert(x==vx&&y==vy&&w==vw&&h==vh);
+ int refresh=frame==0||present_size_changed()||present_damage();
+ /* Bars aren't re-painted on simple cursor activity, even during the wheel. */
+ if(presentMode==2)assert(!presentOverlap&&presentArea==(refresh?fw*fh-vw*vh:0));
+ presentArea=0;presentCalls++;
+ if(b[67*960+480]==0x63d7cf||b[467*960+480]==0x63d7cf)presentWheels++;
+}
 static int A peek(Msg*m,void*w,D a,D b,D c){
+ if(present_peek(m))return 1;
  if(tourFrames){
   if(frame<tourFrames)return 0;
   memset(m,0,sizeof *m);m->msg=0x12;return 1;
@@ -86,7 +140,7 @@ static int A peek(Msg*m,void*w,D a,D b,D c){
  }
  if(frame<75)return 0;memset(m,0,sizeof *m);m->msg=0x12;return 1;
 }
-static int A rect(void*w,Rect*r){*r=pointerScenario==2?(Rect){0,0,1920,1080}:pointerScenario?(Rect){0,0,1300,790}:(Rect){0,0,960,540};return 1;}
+static int A rect(void*w,Rect*r){if(presentMode){int h,w=present_client(&h);*r=(Rect){0,0,w,h};return 1;}*r=pointerScenario==2?(Rect){0,0,1920,1080}:pointerScenario?(Rect){0,0,1300,790}:(Rect){0,0,960,540};return 1;}
 static Q A regcls(void*k){memcpy(&winproc,(char*)k+8,sizeof winproc);return 1;}
 static int64_t A dispatchMsg(Msg*m){assert(winproc);return winproc(m->w,m->msg,m->wp,m->lp);}
 static int pathslot(const S*p){
@@ -128,7 +182,8 @@ static int A replace(const S*a,const S*b,D f){
 }
 static int A draw(void*dc,int x,int y,int w,int h,int sx,int sy,int sw,int sh,const D *b,const void*fmt,D palette,D op){
  assert(sw==960&&sh==540&&op==0xcc0020);
- if(pointerScenario==2)assert(x==0&&y==0&&w==1920&&h==1080);
+ if(presentMode)present_frame(x,y,w,h,b);
+ else if(pointerScenario==2)assert(x==0&&y==0&&w==1920&&h==1080);
  else if(pointerScenario)assert(x==0&&y==29&&w==1300&&h==731);
  else assert(w==960&&h==540);
  frame++;
@@ -164,12 +219,13 @@ typedef struct{char*n;void*p;}Bind;
 static const Bind bind[]={
  {"LoadLibraryExW",load_radio},{"GetProcAddress",radio_proc},{"ExitProcess",die},{"GetTickCount64",ticks},{"GetEnvironmentVariableW",nil},{"GetAsyncKeyState",key},{"PeekMessageW",peek},
  {"GetClientRect",rect},{"CreateFileW",openfile},{"WriteFile",writefile},{"MoveFileExW",replace},{"DeleteFileW",removefile},{"StretchDIBits",draw},
- {"GetCurrentProcessId",ok},{"GetLastError",errorcode},{"PatBlt",ok},{"TrackMouseEvent",ok},{"GetModuleHandleW",ok},{"Sleep",nil},{"CreateDirectoryW",ok},{"ReadFile",readfile},{"CloseHandle",ok},{"RegisterClassExW",regcls},
+ {"GetCurrentProcessId",ok},{"GetLastError",errorcode},{"PatBlt",patblt},{"TrackMouseEvent",ok},{"GetModuleHandleW",ok},{"Sleep",nil},{"CreateDirectoryW",ok},{"ReadFile",readfile},{"CloseHandle",ok},{"RegisterClassExW",regcls},
  {"CreateWindowExW",ok},{"DefWindowProcW",nil},{"ShowWindow",ok},{"TranslateMessage",ok},{"DispatchMessageW",dispatchMsg},
  {"GetDC",ok},{"ReleaseDC",ok},{"LoadCursorW",ok},{"PostQuitMessage",nil},{"SetProcessDPIAware",ok},{"GetForegroundWindow",ok}
 };
 static D d(const unsigned char*a,size_t p){D x;memcpy(&x,a+p,4);return x;}static S s(const unsigned char*a,size_t p){S x;memcpy(&x,a+p,2);return x;}static Q q(const unsigned char*a,size_t p){Q x;memcpy(&x,a+p,8);return x;}
 int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("DC_OPENING");opening=mode?atoi(mode):0;mode=getenv("DC_POINTER");pointerScenario=mode?atoi(mode):0;deleteTest=getenv("DC_DELETE")!=0;atmTest=getenv("DC_ATM_TEST")!=0;if(argc==3&&!strcmp(argv[2],"--tour")){
+ const char *p=getenv("DC_PRESENT");if(p)presentMode=!strcmp(p,"verify")?2:1;
  loadCareer=getenv("DC_TRIP_LOAD");saveCareer=getenv("DC_TRIP_SAVE");
  if(getenv("DC_TRIP_SEED"))tourSeed=strtoul(getenv("DC_TRIP_SEED"),0,0);
  assert(scanf("%d %x",&tourFrames,&tourSaveHash)==2&&tourFrames>0);
@@ -185,6 +241,10 @@ int main(int argc,char**argv){assert(argc>=2&&argc<=4);const char *mode=getenv("
  if(!setjmp(jb)){typedef void (A *WinEntry)(void);WinEntry start=(WinEntry)(img+d(file,opt+16));start();assert(!"PE entrypoint returned unexpectedly");}
  assert(saved>0&&safeWrites==saved&&(!loadCareer||readCareer));
  if(tourFrames){
+  if(presentMode){
+   printf("GDI presentation: %d blits, %d black fills, %d overlaps, %d wheel frames.\n",presentCalls,presentFills,presentOverlap,presentWheels);
+   if(presentMode==2)assert(presentCalls==tourFrames&&presentFills>=4&&presentWheels>=6);
+  }
   assert(fsz[0]>=4);
   D actual=d(vdisk[0],fsz[0]-4);
   printf("Street tour: %d frames, %d atomic writes, final save %08x (expected %08x).\n",frame,safeWrites,actual,tourSaveHash);
