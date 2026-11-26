@@ -214,9 +214,9 @@ static void speed_and_stops(void){
   assert(cars[1].s==expected*.55f&&cars[1].cond==10);
  }
  start_drive(3,100);cars[2]=(Car){1390,1024,1.56f,0,1,0,100};
- for(int f=0;f<360&&cars[1].cond==100;f++){tick(UP);assert(!street_overlap(cars+1,cars+2));}
+ for(int f=0;f<360&&vehicle_hp(cars+1)==VEHICLE_CONDITION_MAX;f++){tick(UP);assert(!street_overlap(cars+1,cars+2));}
  const float top=oldCaps[3]*.55f;
- assert(cars[1].cond==100-cl((int)(top*top/1450),1,37)&&cars[1].s<0&&cars[1].x<1390);
+ assert(vehicle_hp(cars+1)==VEHICLE_CONDITION_MAX-2*cl((int)(top*top/1450),1,37)&&cars[1].s<0&&cars[1].x<1390);
 }
 static void circuit_steer_to(float x,float y,int stop){
  int car=p.car,condition=cars[car].cond;

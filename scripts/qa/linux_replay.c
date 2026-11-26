@@ -19,7 +19,7 @@ static unsigned unpinned;
 static const struct{int code;U mask;} binding[]={
  {SDL_SCANCODE_W,UP},{SDL_SCANCODE_S,DOWN},{SDL_SCANCODE_A,LEFT},{SDL_SCANCODE_D,RIGHT},
  {SDL_SCANCODE_E,USE},{SDL_SCANCODE_SPACE,FIRE},{SDL_SCANCODE_LSHIFT,BRAKE},
- {SDL_SCANCODE_ESCAPE,ESC},{SDL_SCANCODE_M,MAP},{SDL_SCANCODE_F6,ACTIVITIES},{SDL_SCANCODE_F5,SAVE},{SDL_SCANCODE_RETURN,ENTER},
+ {SDL_SCANCODE_ESCAPE,ESC},{SDL_SCANCODE_M,MAP},{SDL_SCANCODE_F6,ACTIVITIES},{SDL_SCANCODE_P,PHONE},{SDL_SCANCODE_F7,PHONE_ALT},{SDL_SCANCODE_C,CAMERA},{SDL_SCANCODE_L,LOADOUT},{SDL_SCANCODE_F8,ATLAS_WORLD},{SDL_SCANCODE_F5,SAVE},{SDL_SCANCODE_RETURN,ENTER},
  {SDL_SCANCODE_F1,HELP},{SDL_SCANCODE_F2,GFX},{SDL_SCANCODE_F3,SLOT},{SDL_SCANCODE_F4,NEW_SLOT},
  {SDL_SCANCODE_TAB,WHEEL},{SDL_SCANCODE_V,USE_PATCH},{SDL_SCANCODE_X,PUNCH},{SDL_SCANCODE_T,TAXI_NEXT},{SDL_SCANCODE_DELETE,DELETE_SLOT}
 };
@@ -191,7 +191,7 @@ void SDL_RenderPresent(SDL_Renderer *renderer){
 
 int SDL_QueueAudio(SDL_AudioDeviceID dev,const void *data,Uint32 n){
  int (*real)(SDL_AudioDeviceID,const void *,Uint32)=dlsym(RTLD_NEXT,"SDL_QueueAudio");
- assert(real&&n==112000);int result=real(dev,data,n);const char *path=getenv("DC_RADIO_CAPTURE");
+ assert(real&&(n==112000||n==40000));int result=real(dev,data,n);const char *path=getenv("DC_RADIO_CAPTURE");
  if(!result&&path){FILE *f=fopen(path,"ab");assert(f&&fwrite(data,1,n,f)==n&&!fclose(f));}
  return result;
 }

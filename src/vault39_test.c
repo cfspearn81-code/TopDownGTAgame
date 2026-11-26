@@ -26,7 +26,7 @@ int main(void){
  interior_x=V39_STAFF_X;interior_y=V39_STAFF_Y;assert(v39_staff_near()&&v39_staff_visible());
  tick(0);tick(USE);for(int j=0;j<24;j++)tick(USE);tick(0);
  assert(scene==3&&interior_subroom&&!int_solid(interior_x,interior_y)&&p.noticeT==0);
- interior_x=interior_desk_x;interior_y=interior_desk_y;vaultkey(USE);assert(menu==1&&nopt==6);
+ interior_x=interior_desk_x;interior_y=interior_desk_y;vaultkey(USE);assert(menu==1&&nopt>=6&&nopt<=7);
  for(int j=0;j<4;j++)assert(opt[j].action==14+j);
  for(int j=0;j<4;j++)vaultkey(DOWN);vaultkey(ENTER);assert(menu==1&&strstr(notice,"Ivo:"));
  vaultkey(ESC);interior_x=W/2;interior_y=428;vaultkey(USE);

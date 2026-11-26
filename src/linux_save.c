@@ -3,13 +3,15 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 
-static int dirfd=-1;
+static int dirfd=-1,lockfd=-1;
 static unsigned stage_sequence;
 static char save_name[16]="career.dat";
 
@@ -53,7 +55,18 @@ int linux_disk_init(void){
  if(dirfd>=0)close(dirfd);
  dirfd=fd;disk_slot(0);return 1;
 }
-void linux_disk_shutdown(void){if(dirfd>=0)close(dirfd);dirfd=-1;}
+int linux_disk_lock(void){
+ if(dirfd<0){errno=EBADF;return 0;}
+ if(lockfd>=0)return 1;
+ lockfd=openat(dirfd,".afterhours.lock",O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK,0600);
+ if(lockfd<0)return 0;
+ if(flock(lockfd,LOCK_EX|LOCK_NB)==0)return 1;
+ int saved=errno;close(lockfd);lockfd=-1;errno=saved;return 0;
+}
+void linux_disk_shutdown(void){
+ if(lockfd>=0)close(lockfd);lockfd=-1;
+ if(dirfd>=0)close(dirfd);dirfd=-1;
+}
 
 int disk_present(void){
  struct stat info;
@@ -117,5 +130,40 @@ static int write_slot(const void *bytes,unsigned size,int replace){
  if(ok)(void)fsync(dirfd);
  return ok;
 }
+/* Keep the verified prior-format bytes on the first expanded write. The
+ * filename includes the old checksum so a re-used slot never overwrites a
+ * previous career's backup. Hidden backups do not enter the slot browser. */
+int linux_disk_backup_upgrade(int stock_patches){
+ if(dirfd<0||!save_name[0])return 0;
+ int fd=openat(dirfd,save_name,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+ if(fd<0)return errno==ENOENT;
+ struct stat st;
+ if(fstat(fd,&st)||!S_ISREG(st.st_mode)){close(fd);return 0;}
+ if(st.st_size>304&&st.st_size!=1044){close(fd);return 0;}
+ uint32_t family=0;
+ if(st.st_size==1044){
+  if(pread(fd,&family,sizeof family,968)!=sizeof family){close(fd);return 0;}
+  if(family&0x80000000u){
+   unsigned char patches;uint32_t hybrid;
+   if(pread(fd,&patches,sizeof patches,267)!=sizeof patches||
+      pread(fd,&hybrid,sizeof hybrid,684)!=sizeof hybrid){close(fd);return 0;}
+   /* Old Base Village cannot read a stocked extension. Preserve the
+      existing compatibility backup only on the first such transition. */
+   if(!stock_patches||patches||(hybrid&0x80000000u)){close(fd);return 1;}
+  }
+ }
+ uint32_t header[2],digest;
+ int ok=st.st_size>=176&&pread(fd,header,sizeof header,0)==sizeof header&&
+        pread(fd,&digest,sizeof digest,st.st_size-4)==sizeof digest;
+ if(close(fd)||!ok||header[0]!=0x44433131u||header[1]<2||header[1]>11||(header[1]==11&&st.st_size!=1044&&st.st_size!=304))return 0;
+ char dest[60];
+ const char* label=header[1]!=11?"afterhours":st.st_size==1044&&!(family&0x80000000u)?"outerloop":"crossroads";
+ snprintf(dest,sizeof dest,".pre-%s-%s-r%u-%08x.bak",label,save_name,header[1],digest);
+ if(linkat(dirfd,save_name,dirfd,dest,0))return errno==EEXIST;
+ /* Failure here must not clobber the old record. */
+ if(fsync(dirfd)&&errno!=EINVAL&&errno!=ENOTSUP)return 0;
+ return 1;
+}
+int linux_disk_backup_legacy(void){return linux_disk_backup_upgrade(0);}
 int disk_write(const void *bytes,unsigned size){return write_slot(bytes,size,1);}
 int disk_create(const void *bytes,unsigned size){return write_slot(bytes,size,0);}

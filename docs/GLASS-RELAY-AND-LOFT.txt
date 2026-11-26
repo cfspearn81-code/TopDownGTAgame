@@ -1,0 +1,69 @@
+GLASS RELAY / GLASS CROWN / SIGNAL CART           PORT VANTA RESIDENT NOTES
+
+YOUR APARTMENT AND OTHER SAFEHOUSES
+At Apartment Four or the leased Breakwater Safehouse, press Enter in the
+main room to open private quarters. E in the original room still reads
+Mara's note or talks to Reed. Use left/right arrows to select a station.
+
+- Locker: Up/down selects a bin. E stores one, Space withdraws one. T swaps
+  between warehouse shelves and nine exact Glasshouse strain/grade slots.
+  A strain lot keeps its exact edition. Existing ungraded warehouse stock
+  still supports House or $3 clean Select shelving, and returns to bulk
+  upon withdrawal.
+- Residence: M pins the Glass Crown Sky Club (The Star Almanac). Buy the
+  $550 Breakwater Safehouse at Reed's desk first. At Glass Crown's lobby,
+  Enter opens the lease desk; E buys the penthouse for $640 clean cash.
+  All three residences share your private collection. The penthouse has a
+  different harbor view. At its Residence station, E buys a one-time $180
+  renovation: living reef wall, lit flooring, and improved recovery.
+- Bunk: short nap (2h), full sleep (8h), or wait out weather (4h). Rest
+  advances city time. Waiting guarantees a short clear interval. The bunk
+  is unavailable during a job or pursuit and resets refreshments.
+- Refreshments: Sunline has gold highlights, a brisk stride and a
+  bright jingle. Night Bell is a $5 virtual cocktail with cool edges, a mellow arpeggio
+  and weightier steps. A Glassleaf roll has teal curls, light footsteps
+  and soft chimes. T selects a Glasshouse strain and grade, E consumes
+  one matching in-game lot, and the player animates the action. These
+  are fictional game states. They overlap, then fade; familiarity makes
+  effects shorter. Quiet Reset clears all afterglow and familiarity.
+  Low FX suppresses particles, not the timer. Audio hardware is optional.
+- Display case: Up/down selects a cosmetic finish. E mounts a snapshot
+  of your active pulse frame, attachment, and cell hue; Space clears it.
+  M pins the Night Cart while it is open, or the cosmetic gallery when closed.
+
+THE GLASS RELAY
+Locker M pins the nearest aquarium. E enters its lobby. Enter opens the
+Glass Relay. Doors: Kelp Forest, Jelly Drift, Ray Lagoon and Shoal Walk.
+Ordinary lobby lights and photo assignments still work with E.
+  1. Use E to sign Inez's work order. Change viewing window with left/right.
+  2. Kelp Forest: press E when the gold wrasse crosses the brass brackets.
+  3. Jelly Drift: select each lamp and rotate it to match the engraved number.
+  4. Ray Lagoon: follow the three arrow marks to guide the kite ray.
+  5. Shoal Walk: use E to raise the shutter for a one-time $75 grant.
+  6. At the opened Shoal Walk, Space enters the promenade. Walk left/right
+     and use E at all four stops, including conversations with the keeper,
+     for a one-time $30 steward's stipend.
+Each completed restoration step is saved. Esc backs out of your current task.
+
+SIGNAL CART / FICTIONAL ARCADE PULSE EQUIPMENT
+Find the current street stop via the apartment display case or the Signal
+phone clue. The Night Cart opens at 19:00, closes at 05:00 and moves between
+four stops while open. Walk up to the parked van and press E on foot. Buy
+the basic pulse at Vanta Armory first. The daytime Signal Gallery is a
+separate ordinary storefront; opening it with Enter offers finishes only.
+At the van use left/right for catalogues, up/down to select, E to buy/equip.
+  * Finishes: cosmetic variations for the home display, no stat effect.
+  * Pulse frames: Ferry Prism balances span and capacity; Arc Seed favors
+    speed/capacity; Halo Bridge favors span/impact. Owning a frame lets
+    you equip it again for free. Space returns to the original Legacy Pulse.
+  * Attachments: default Stock glass, span-extending Iris arc, or Tide
+    capacitor for more charge capacity and a shorter beat.
+  * Charge cells: Chime (default), Bloom (booster, two charge units per
+    pulse), and Echo (stretched span, lower impact). E buys six and
+    selects that cell. Space tops up if stock exists.
+On foot the new HUD shows loaded charges plus reserve for your selected
+variant. L loads from reserve. One charge tool at a time can be active;
+a switch returns unspent charges to reserves. Firing and impact are
+arbitrary game-native pulse mechanics; there are no physical ammunition,
+weapon or procurement instructions. The existing unlimited-charge Legacy
+Pulse is unchanged when equipped.

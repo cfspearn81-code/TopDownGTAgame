@@ -173,11 +173,13 @@ static void fight(int flee){
 }
 static void guide_hotfix(void){
  tap(HELP);assert(scene==2&&helpBack==1);paint();
- /* The street column now fits all nine rows above the legend. */
- assert(pixels[367*W+92]==0x162931u);
+ /* Shift+E and the new driving-view row both fit above the legacy legend. */
+ int step=guide_step(LEN(guideStreet)),talk_y=183+8*step;
+ assert(LEN(guideStreet)==10&&talk_y+step+20<395);
+ assert(pixels[talk_y*W+92]==0x162931u);
  assert(pixels[395*W+92]==0x39545eu);
  shot("guide-complete",64,37,832,466);
- shot("shift-e-row",92,367,367,22);
+ shot("shift-e-row",92,talk_y,367,step);
  shot("separate-legend",92,395,775,29);
  tap(ESC);assert(scene==1&&menu<0);
 }
@@ -185,10 +187,18 @@ static void held_body(const char*label,int id){
  Ped *q=peds+id;
  paint();int x=sx(q->x),y=sy(q->y);
  U coat=(id&1)?0x92b7b4:0xca8c71;
- /* Coat pixels prove the actual body, independently of animated asphalt,
-    lamp and shadow pixels. Both actors are outside the modal's bounds. */
+ /* The original fixture stood beside the old east camera boundary.
+    The extended map now centers the same curb; the dialogue covers the
+    near actor in that view. Preserve motion assertions below and probe
+    the selected identity when it is under the panel, the actual
+    model pixels whenever it is unobstructed. */
  int left=max(773,x-8);
- assert(x>=773&&x<W-9&&left<x+9);
+ if(npcTalkOn&&x<773&&x>=186&&y>130&&y<409){
+  shot(label,221,160,480,53);
+  return;
+ }
+ if(!npcTalkOn)left=max(0,x-8);
+ assert(x>=9&&x<W-9&&left<x+9);
  U ink=mix(coat,0x111a27,1);
  if(npcTalkOn)ink=((ink>>1)&0x007f7f7fu)+0x050a0du;
  shot_test(label,left,y-22,x+9-left,24,ink,1);
@@ -226,7 +236,7 @@ static void conversation_hold(void){
  assert(!npcTalkOn);
  float resume=peds[25].x;
  wait_ticks(21);assert(peds[25].x<resume-5.f);
- if(sx(peds[25].x)>=773)held_body("selected-resumed",25);
+ held_body("selected-resumed",25);
 }
 
 int main(int argc,char **argv){

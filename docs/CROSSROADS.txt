@@ -1,0 +1,65 @@
+DEAD CHANNEL / PORT VANTA CROSSROADS
+Combined Conversation Hold + Outer Loop + Base Village
+
+Upstream compatibility: the Conversation Hold Hotfix at
+6e45643551538dcfcde018035619352c17ba0729 retains Vault 39, the
+Mika/Ivo service and rear room, public NPC hold, compact pistol
+pose, the weapon wheel/med patches, and Windows letterbox-only
+presentation. Those are not replacements for the Base Village
+strip club, Trap House, Motor Works, expanded map or Signal.
+
+L = reload the currently fitted arcade Pulse tool. Tab = weapon
+wheel and V = stocked med patch while the wheel is open. Both
+are separate from Signal (P/F7) and optional chase view (C).
+M = atlas; F8 from the atlas shows the expanded road network.
+
+Save compatibility:
+- Rev2–10 retain the established imports.
+- 304-byte Rev11 stores a nonzero med-patch count.
+- 1,044-byte Rev11 stores expanded features and may also contain a
+  med-patch count. It validates its full and base checksums.
+- Vendor gear, career, house, club, garage and inner/outer coordinates
+  use their original offsets. Older saves do not have to be copied
+  into an install folder or started over.
+- Keep a backup before moving this save to an older edition. Linux
+  automatically retains the original in a hidden compatibility backup
+  for the first relevant format change. Windows uses its established
+  atomic slot replacement but has no automatic downgrade backup.
+
+Both platforms come from this same source tree: run
+  bash scripts/build-linux.sh
+  bash scripts/build.sh
+and package with python3 scripts/package-crossroads.py.
+The active target names are Windows 11 x64 and Linux x86-64;
+the Linux build requires glibc 2.34 and SDL2.
+
+TEST RESULTS AND LIMITS
+- Native SDL suite: legacy 3,664-frame all-input opening (unchanged
+  digest), Rev2–10 loads, slot separation, letterbox input and F1.
+- Combined Base Village tests: fresh $0 club entry on one E, classic
+  lamp raster/palette, all five vehicle collisions and exact repair,
+  separate Bell Lane entrance, normal three-upgrade Trap House flow,
+  graded storage, saved rush timer, and a single clean-cash payout.
+- Both actual launchers matched Vault 39 service and NPC checkpoint
+  renders, weapon-wheel/med checks and original Pulse aim replays.
+  Windows met the letterbox test: 75 blits and no black fill touching
+  the logical viewport.
+- Exact real earlier ELF saves and real launchers tested: 304-byte
+  stocked Conversation Hold save; 1,044-byte Base Village property
+  save; patched 1,044-byte hybrid. Native Linux retained the exact
+  compact predecessor bytes in a one-time compatibility backup. The
+  exact PE loaded/re-saved all three within the Win32 test harness.
+- Linux was exercised through SDL2 software/dummy drivers. The
+  Win64 PE ran its actual entrypoint with simulated Win32 on Linux;
+  this is not a real Windows desktop, Wine, or hardware GPU test.
+- See scripts/test-base-village.sh, scripts/test.sh --tour,
+  scripts/qa/crossroads_saves.py and dual-host replay tests.
+
+Release executable SHA-256:
+a50ae41f84f020c02bcefdfaf4ee959aec628890ffb09ed776092b64186c6623  build/DeadChannel
+9ef9aa9094d5e5c53957b93fa2ca22c70ad5916b753cb20477bbfbe6bab2fa3c  build/DeadChannel.exe
+
+The 176-frame conversation-hold replay matched five checkpoints
+on both launchers and the exact same save. In the expanded camera
+view the dialog can cover the pedestrian, so that fixture checks
+the held selection in the dialog and the actor render after closing.

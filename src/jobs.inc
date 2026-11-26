@@ -287,7 +287,7 @@ static int job_use_street(void){
   if(p.car>=0)return 0;
   Car *van=cars+jobRide;
   if(!street_line_open(p.x,p.y,van->x,van->y,2))return 0;
-  van->cond=65;advanceJob();tell("Van running. Drive it to Dax's marked service bay.");
+  vehicle_set_health(van,65*3);advanceJob();tell("Van running. Drive it to Dax's marked service bay.");
   return 1;
  }
  if(p.car!=jobRide){

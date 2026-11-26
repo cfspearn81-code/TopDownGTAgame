@@ -1,0 +1,63 @@
+PORT VANTA OUTER LOOP | LINUX RELEASE QA
+
+Build: native 64-bit x86 Linux SDL2 ELF; no Wine or installer. To
+build from Source, use bash scripts/build-linux.sh. To run the Linux
+regression with isolated scratch saves, use bash scripts/test-linux.sh.
+SDL dummy video/audio paths and software framebuffers provide
+repeatable keyboard/mouse/render tests. They do not certify a physical
+audio device, every desktop launcher or a Windows distribution.
+The build needs glibc 2.34+ and a system SDL2 runtime.
+
+Legacy gameplay: the original 3,664-frame native keyboard tour still
+produces the original save digest. The baseline F1 help, letterbox
+mouse/input scaling, title and career controls, and Rev2–10 migration
+were exercised. The save harness checks concurrent-process writes and
+deletes, revision checksums, distinct slots and no overwrite on errors.
+
+City: 2,242 sample probes covered independently traceable connected
+outer roads, foot and vehicle hulls, linked atlas pins and the alternate
+road around Freight Parkway. Independent keyboard runs completed the
+Freight Parkway (dry), Glass Bluff (wet) and harbor (wet) approaches
+with 100 car condition. A native round trip retained their outer x/y
+within 0.01 world unit, with a non-overlapping car and safe legacy
+coordinates in the old save prefix. Test closures preserved car health.
+Actual collision traffic draws in both camera modes. Day counts and
+nightlife groups changed with the game clock.
+
+Camera and garage: real native C controls display an actual rendered
+perspective with rear and side of car; F2 shows overhead while retaining
+the C preference. Independent steering / braking / wall tests checked
+mirrored lag, acceleration pullback, settled camera and fixed HUD.
+Blufflight Five (16.7 s) and Harbour Spur (21.6 s) were driven with
+keyboard controls under race logic, both at 100 condition. Maintenance,
+installed options, held title classes, rare slots and recovery were
+tested with disposable careers.
+
+Integrated progression: a wet-night fixture took a typed timed lot
+from the cabinet through Signal to a delivery. The delivery-funded
+ledger conversion, not ordinary club receipts alone, made the prism
+mirrors affordable. Save/reload retained the selected chase camera,
+tune, deed, mirror and exact inventory/income state. Separate club QA
+covers the three VIP booths, distinct grade reservations, the lounge
+receipt and venue incidents. The newest optional cabaret scene is
+tested for default cancellation, wallet-only debit once, insufficient
+funds, animation, exit on Escape or mouse, automatic timeout and
+normal saved-state reload.
+
+Venues and sound: independent fixture exercised linked restoring
+aquarium tasks, walkable promenade, furnished penthouse, exact locker
+grades, licensed loadout and reserve charge, consumable effects,
+rotating shop, and wallet state through two Linux processes. All local
+radio sources produced distinct nonzero PCM. Native SDL input verified
+no external launch on first confirmation or cancellation, and exactly
+the official URL on confirmation (intercepted; no actual external
+account was accessed). No system integration with YouTube Music
+audio is claimed.
+
+Saves: original earlier-length slots and old Afterhours Rev11 bytes
+are backed up once before migration; failed/corrupt/neighboring slot
+fixtures preserve original files. The checksum beside this archive
+is for the whole package, not the internal career save.
+
+Exact staged ELF SHA-256:
+a8bcbc86d1494a4a43ac61c746c8b7850ba95800418023f21ce8953c081babe7

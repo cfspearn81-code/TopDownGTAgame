@@ -8,3 +8,5 @@ c47a954abb68e58c19418aab20a5c4fbc6a2fd36f3fcdb7d7c3e036b9eda9f55  Dead-Channel-C
 b362744cb9650a1b792019ca54f46a836ca0739f8e443df2049a68bdc113fac1  Dead-Channel-Port-Vanta-Sessions-Linux-x64.tar.gz
 2c1786dd6d7f8dff6be19cee195cc4dea4007c4da74d246949e3a830a829cb4e  Dead-Channel-Conversation-Hold-Hotfix-Windows-11-x64.zip
 04eedfda81ddebfa1da612af08e3d9ed95b509d127939d7617814dfe7dee06c9  Dead-Channel-Conversation-Hold-Hotfix-Linux-x64.tar.gz
+7433db6429bcf009a25187e3e6cf84dec049117a1073c8a6d28cf07a0303a48b  Dead-Channel-Port-Vanta-Crossroads-Windows-11-x64.zip
+f19cdf3dc4294c997e0045e1fa2365ff37f9ddb0433e193c53b96e85e45b9570  Dead-Channel-Port-Vanta-Crossroads-Linux-x64.tar.gz

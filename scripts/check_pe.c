@@ -14,7 +14,7 @@ typedef struct {void *w;D msg;Q wp;Q lp;D time;int x,y;D unused;}Msg;
 static int frame, saved, volume, delivered, menuFrame, safeWrites;static jmp_buf jb;
 static Q ms;static unsigned checksum,previous;static const char *loadCareer,*saveCareer;static int readCareer,opening,pointerScenario,pointerStage,pointerPx,pointerPy,clearedPx,createStage,creates;
 static int deleteTest,deleteStage,deleteCalls,atmTest,borderClick;
-static unsigned fsz[252],offset;static unsigned char vdisk[252][1024],pending[1024];static unsigned psize;static D status;static unsigned beforePin,afterPin,afterClear;
+static unsigned fsz[252],offset;static unsigned char vdisk[252][2048],pending[2048];static unsigned psize;static D status;static unsigned beforePin,afterPin,afterClear;
 #define A __attribute__((ms_abi))
 typedef int64_t (A *HostProc)(void*,D,Q,int64_t);static HostProc winproc;
 static Q A ok(void){return 1;}
@@ -31,7 +31,7 @@ static Q A key(int k){
   static const struct {int key;unsigned bit;} bindings[]={
    {'W',1},{'S',2},{'A',4},{'D',8},{'E',16},{0x20,32},{0x10,64},
    {0x1b,128},{'M',256},{0x74,512},{13,1024},{0x70,2048},{0x71,4096},
-   {0x72,8192},{0x73,16384},{'X',32768},{'T',65536},{0x2e,131072},{0x75,262144},{0x09,524288},{'V',1048576}
+   {0x72,8192},{0x73,16384},{'X',32768},{'T',65536},{0x2e,131072},{0x75,262144},{'P',524288},{0x76,1048576},{'C',2097152},{'L',4194304},{0x77,8388608},{0x09,16777216},{'V',33554432}
   };
   for(unsigned i=0;i<sizeof bindings/sizeof *bindings;i++)
    if(bindings[i].key==k)return (tourMask&bindings[i].bit)?0x8000:0;
@@ -169,7 +169,7 @@ static int A readfile(void*h,void*p,D n,D*g,void*over){
  *g=n<fsz[i]-offset?n:fsz[i]-offset;memcpy(p,vdisk[i]+offset,*g);offset+=*g;readCareer=1;return 1;
 }
 static int A writefile(void*h,const void*p,D n,D*g,void*over){
- assert((uintptr_t)h==400&&n>=128&&n<1024&&*(const D*)p==0x44433131);
+ assert((uintptr_t)h==400&&n>=128&&n<sizeof pending&&*(const D*)p==0x44433131);
  memcpy(pending,p,n);psize=*g=n;saved++;return 1;
 }
 static int A replace(const S*a,const S*b,D f){

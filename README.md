@@ -1,13 +1,25 @@
-# Dead Channel
+# Dead Channel | Port Vanta Crossroads
 
-An original top-down, single-player arcade crime sandbox for Windows 11 x64
-and x86-64 Linux, set in
-Port Vanta. This is not GTA, a GTA port, or a browser game. The city, art and
-code are original to this project; see the [bundled font license](docs/FONT-LICENSE.txt).
+An original top-down PC action and driving game. Crossroads combines the
+published Conversation Hold Hotfix with the expanded Outer Loop and
+Base Village. Both native launchers read **Dead Channel | Port Vanta Crossroads**.
 
-**Play the Conversation Hold Hotfix:** the Windows ZIP contains `DeadChannel.exe`; the native
-Linux tarball contains the executable `DeadChannel`. Extract the appropriate
-archive and run its executable. The title on both reads `Dead Channel | Conversation Hold Hotfix`.
+- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Port-Vanta-Crossroads-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
+- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Port-Vanta-Crossroads-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2 runtime.
+- [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt) · [Compatibility and testing](docs/CROSSROADS.txt).
+
+**Base Village:** Leave Apartment 4 and walk straight left to the pink
+Afterimage marquee. Press **E** to enter directly. Vault 39 is still its
+own nightclub with Mika's bar and Ivo's contracts. **P** opens Signal
+(**F7** if rebound); use Night Wire to pin the buyable, upgradable Trap
+House at Bell Lane. **Enter** at its side door.
+
+**Drive the Outer Loop:** **C** switches to the optional behind-car chase
+view, **M** opens the atlas and **F8** expands it to new coastal, hill and
+highway roads. Cars take one-third less collision damage at the same
+0–100 condition scale. Visit Nightglass Motor Works for parts and races.
+The original street-lamp look is restored; rain, fog and wet roads remain.
+
 After the first courier shift, press **F6** to open 17 city listings. Start with **Side B Before Sign-Off** at the DJ rack in Blue Hour Tram Hall. [City listings and controls](docs/CITY-LISTINGS.txt).
 
 Press **E** by a person to say hello, stay quiet, or rob them in-game.
@@ -23,9 +35,8 @@ free house soda; wait through the current customer's order and press **E**
 to take it. Ivo handles contracts past the bar, behind the recessed
 **Employees Only** door. People and vehicles have updated in-game models. See [Vault 39 controls](docs/START-HERE.txt).
 
-The Windows display fix removes black flashes caused by whole-window
-background fills. Extract the new ZIP and run its executable; your
-existing career and med patches are retained. Linux behavior is unchanged.
+The Windows display fix still limits black fills to letterbox bars. Existing
+careers, med patches, and Base Village ownership are supported.
 
 Hold **Tab** to open the weapon wheel. Point near fists or your owned
 pistol, then release **Tab** to equip. While holding **Tab**, press **V**
@@ -40,22 +51,18 @@ stays clear of your character's head through walking, sprinting and recoil. The 
 still moves with your stride and recoil, and the flash and street trace
 start at the visible barrel tip. At a wall or car, the pistol lowers
 beside your hip until you clear the obstacle. It will not fire while
-lowered. Rooms and cars remain non-firing.
+lowered. Cars do not allow firing; indoor firing only occurs in an active NPC fight.
 
 Press **E** to board or exit cars. **Enter** still confirms menus and boards trams.
 
-- **Windows:** [download the Windows 11 x64 ZIP](downloads/Dead-Channel-Conversation-Hold-Hotfix-Windows-11-x64.zip).
-- **Linux:** [download the Linux x86-64 tarball](downloads/Dead-Channel-Conversation-Hold-Hotfix-Linux-x64.tar.gz)
-  or build below. The package needs an x86-64 glibc desktop with glibc
-  **2.34 or newer** and the SDL2 runtime (`libSDL2-2.0.so.0`). It does not
-  need Wine, a browser, SDL headers, or an account. The ELF's measured
-  version floor is not a certification of every Linux distribution.
-
-[Verify downloads with SHA-256](downloads/SHA256SUMS.txt). The repository archives are byte-for-byte the
-same tested Windows and Linux packages delivered for this hotfix. Both executables run offline. See [platform-specific launch, controls and saves](docs/START-HERE.txt).
+Earlier download archives remain available, including the
+[Conversation Hold Windows ZIP](downloads/Dead-Channel-Conversation-Hold-Hotfix-Windows-11-x64.zip)
+and [Conversation Hold Linux archive](downloads/Dead-Channel-Conversation-Hold-Hotfix-Linux-x64.tar.gz).
+Both current launchers play offline; the optional official YouTube Music link
+opens the desktop browser, not an in-game stream.
 
 Create a character, start in Apartment 4 and take Mara's first courier job.
-Explore 78 enterable city buildings and five rear rooms. Earn clean cash
+Explore the original city, Base Village and the expanded Outer Loop. Earn clean cash
 from legal shifts and businesses, take street contracts, drive and repair cars,
 and use the atlas to pin destinations. The game tracks separate clean and dirty
 wallets, a protected bank balance, business stock, and a 24-minute game day.
@@ -81,7 +88,7 @@ bash scripts/test.sh --tour
 ```
 
 Outputs: `build/DeadChannel` and `build/DeadChannel.exe`. Both launchers use
-the same engine and Rev2–10 save reader. Windows saves use
+the same engine and support Rev2–10 plus both older Rev11 layouts. Windows saves use
 `%LOCALAPPDATA%/DeadChannel`; Linux saves use
 `${XDG_DATA_HOME:-$HOME/.local/share}/DeadChannel`. Close both builds and back up
 the target saves before copying between platforms. No automatic sync.
@@ -89,5 +96,6 @@ the target saves before copying between platforms. No automatic sync.
 Linux automated testing runs the exact ELF using SDL's software renderer and
 dummy video driver. Windows automated testing runs the exact PE with simulated
 Win32 on Linux. Interactive desktop/physical Windows testing remains open.
+Package the verified builds with `python3 scripts/package-crossroads.py`.
 Before publishing another build, update [HANDOFF.md](HANDOFF.md) for the next
 maintainer and verify the matching archives/checksums.

@@ -1,0 +1,61 @@
+THE AFTERIMAGE | PORT VANTA AFTER-HOURS CABARET
+
+1. The Afterimage Strip Club is in Base Village, straight west of Apartment 4.
+   From a new career, leave the apartment and walk left across one street.
+   Find the pink STRIP CLUB / THE AFTERIMAGE marquee; press E at its doorway
+   to enter directly. No missions, money, or nighttime requirement for entry.
+   The map and Signal's live-show and VIP posts pin this same entrance.
+   The old Shadow Stage Playhouse foyer also works: press E at that door,
+   then Enter in the foyer. The exit always returns to the door you used.
+
+2. WASD / arrows walk. Shift runs. E or Enter operates a nearby station.
+   Menus take Up / Down and E / Enter, or a click. Esc or right-click closes a
+   station. Esc on the floor pauses. F1 opens the field guide. The three original
+   synth records are distinct; they are generated, not streamed.
+
+3. On the floor, the DJ booth is left, the bar is right, and the stage is ahead.
+   Read the audience request at the DJ deck and select the matching record for
+   more guests. Hit the encore cue when the meter passes gold. The queue steward
+   is right of the exit. Read their incident report and choose the matching fix,
+   or brief the crew early. Fixing trouble preserves service and earnings.
+
+4. The left door goes to the box office. Approach the ledger and buy the venue
+   for $480 clean cash. Four drinks are included. Sets close every 45 active
+   seconds, including elsewhere in the city but not offline. Collect clean
+   proceeds from the till ($9,999 cap). The ledger breaks out ticket revenue,
+   drink and Top Shelf proceeds, the stage payment and door-staff costs.
+
+5. Available cover prices: open door $0, standard $3, premium $6. Premium cover
+   attracts fewer guests, especially below 65 reputation. The two paid
+   residencies bring new performers. Two bouncers prevent disturbances; they
+   cost $4 each per set. Prism mirrors and Aurora lights are visible fit-outs.
+   Restock up to four drinks ($3 each), or reset both cleanliness and service
+   with the $16 house crew. The lounge's linen cart cleans for free.
+
+6. The right door leads to the velvet lounge. Velvet, Mirage and Aurora are three
+   separate VIP booths. Approach each named booth, match its posted drink,
+   and optionally serve its exact Top Shelf order. The matched drink uses one
+   serving and yields an $8, $12 or $16 tip plus service and reputation. Premium
+   orders can only be served once per booth per set.
+
+7. Stock Top Shelf (grade A) Halo Moss, Prism Fern and Echo Bloom from the Signal
+   satchel at the stock cabinet. Each earns $18, $25 or $32 when matched.
+   Booth requests rotate as sets close. Correctly stocked booths can earn extra
+   even without personal service, provided there are house drinks. Lower
+   grades remain in the satchel. Legacy cabinet stock still sells as a house
+   reserve at the old $18 rate.
+
+8. The ledger's fictional exchange queues 40 marked credits for a $30 arcade
+   token. It clears at the next closing with till space and no open Revenue
+   case. A case holds the pending token; no additional deposit is taken until
+   the pending one clears. All stock, management, improvements, personal tips,
+   till funds and outstanding token state persist with the career.
+
+9. At any VIP booth, choose VIP lap dance for a short, costumed cabaret
+   performance. Confirm the $25 clean-cash fee or back out free. Once booked,
+   you can leave at any time with Esc or the Leave button. The fee is not
+   refunded. Booking does not affect business income or VIP stock.
+
+10. Matinees run all day. Headline sets from 20:00 to 04:59 draw a larger crowd
+   and a street queue. New costumes, mirrors and light effects do not change the
+   controls; low FX remains available.

@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory(prefix="dc-win-present-") as d:
  sp.run(['cc','-O2',r/'scripts/check_pe.c','-o',d/'pe'],check=True)
  sp.run(['cc','-O2','-I',r/'src',r/'scripts/qa/wheel_buy_plan.c','-o',d/'fixture'],check=True)
  sp.run([d/'fixture',d/'start.dat'],stdout=sp.DEVNULL,check=True)
- keys=[0]*75;keys[1]=1024;keys[10:17]=[524288]*7;keys[68]=512
+ keys=[0]*75;keys[1]=1024;keys[10:17]=[16777216]*7;keys[68]=512
  tape=(f'{len(keys)} 0\n'+''.join(f'{len(list(g))} {k}\n' for k,g in groupby(keys))).encode()
  env=dict(os.environ,DC_PRESENT=mode,DC_TRIP_LOAD=str(d/'start.dat'),DC_TRIP_SAVE=str(d/'end.dat'))
  sp.run([d/'pe',exe,'--tour'],env=env,input=tape,check=True,timeout=60)

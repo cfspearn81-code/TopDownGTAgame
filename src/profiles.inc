@@ -22,7 +22,7 @@ static int profile_page(void){return cardSelected/PROFILE_PAGE;}
 static void profiles_scan(void){
  cardCount=0;int selected=0;
 #if (defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)) && !defined(DC_TEST)
- Save held;cp(&held,&sv,sizeof sv);int loaded=wason;
+ Save held;NightSave heldNight;cp(&held,&sv,sizeof sv);cp(&heldNight,&nv,sizeof nv);int loaded=wason;
  for(int i=0;i<PROFILE_SLOTS;i++){
   disk_slot(i);if(!disk_present())continue;
   load_save();
@@ -32,7 +32,7 @@ static void profiles_scan(void){
   if(i==sideSlot)selected=cardCount;
   cardCount++;
  }
- cp(&sv,&held,sizeof sv);wason=loaded;disk_slot(sideSlot);
+ cp(&sv,&held,sizeof sv);cp(&nv,&heldNight,sizeof nv);wason=loaded;disk_slot(sideSlot);
 #else
  if(wason)cards[cardCount++]=(Card){.id=sideSlot,.status=1,.cash=sv.cash,.dirty=sv.dirty,.ticks=sv.playedTicks,.legacy=sv.legacyClock,.intro=sv.intro,.look=sv.look};
 #endif
@@ -69,7 +69,7 @@ static void profiles_open(int create){
  profiles_scan();if(create&&!profileError)new_profile();
 }
 static void profiles_activate(void){
- vd_reset();
+ vd_reset();night_world_reset();outer_life_reset();ng_reset();
  revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};
  sprintBest=0;end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
  navSlot=-1;walking=fn=deadAnim=saveFlash=0;punchFlash=crashFlash=0;lastCar=near=by=-1;
@@ -86,15 +86,15 @@ static void profiles_choose(void){
  if(!c->status){profileError="This file could not be loaded. It has not been changed.";return;}
  if(profileReturn&&sideSlot==c->id){scene=profileReturn;return;}
 #if (defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)) && !defined(DC_TEST)
- Save held;cp(&held,&sv,sizeof sv);int loaded=wason;
+ Save held;NightSave heldNight;cp(&held,&sv,sizeof sv);cp(&heldNight,&nv,sizeof nv);int loaded=wason;
  disk_slot(c->id);load_save();
- if(!wason){cp(&sv,&held,sizeof sv);wason=loaded;disk_slot(sideSlot);profiles_scan();profileError="This file could not be loaded. It has not been changed.";return;}
+ if(!wason){cp(&sv,&held,sizeof sv);cp(&nv,&heldNight,sizeof nv);wason=loaded;disk_slot(sideSlot);profiles_scan();profileError="This file could not be loaded. It has not been changed.";return;}
 #endif
  sideSlot=c->id;profiles_activate();
 }
 static void creator_commit(void){
  int oldSlot=sideSlot;
- Save held;cp(&held,&sv,sizeof sv);
+ Save held;NightSave heldNight;cp(&held,&sv,sizeof sv);cp(&heldNight,&nv,sizeof nv);
  starter_save();sv.look=draft;
  int len=sl(draftName);
  while(len>0&&draftName[len-1]==' ')len--;
@@ -111,7 +111,7 @@ static void creator_commit(void){
     * Continue only when the slot is now occupied, not on general I/O failure. */
    if(!disk_present())break;
  }
- if(id<0){disk_slot(oldSlot);cp(&sv,&held,sizeof sv);profileError="Could not write a new career. No existing save was replaced.";return;}
+ if(id<0){disk_slot(oldSlot);cp(&sv,&held,sizeof sv);cp(&nv,&heldNight,sizeof nv);profileError="Could not write a new career. No existing save was replaced.";return;}
  sideSlot=id;
 #else
  sideSlot=oldSlot+1;

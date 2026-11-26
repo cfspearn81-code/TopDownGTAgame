@@ -60,7 +60,7 @@ static const char *const wi_brand[]={"SALTMARSH","BLUE HOUR","LOW TIDE","HARBOUR
 static U wi_hash(U n){n=(n^(n>>16))*0x7feb352du;n=(n^(n>>15))*0x846ca68bu;return n^(n>>16);}
 static int wi_index(int b){return (b*7+4)%LEN(wiRoles);}
 static const char*storefront_sign(int i){return wiRoles[wi_index(i)].noun;}
-static int tram_hall(int b){return wiRoles[wi_index(b)].plan[0].t==WI_TIMETABLE;}
+static int tram_hall(int b){return b!=ncFrontId&&wiRoles[wi_index(b)].plan[0].t==WI_TIMETABLE;}
 static int tram_destination(int b){
  for(int offset=1;offset<nb;offset++){
   int stop=(b+offset)%nb;
@@ -72,7 +72,7 @@ static int contract_room(int kind,int x,int y,int exclude){
  int role=kind==JOB_VAULT?WI_PARCELS:WI_RADIO;
  int best=-1;float distance=ROOM*ROOM*2.f;
  for(int i=0;i<nb;i++){
-  if(i==exclude||!ordinaryDoorY[i]||wiRoles[wi_index(i)].plan[0].t!=role)continue;
+  if(i==exclude||i==ncFrontId||!ordinaryDoorY[i]||wiRoles[wi_index(i)].plan[0].t!=role)continue;
   float d=d2(x-ordinaryDoorX[i],y-ordinaryDoorY[i]);
   if(d<distance){best=i;distance=d;}
  }
@@ -80,6 +80,8 @@ static int contract_room(int kind,int x,int y,int exclude){
 }
 static const char*walkin_name(int b){
  if(b<0||b>=nb)return "STREET DOOR";
+ if(b==ncFrontId)return "THE AFTERIMAGE STRIP CLUB";
+ if(b==NIGHT_CLUB_LEGACY)return "SHADOW STAGE PLAYHOUSE";
  if(!wi_names[b][0]){char*q=append(wi_names[b],wi_brand[(b/LEN(wiRoles)+wi_index(b)*3)%LEN(wi_brand)]);q=append(q," ");append(q,wiRoles[wi_index(b)].noun);}
  return wi_names[b];
 }
@@ -165,7 +167,9 @@ static void wi_bake(void){
  center(W/2,b+8,"STREET EXIT",MUTED,0);surface=old;
 }
 static void walkin_open(int building){
+ if(building==ncFrontId&&night_club_open(building))return;
  if(building<0||building>=nb||buildings[building].w<=0||buildings[building].h<=0||zone_is_building(building))return;
+ if(night_garage_open(building)||night_venues_open(building))return;
  pulse_guard_reset();walkin_active=building;wi_layout(building);wi_x=W/2;wi_y=416;wi_angle=-1.570796f;walking=0;scene=4;menu=-1;mapOn=0;
  wi_bake();
 }

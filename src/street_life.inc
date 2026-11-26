@@ -54,6 +54,10 @@ static int street_clip_axis(float pos,float delta,float low,float high,float*t0,
 static int street_line_open(float x,float y,float tx,float ty,float radius){
  if(x<35||y<35||tx<35||ty<35||x>ROOM-36||y>ROOM-36||tx>ROOM-36||ty>ROOM-36)return 0;
  float dx=tx-x,dy=ty-y;
+ if(outer_is_new(x,y)||outer_is_new(tx,ty)){
+  int steps=1+(int)((absf(dx)+absf(dy))/4.f);
+  for(int i=0;i<=steps;i++)if(!outer_area(x+dx*i/steps,y+dy*i/steps,radius))return 0;
+ }
  for(int yy=cl((int)((dy<0?ty:y)-radius)/256,0,7);yy<=cl((int)((dy>0?ty:y)+radius)/256,0,7);yy++)
   for(int xx=cl((int)((dx<0?tx:x)-radius)/256,0,7);xx<=cl((int)((dx>0?tx:x)+radius)/256,0,7);xx++){
    const BlockScenery*block=scenery+yy*8+xx;
@@ -108,6 +112,16 @@ static float street_wall_depth(const Car*c){
  if(l<35)depth=35-l;if(t<35&&35-t>depth)depth=35-t;
  if(h>ROOM-36&&h-(ROOM-36)>depth)depth=h-(ROOM-36);
  if(b>ROOM-36&&b-(ROOM-36)>depth)depth=b-(ROOM-36);
+ if(outer_is_new(h,b)){
+  /* Historic inner-edge limits are now wide gates in the surveyed road.
+     Test the rotated hull perimeter instead of an axis-aligned proxy. */
+  for(int ui=-2;ui<=2;ui++)for(int vi=-2;vi<=2;vi++){
+   if(ui&&ui!=-2&&ui!=2&&vi&&vi!=-2&&vi!=2)continue;
+   float u=ui*STREET_HALF_L/2.f,v=vi*STREET_HALF_W/2.f;
+   float px=c->x+u*co-v*si,py=c->y+u*si+v*co;
+   if(!outer_onroad(px,py))depth=depth<1.f?1.f:depth;
+  }
+ }
  for(int yy=cl((int)t/256,0,7);yy<=cl((int)b/256,0,7);yy++)
   for(int xx=cl((int)l/256,0,7);xx<=cl((int)h/256,0,7);xx++){
    const BlockScenery*block=scenery+yy*8+xx;
@@ -129,6 +143,7 @@ static int street_hits_wall(const Car*c){return street_wall_depth(c)>0.f;}
 static int street_car_clear(int id,const Car*old,const Car*next){
  float penetration=street_wall_depth(next);
  if(penetration>0.f&&(!old||penetration+.001f>=street_wall_depth(old)))return 0;
+ if(!outer_vehicle_clear(old,next))return 0;
  for(int j=0;j<nc;j++){
   if(j==id||(j==0&&!sv.owned))continue;
   const Car*b=cars+j;
@@ -206,8 +221,8 @@ static int street_foot_move_clear(float x,float y){
  return street_step_past_cars(p.x,p.y,x,y,7.f);
 }
 static void street_player_step(float dx,float dy){
- if(dx&&street_foot_move_clear(p.x+dx,p.y))p.x+=dx;
- if(dy&&street_foot_move_clear(p.x,p.y+dy))p.y+=dy;
+ if(dx&&!night_phone_lane_stop(p.x,p.y,p.x+dx,p.y,8)&&street_foot_move_clear(p.x+dx,p.y))p.x+=dx;
+ if(dy&&!night_phone_lane_stop(p.x,p.y,p.x,p.y+dy,8)&&street_foot_move_clear(p.x,p.y+dy))p.y+=dy;
 }
 static int street_foot_clear(float x,float y,int ignore){
  return open_space(x,y)&&street_foot_car_clear(x,y,ignore,7.f);

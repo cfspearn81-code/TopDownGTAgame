@@ -22,7 +22,7 @@ static void discover(void){
  press(MAP);assert(mapOn);
  for(int i=0;i<LEN(bankAtms);i++){
   NavPoint door=nav_door(NAV_ATM_BASE+i);
-  int x=NAV_MAP_X+door.x*NAV_MAP_SIZE/ROOM,y=NAV_MAP_Y+door.y*NAV_MAP_SIZE/ROOM;
+  int x=NAV_MAP_X+door.x*NAV_MAP_SIZE/BASE_ROOM,y=NAV_MAP_Y+door.y*NAV_MAP_SIZE/BASE_ROOM;
   pointer_input(x,y,1);
   assert(navSelected==NAV_ATM_BASE+i&&navManualLoc==navSelected);
   paint();assert(navHasManual&&navGoalKind==3&&navCount>=2);

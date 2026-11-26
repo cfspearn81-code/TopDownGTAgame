@@ -1,0 +1,48 @@
+TRAP HOUSE / BELL LANE ANNEX
+============================
+
+By the east end of Bell Lane Tailors, southwest of Apartment Four.
+Open M for the atlas and select the gold house icon in Tide Market,
+or use Signal: P, Night Wire, @belllane / Trap House, Enter.
+F7 opens Signal instead if you previously selected that setting.
+Stand by the signed Trap House door on foot and press Enter.
+The original Bell Lane Tailors door still opens with E.
+
+BUY & BUILD
+Preview the Trap House for free. The deed is $480 in clean cash:
+select it once and then confirm with Enter or E. The purchase is
+independent of the Afterimage, Motor Works and Lantern Grow Loft.
+Escape closes a panel. WASD or arrows walk around the room. Press
+E at the labeled center Build & Deed workbench, or at another
+station to use it. Escape again returns to the street. Timed city
+jobs/listings must be completed or canceled before you enter.
+
+| Project        | Tier 1 | Tier 2 | What it changes                         |
+|----------------|--------|--------|-----------------------------------------|
+| Steel racks    | $90    | $160   | 9 base / 18 tier 1 / 27 tier 2 units.   |
+| Storm shutters | $110   | $195   | -$8 per tier from the local service fee.|
+| Dispatch relay | $140   | $220   | +$14 pay and -6s per tier; unlocks rush.|
+
+The shutters affect only the fictional district-attention surcharge on
+the legal service desk. They never change a pursuit or remove alerts.
+Each upgrade visibly adds hardware to the room.
+
+GRADED STOCKROOM
+At the left rack, select the exact strain and quality. E/Enter stores
+one unit from your satchel; Space withdraws one. This locker is separate
+from both Lantern and Apartment Four. No strain, grade or quantity is
+changed by moving stock. You cannot store beyond the current capacity.
+
+ELECTRONICS DISPATCH
+At the right desk, book a neighborhood electronics repair:
+Standard costs $14 and pays $49 after 26 seconds. The first relay tier
+unlocks rush: $30; base payout $82; base countdown 44 seconds. The relay
+adjusts payout and time as above. At high district attention a service
+surcharge applies until shutters reduce it. A booking never uses your
+strain shelf. Do other activities while it runs, or wait inside. Return
+to the same desk and select Claim completed payout. Cash is paid once.
+Game pause and Signal stop the countdown. F5 manually saves from inside.
+
+The deed, three construction levels, per-grade stock, dispatch countdown
+and completed count persist in previously-unused slots of the same native
+1,044-byte Rev11 format. Existing businesses and stock are unchanged.
