@@ -102,6 +102,31 @@ static void use_key_priority(void){
 
  puts("E boards, steals and exits; a held E does not bounce out. Enter ignores cars; jobs, doors and ATMs win overlaps.");
 }
+/* Vehicle staging must not make the user fight E's door priority. */
+static void direct_staging(void){
+ for(int action=0;action<3;action++){
+  reset_block();
+  int venue=action==0?0:action==1?6:3;
+  p.x=loc[venue].x;p.y=loc[venue].y;
+  int ride;
+  if(action<2){
+   beginJob(action==0?JOB_TAXI:JOB_SPRINT);ride=jobRide;assert(ride==nc-1);
+  }else{
+   sv.cash=200;active(3);doOpt(30);ride=0;assert(sv.owned&1);
+  }
+  assert(d2(cars[ride].x-p.x,cars[ride].y-p.y)>91.f*91.f);
+  for(int step=0;step<125&&p.car<0;step++){
+   StreetUse target=street_use_target(placeNear(),carNear());
+   if(target.kind==STREET_USE_CAR&&target.id==ride){tick(USE);break;}
+   float x=cars[ride].x-p.x,y=cars[ride].y-p.y;
+   U keys=(absf(x)>1&&absf(x)>absf(y)*.36f)?(x>0?RIGHT:LEFT):0;
+   if(absf(y)>1&&absf(y)>absf(x)*.36f)keys|=y>0?DOWN:UP;
+   tick(keys);
+  }
+  assert(p.car==ride);
+ }
+ puts("Direct E boarding for staged taxi, sprint and garage vehicles.");
+}
 static void start_drive(int model,int condition){
  reset_block();p.x=512;p.y=1002;
  cars[1]=(Car){512,1024,0,0,model,2,condition};
@@ -236,6 +261,6 @@ static void drive_the_recovery(void){
  puts("Stalled van restarted, driven to Dax's marked bay, stopped and handed over.");
 }
 int main(void){
- init_city();road_cover();brake_and_lights();use_key_priority();measure_foot_pace();speed_and_stops();drive_the_circuit();drive_the_recovery();
+ init_city();road_cover();brake_and_lights();use_key_priority();direct_staging();measure_foot_pace();speed_and_stops();drive_the_circuit();drive_the_recovery();
  puts("Road QA: obstruction-aware boarding and firefights, solid pursuers, fixed impact tracers, safe reload footing, input-driven braking/reverse lamps and 10,000 bounded tire marks passed.");
 }

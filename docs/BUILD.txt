@@ -1,22 +1,38 @@
-Rebuild the portable Windows game from a 64-bit Linux x86-64 host:
+Dead Channel: build on x86-64 Linux
+
+Native Linux:
+  bash scripts/build-linux.sh
+  bash scripts/test-linux.sh
+Output: build/DeadChannel, an x86-64 ELF PIE. GCC builds with the system
+SDL2 SDK when it is present and declared by pkg-config; otherwise it uses
+the minimal SDL2 x86-64 C ABI declarations and the installed runtime
+SONAME libSDL2-2.0.so.0. The distributed ELF's strongest GLIBC symbol
+requirement is GLIBC_2.34. Never claim all distros are supported just from
+that floor. The test script uses Python 3 and SDL2's dummy video renderer.
+
+Windows x64 cross-build:
   bash scripts/build.sh
-
-Requires GCC, Python 3 and GNU binutils with i386pep support. The linked
-Windows executable is build/DeadChannel.exe. The generated font include is
-provided. Regenerating it separately requires Pillow and DejaVu fonts.
-
-Engine regression:
-  gcc -O2 -g -fsanitize=address,undefined -o build/test src/test.c
-  ASAN_OPTIONS=detect_leaks=0 ./build/test
-
-Win32-ABI executable smoke test (stubbed Win32 on Linux, not Wine):
-  gcc -O2 -o build/check_pe scripts/check_pe.c
-  ./build/check_pe build/DeadChannel.exe
-
-Full keyboard tour, including the exact Windows executable:
   bash scripts/test.sh --tour
-Extended sanitizer soak (48 starting contexts):
-  bash scripts/test.sh --extended
-The tour uses gzip to stream scripts/qa/street-tour.txt.gz into check_pe.
-The first line contains the frame count and expected final save checksum.
-The remaining lines contain a run length and the game's integer key mask.
+Output: build/DeadChannel.exe. Requires GCC, Python 3 and GNU binutils
+with i386pep support. The executable is exercised through simulated Win32
+on Linux; this is not Wine or a physical Windows test.
+
+Both hosts run the same fixed-step C engine. Do not compile the .inc
+files separately. The generated font include is provided; regenerating
+it separately requires Pillow and DejaVu fonts. Changing shared host
+declarations or save layout requires both platforms' regressions.
+
+The original Easy Entry Hotfix regression tour uses scripts/qa/curb-access-tour.txt.gz. The first
+line is the frame count and explicit-save digest, then each line is a
+run length and key mask. The Linux test captures before normal quit so
+the explicit F5 save can match the Windows test byte for byte, and then
+checks the final on-close save independently.
+
+Release checks: bash scripts/test-city-listings.sh runs focused activity tests.
+bash scripts/test-verdict-core.sh builds both launchers and replays five A1
+journeys against the native Linux and simulated Windows entry points.
+After both hosts and their stock QA drivers have been built:
+  python3 scripts/qa/explore_client_replay.py .
+  python3 scripts/qa/verdict_city_replay.py
+The latter uses the six synthetic news tapes from test-city-listings.sh.
+For deterministic packaging, run python3 scripts/package-release.py.

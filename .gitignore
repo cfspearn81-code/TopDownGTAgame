@@ -1,8 +1,7 @@
 /build/
-/dist/
-*.dat
-*.tmp
-*.obj
-*.o
-*.ppm
+/downloads/*.zip
+/downloads/*.tar.gz
 __pycache__/
+*.pyc
+*.orig
+*.rej

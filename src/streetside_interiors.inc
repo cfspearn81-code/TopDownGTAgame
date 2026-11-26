@@ -169,14 +169,23 @@ static void walkin_open(int building){
  walkin_active=building;wi_layout(building);wi_x=W/2;wi_y=416;wi_angle=-1.570796f;walking=0;scene=4;menu=-1;mapOn=0;
  wi_bake();
 }
+/* One ticket rule shared by gate, departure board and atlas. */
+static const char*tram_block(void){
+ if(p.heat>0)return "CLOSED: go outside and lose pursuit.";
+ if(job.kind==JOB_TAXI&&taxi.phase>=TAXI_BOARDING&&taxi.phase<=TAXI_EXITING)return "CLOSED: finish your passenger fare.";
+ if(job.kind>=0)return "CLOSED: finish or abandon your contract.";
+ if(vdActive>=0&&!a1_can_ride())return "CLOSED: finish or close your listing.";
+ if(sv.cash<5)return "SHORT FARE: need $5 clean cash on hand.";
+ return 0;
+}
 static void tram_board(void){
  int destination=tram_destination(walkin_active);
  if(destination<0)return;
- if(job.kind>=0){tell("Finish or abandon the active contract before boarding.");return;}
- if(p.heat>0){tell("The tram gates are closed to riders in pursuit.");return;}
- if(sv.cash<5){tell("A tram ticket costs $5 clean cash.");return;}
+ const char*blocked=tram_block();
+ if(blocked){tell(blocked);return;}
  sv.cash-=5;p.x=ordinaryDoorX[destination];p.y=ordinaryDoorY[destination];
- walkin_open(destination);tell("Arrived. Exit to the street.");request_save();
+ int parked=sv.owned&&d2(cars[0].x-ordinaryDoorX[walkin_active],cars[0].y-ordinaryDoorY[walkin_active])<230.f*230.f;
+ walkin_open(destination);tell(parked?"Arrived. Your car stays at the departure end this session; M shows its marker.":"Arrived. Exit to the street. Your $5 ticket was paid from clean cash.");request_save();
 }
 static void walkin_tick(U keys,U tap){
  if(walkin_active<0||walkin_active>=nb){scene=1;return;}
@@ -192,6 +201,7 @@ static void walkin_tick(U keys,U tap){
  if(!wi_solid(wi_x+x*v,wi_y))wi_x+=x*v;
  if(!wi_solid(wi_x,wi_y+y*v))wi_y+=y*v;
  p.secs+=dt;job_clock_tick(dt);
+ if(vd_frame(keys,tap))tap&=~(USE|ENTER);
  if((tap&ENTER)&&tram_hall(walkin_active)&&wi_at_station()&&!wi_at_door()){tram_board();return;}
  if(tap&USE){
   if(wi_at_door()){if(storefrontCaption){p.noticeT=0;storefrontCaption=0;}
@@ -221,22 +231,29 @@ static void wi_title(const char*s,U color){
 }
 static void walkin_paint(void){
  if(walkin_active<0||walkin_active>=nb)return;
- const WiRole*r=wiRoles+wi_role;Building*b=buildings+walkin_active;
+ const WiRole*r=wiRoles+wi_role;
  /* Tight copy compiles to vector stores; the heavy scenery bakes once per visit. */
  for(int i=0;i<W*H;i++)pixels[i]=wi_back[i];
  person((int)wi_x,(int)wi_y,0x56baae,walking?(int)(sn(footcycle)*4):0,wi_angle,4,1);
- char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,district(b->x,b->y));q=append(q,"   /   ");append(q,r->section);
+ char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,venue_address(walkin_active));q=append(q,"   /   ");append(q,r->section);
  draw_day_clock(5);textat(DAY_BADGE_LABEL_X,9,ad,MUTED,0);wi_title(walkin_name(walkin_active),r->accent);draw_wallet(W-291,10,270);
  const InteriorProp*f=wi_f;int sx=f->x+f->w/2,sy=f->y-10;
  const char *task=job_room_action(walkin_active);
  U marker=task?PINK:r->accent;
  if(wi_at_station()){disc(sx,sy,10,0x23343d);center(sx,sy-10,"E",marker,0);}
  else{disc(sx,sy,4,DARK);disc(sx,sy,2,marker);}
+ if(tram_hall(walkin_active)){
+  int to=tram_destination(walkin_active);const char*blocked=tram_block();char card[147];
+  char*end=append(card,walkin_name(walkin_active));end=append(end,"  >  ");append(end,walkin_name(to));
+  box(19,132,730,68,0x16242b,0x837b60);textat(30,133,card,GOLD,0);
+  textat(30,154,to==69?"LANTERN WARD / West seawall, near West Wind Bakehouse":"EAST FREIGHT / East freight grid, near Wrecker Yard",PAPER,0);
+  end=append(card,"$5 CLEAN CASH   /   ");append(end,blocked?blocked:"OPEN: use ENTER at the departures board.");textat(30,175,card,blocked?PINK:TEAL,0);
+ }
  rect(16,477,W-32,1,0x475a65);
  const char*hint=wi_at_door()?"Return to street":
-     wi_at_station()?(task?task:tram_hall(walkin_active)?"Departures    [ENTER] Ride tram / $5 clean":r->action):task?job_objective():"Walk to the lit station";
+     wi_at_station()?(task?task:tram_hall(walkin_active)?(tram_block()?tram_block():"Departures    [ENTER] Ride tram / $5 clean cash"):r->action):task?job_objective():"Walk to the lit station";
  if(!wi_at_door()&&!wi_at_station()&&wi_at_plaque())hint="Read the address plaque";
  textat(23,484,(wi_at_station()||wi_at_door()||wi_at_plaque())?"[E]":"WASD",r->accent,0);textat(81,484,hint,PAPER,0);
  if(p.noticeT>0)textat(23,509,notice,notice_color(),0);else if(saveFlash>0)textat(23,509,"Saved.",CASH_GREEN,0);else if(saveFlash<0)textat(23,509,"Save failed.",CASH_RED,0);
- if(menu>=0){paint_active_menu();draw_wallet(W-291,10,270);}
+ if(menu>=0&&scene!=2){paint_active_menu();draw_wallet(W-291,10,270);}
 }

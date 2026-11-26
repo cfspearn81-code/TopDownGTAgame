@@ -21,7 +21,7 @@ static void confirm_delete(void);
 static int profile_page(void){return cardSelected/PROFILE_PAGE;}
 static void profiles_scan(void){
  cardCount=0;int selected=0;
-#if defined(_WIN_NATIVE) && !defined(DC_TEST)
+#if (defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)) && !defined(DC_TEST)
  Save held;cp(&held,&sv,sizeof sv);int loaded=wason;
  for(int i=0;i<PROFILE_SLOTS;i++){
   disk_slot(i);if(!disk_present())continue;
@@ -48,7 +48,7 @@ static void confirm_delete(void){
  deleteOpen=deleteArmed=0;
  if(profileReturn&&deleteCard.id==sideSlot)return;
  int ok=0;
-#if defined(_WIN_NATIVE) && !defined(DC_TEST)
+#if (defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)) && !defined(DC_TEST)
  disk_slot(deleteCard.id);ok=disk_delete();disk_slot(sideSlot);
 #else
  if(deleteCard.id==sideSlot){wason=0;ok=1;}
@@ -69,12 +69,13 @@ static void profiles_open(int create){
  profiles_scan();if(create&&!profileError)new_profile();
 }
 static void profiles_activate(void){
+ vd_reset();
  revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};
  sprintBest=0;end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
  navSlot=-1;walking=fn=deadAnim=saveFlash=0;punchFlash=crashFlash=0;lastCar=near=by=-1;
  lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;menu=-1;mapOn=0;profileReturn=0;profileError=0;
  if(sv.intro==0)open_interior(12);
- else{scene=1;tell(sv.intro<3?"FIRST SHIFT: follow the purple route to Mercury Dispatch.":"Career loaded. Press M to pick a destination.");}
+ else{scene=1;tell(sv.intro<3?"FIRST SHIFT: follow the purple route to Mercury Dispatch.":sv.owned?"Career loaded. Your registered car is marked on the atlas (M, then T).":"Career loaded. Press M for the atlas, F6 for city listings.");}
  bank_ui_reset();
 }
 static void profiles_choose(void){
@@ -84,7 +85,7 @@ static void profiles_choose(void){
  Card *c=cards+cardSelected;
  if(!c->status){profileError="This file could not be loaded. It has not been changed.";return;}
  if(profileReturn&&sideSlot==c->id){scene=profileReturn;return;}
-#if defined(_WIN_NATIVE) && !defined(DC_TEST)
+#if (defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)) && !defined(DC_TEST)
  Save held;cp(&held,&sv,sizeof sv);int loaded=wason;
  disk_slot(c->id);load_save();
  if(!wason){cp(&sv,&held,sizeof sv);wason=loaded;disk_slot(sideSlot);profiles_scan();profileError="This file could not be loaded. It has not been changed.";return;}
@@ -100,7 +101,7 @@ static void creator_commit(void){
  int start=0;while(start<len&&draftName[start]==' ')start++;
  if(start==len)append(sv.name,"Vanta Local");else cp(sv.name,draftName+start,len-start);
  sv.hash=savehash();
-#if defined(_WIN_NATIVE) && !defined(DC_TEST)
+#if (defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)) && !defined(DC_TEST)
  int id=-1;
  for(int i=0;i<PROFILE_SLOTS;i++){
    if(i==1)continue; /* Historical side-career path is load-only unless it already exists. */

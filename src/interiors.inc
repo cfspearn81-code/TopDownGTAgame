@@ -311,6 +311,7 @@ static void interior_tick(U keys,U tap){
  interior_cam_x+=((interior_x-W/2)*.13f-interior_cam_x)*.11f;
  interior_cam_y+=((interior_y-282)*.08f-interior_cam_y)*.11f;
  p.secs+=dt;job_clock_tick(dt);
+ if(vd_frame(keys,tap))tap&=~(USE|ENTER);
  if(tap&USE){
   int k=loc[interior_active_loc].kind,li=legal_index_for_kind(k);
   if(int_at_door()){if(interior_subroom)int_switch_room(k,0);else int_leave();return;}
@@ -898,7 +899,7 @@ static void interior_paint(void){
  else if(li>=0&&int_at_staff_gate())prompt=sv.legit[li].owned?"E / OPEN STAFF DOOR":"STAFF DOOR / FRANCHISE OWNERS ONLY";
  else if(k==15&&int_at_chief())prompt="E / SPEAK TO CHIEF RIVAS";
  else if(k==15&&int_at_custody())prompt="E / INSPECT CUSTODY GATE";
- else if(int_at_desk())prompt=k==13?"E / READ NOTE":li>=0&&interior_subroom?"E / USE ACCOUNT DESK":dropping?(job.kind==JOB_COURIER?"E / SIGN THE MANIFEST":"E / HAND OVER THE CARGO"):k==4&&interior_subroom?"E / OPERATE BATCH TERMINAL":"E / TALK AT THE COUNTER";
+ else if(int_at_desk())prompt=k==13?"E / READ NOTE":li>=0&&interior_subroom?"E / USE ACCOUNT DESK":dropping&&job.kind==JOB_VAULT&&p.heat>0?"HANDOFF CLOSED / GO OUTSIDE AND LOSE PURSUIT":dropping?(job.kind==JOB_COURIER?"E / SIGN THE MANIFEST":"E / HAND OVER THE CARGO"):k==4&&interior_subroom?"E / OPERATE BATCH TERMINAL":"E / TALK AT THE COUNTER";
  else if(int_feature_near(k))prompt="E / INSPECT FIXTURE";
  if(shelterT>0){fmt(v,"RESTING / SECONDS LEFT: ",(int)(shelterT+0.99f));textat(25,489,v,LIME,0);}
  else if(p.noticeT>0)textat(25,489,notice,notice_color(),0);
@@ -907,7 +908,7 @@ static void interior_paint(void){
  }else textat(25,489,t->instruction,PAPER,0);
  textat(25,514,prompt,a,0);
  if(saveFlash)textat(830,512,saveFlash>0?"SAVED":"SAVE ERROR",saveFlash>0?TEAL:PINK,0);
- if(menu>=0)paint_active_menu();
+ if(menu>=0&&scene!=2)paint_active_menu();
  draw_wallet(650,7,294);
 }
 static void interior_facade(int n){

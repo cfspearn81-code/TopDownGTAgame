@@ -1,3 +1,119 @@
+PORT VANTA SESSIONS | RELEASE VERIFICATION
+==========================================
+Test careers were generated in temporary directories, not real player saves.
+Both games use the Easy Entry Hotfix layout (304 bytes, Rev10) and old loaders.
+
+TESTED BINARIES
+ Windows PE x64: c73d1ee44dcc90b7dc1ef8aee44d873c74a24711712cec9483755ff9c7daf4c6
+ Linux ELF x64:  0ab8f798a7eaeed4f984766a5e3f57f747c77fb8d6e8f99a755dc2018a62768c
+
+CITY LISTINGS | WHAT WAS EXERCISED
+- A1 Side B: five keyboard journeys per actual executable, starting at Blue
+  Hour. At $0 and $4, boarding was refused without debiting any wallet;
+  walking to the studio paid $95 once. With $5, the tram debited $5 and the
+  broadcast paid the same $95. Covered both sleeves, early and late,
+  a held boarding key, double desk input, personal pin retention, existing
+  passenger/courier/pursuit blocks and session reset. Hosts submitted equal
+  audio per sleeve (56,000 mono signed-16 samples, 16 kHz); the songs were
+  different. Missing audio backends did not block the headline, pay or save.
+- A2 One-Take: both film titles from real vehicle poses under Low FX,
+  wide/handbrake inputs, immediate retake, owned ride unchanged. The
+  265-frame host replay ended at ff47a48e.
+- A3 One More Stop / B1 Cab Rank: standard fare and two pre-acceptance
+  quoted tickets, no mutation on decline, named destinations, direct Ren
+  and the Copper detour, no duplicate bonus, exit/expiry, separate base,
+  tip and detour, localized bumper-contact grouping.
+- A4 Supper, B3a still, B3b poster, B3c transmitter: 7,886 planned input
+  frames per host, 13 room visits, 47 routed legs, all nine frame crops
+  matched on both clients. Tested $0 on foot, wrong lighting and direction,
+  wrong answer, three readings out of order, duplicate suppression,
+  artwork revisits, cancellation and personal pin retention.
+- B2a Valet: both parking orders, keys, safe exit, handover; owned car
+  unchanged. Host replays: 616 frames/47bd2bc1 and 675/847dbd77, $358 each.
+- B2b Curb Chess: wrong order blocks the apron; reset, move the compact,
+  put the van deep, park the Mote and exit. 731 frames/6d03c746.
+- B4 Block Bill: both local bills visited at physical venues; real clients
+  awarded $85 per completed booking.
+- B5 Switchboard: native simulations exercised both contacts, WAIT refusal
+  and delivery under pursuit without fighting. Both launchers finished the
+  farther, ready contact on foot for $90 dirty.
+- B6a Crossing Keeper: four queue releases, two WALK grants, interlock;
+  $75 clean once on both launchers. B6b Freight Crossing: both approaches,
+  safe stops and release, driven west detour, local-only hold, walk-away
+  cleanup, unaffected neighboring intersections, pause and fresh session.
+- B7 Dead Air Live: both moving stories filmed from the parked studio van.
+  Keyboard drives, camera tracking and $135 on both calls and both hosts.
+  Focused tests cover a blocked curb, wreck, restaging and cleanup.
+- B8 Harbor Proof: distinct stories, two moving plates, registered and rough
+  results, field-guide pause, print on revisit. Host runs paid $45.
+- B9 Second Shadow: two circuits, keep/discard, $205 each; 2,593 frames /
+  fe795601, $728 total. Ghost visible/hidden and 139 extra atlas ticks matched
+  1,126 recorded poses, 438 braked samples and six splits. No ghost collision.
+
+SIGNAGE, TIMING AND EXISTING CAREERS
+- Assertions check all nine former district mismatches against the doorstep.
+  T in the atlas selects both rail stops and the registered car. Ordinary
+  ATMs, confirmed cases, restitution, properties and old slots remain tested.
+- The 3,664-frame stock opening still yields a6727845: one courier shift,
+  one completed fare, $318 clean, HP 100. Includes Rev2-10 migration, atlas
+  letterbox behavior, field guide and native room interaction regressions.
+- Re-ran the simulated Windows held-E focus case. With no fresh E press,
+  the end position was within one world unit of Linux's no-repress result.
+  This is not a claim about a physical Windows focus bug.
+
+Run the commands in BUILD.txt. SHA256SUMS.txt beside the two downloads
+verifies the complete archives. Windows tests execute the actual PE entry
+point under simulated Win32 services on Linux. Native Linux uses SDL dummy
+video/audio. These are scripted plays, not blind-player or controller trials,
+subjective listening tests, hardware performance tests or distro certification.
+
+Historical reports follow. Their titles and hashes describe earlier builds.
+
+EASY ENTRY HOTFIX QA
+
+- Both complete suites passed: bash scripts/test.sh --tour and
+  bash scripts/test-linux.sh. The new 3,664-frame keyboard route was
+  run through both actual entry points and ended at digest a6727845,
+  $318 clean cash, 100 HP, two legal jobs and one taxi fare. It walks
+  directly to the staged taxi and does not loop through the door.
+- Road QA exercised E boarding for taxi and sprint loaners and garage
+  deliveries. Job, door and ATM priorities, held E and theft still pass.
+- Visual QA checked F1 in an apartment, storefront and atlas, kept the
+  exact backdrop, left the clock unchanged, and restored the prior view.
+  The exact Linux ELF confirmed the apartment and Escape round-trip
+  via rendered pixels. Windows test host checked black-border right
+  click during a 1300x790 letterboxed atlas; the pin stayed. The exact
+  Linux ELF checked the same behavior and in-frame clearing.
+- Compared 304-byte actual F5 files from the two native binaries; they
+  are byte-identical. The Windows PE loaded and resaved the Linux
+  career with intact cash and health. Both passed Rev2-10 migration.
+- Windows tests use simulated Win32 services on Linux. Linux tests use
+  SDL dummy video. Physical Windows and interactive Linux desktop
+  validation remain unverified. No later ATM candidate was included.
+
+EASY ENTRY: WINDOWS + LINUX QA
+
+- Exact Linux ELF runs the 3,252-event-frame Easy Entry keyboard tour
+  through SDL2's dummy video driver and software renderer. The explicit
+  F5 save matches the Windows reference digest 16347d9b. The later normal
+  close save is independently valid: $289 clean, 100 HP, two legal jobs,
+  one taxi fare. Same Rev10 save layout on both platforms.
+- Linux event/run checks cover text and Backspace, mouse-load and resize
+  to 1300x790 with a letterbox, atlas marker set/clear, a held/repeating
+  key cleared on focus change, clean close and process restart, and
+  deletion of the selected career without touching the neighboring slot.
+- Disposable Rev2–10 fixtures booted and migrated through native Linux
+  and Windows launchers. POSIX storage checks cover absolute XDG and
+  fallback directories, exact lengths, private save permissions, a
+  failed replacement, a symlink slot, and 16 two-process no-clobber races.
+- The rebuilt native Windows x64 PE is byte-identical to the published Easy Entry
+  executable and passes its exact Win32-simulation tour on Linux.
+- The x86-64 ELF dynamically needs libSDL2-2.0.so.0 and libc.so.6;
+  GLIBC_2.34 is its highest required GLIBC version. Tests do not certify
+  individual Linux distributions. X11/Wayland desktop interaction and
+  physical Windows 11 launch/input remain unverified; the cloud test
+  environment could not start a private graphical display server.
+
 EASY ENTRY QA
 
 - Keyboard regression covers boarding and stealing with E, releasing

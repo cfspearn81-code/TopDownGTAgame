@@ -1,6 +1,17 @@
 /* Lane traffic and pedestrians are transient world state, not save data.
  * Included by game.c after move/open_space. Car 0 is the active owned ride.
  * The final slot holds the current job vehicle. */
+#if __has_include("verdict_street.inc")
+static int vd_cross_hold(const Car*,float,float);
+static int vd_cross_player_stop(const Car*,float,float);
+static int vd_cross_foot(float,float,float,float,float);
+static void vd_cross_paint(void);
+#else
+#define vd_cross_hold(c,x,y) 0
+#define vd_cross_player_stop(c,x,y) 0
+#define vd_cross_foot(x,y,nx,ny,r) 0
+#define vd_cross_paint() ((void)0)
+#endif
 #define STREET_HALF_L 15.5f
 #define STREET_HALF_W 8.f
 #define STREET_BOARD_SPEED 58.f
@@ -112,7 +123,7 @@ static float street_wall_depth(const Car*c){
     if(a>depth)depth=a;
    }
   }
- return depth;
+ float rail=vd_chess_rail_depth(c);return rail>depth?rail:depth;
 }
 static int street_hits_wall(const Car*c){return street_wall_depth(c)>0.f;}
 static int street_car_clear(int id,const Car*old,const Car*next){
@@ -169,6 +180,7 @@ static int street_foot_car_clear(float x,float y,int ignore,float feet){
 /* Knockback and rival movement share this physical test. An actor displaced
  * by a moving car can step back out but cannot move deeper into it. */
 static int street_step_past_cars(float x,float y,float nx,float ny,float feet){
+ if(vd_cross_foot(x,y,nx,ny,feet))return 0;
  for(int i=0;i<nc;i++)if(i||sv.owned){
   const Car*c=cars+i;float after=street_foot_car_depth(c,nx,ny,feet);
   if(after<=0)continue;
@@ -202,9 +214,9 @@ static int street_foot_clear(float x,float y,int ignore){
 }
 /* Transactional: find room before taking a payment or issuing a job.
  * The separate apply marks a previously moving slot as no longer ambient. */
-static int street_find_car_space(int id,Car*car,float x,float y,int departure){
+static int street_find_car_space(int id,Car*car,float x,float y,int departure,int min_radius){
  static const unsigned char radius[]={23,27,32,37,45,58,74,94,116};
- for(int r=0;r<LEN(radius);r++)for(int i=0;i<16;i++){
+ for(int r=0;r<LEN(radius);r++)if(radius[r]>=min_radius)for(int i=0;i<16;i++){
   float heading=i*.3926991f,dx=cs(heading)*radius[r],dy=sn(heading)*radius[r];
   for(int j=0;j<2;j++){
    Car next=*car;next.x=x+dx;next.y=y+dy;
@@ -346,7 +358,7 @@ static void street_tick_traffic(float dt){
   float goal=d->pace;
   if(d->next%3!=0||dist<38)goal=32.f;
   int j=street_junction(c->x,c->y);
-  if((j>=0&&streetJunctionOwner[j]!=i)||street_yield(c,fx,fy))goal=0;
+  if((j>=0&&streetJunctionOwner[j]!=i)||street_yield(c,fx,fy)||vd_cross_hold(c,fx,fy))goal=0;
   float ahead=6+c->s*.26f;if(ahead>dist)ahead=dist;
   Car probe=*c;probe.x+=fx*ahead;probe.y+=fy*ahead;
   if(!street_car_clear(i,c,&probe))goal=0;
@@ -464,7 +476,7 @@ static void street_walk_step(Ped*q,StreetWalk*w,float dt,float speed){
  float x=q->x+dx*(step/n),y=q->y+dy*(step/n);
  /* A car can pivot across a retreating walker's safety margin.
   * Let the walker back out without admitting any deeper overlap. */
- if(!solid(x,y,4)&&(w->cross==2?street_step_past_cars(q->x,q->y,x,y,3.f):
+ if(!solid(x,y,4)&&!vd_cross_foot(q->x,q->y,x,y,3.f)&&(w->cross==2?street_step_past_cars(q->x,q->y,x,y,3.f):
                                   street_foot_car_clear(x,y,-1,3.f))){
   q->x=x;q->y=y;q->s=speed;w->blocked=0;
  }else if(w->cross==1&&(w->blocked+=dt)>.40f){

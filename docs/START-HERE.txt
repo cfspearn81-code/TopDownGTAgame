@@ -1,13 +1,38 @@
 DEAD CHANNEL / PORT VANTA
-Easy Entry for Windows 11 x64
+Port Vanta Sessions for Windows 11 x64 and Linux x86-64
 
-1. Extract the entire ZIP to a normal folder and open DeadChannel.exe.
-   Look for "Dead Channel | Easy Entry" in the window title.
+1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
+   Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
+   from the extracted Dead-Channel directory. If your extractor did not
+   preserve execute permission, run chmod +x DeadChannel first.
+   Look for "Dead Channel | Port Vanta Sessions" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
    to the teal door and press E. Mara's first job at Mercury Dispatch
    introduces the city and pays for your next move.
+
+LINUX REQUIREMENTS
+A 64-bit x86-64 glibc desktop (glibc 2.34+) and the SDL2 runtime providing
+libSDL2-2.0.so.0. Use your distribution's SDL2 runtime package if it is
+missing. ARM, musl/Alpine, 32-bit and individual distributions are not
+certified by this build. No Wine, browser, installer or online account.
+
+AFTER THE FIRST SHIFT
+Press F6 for City Listings, or use Esc > City Listings. Pick Side B Before
+Sign-Off if you want a first stop. For all 17 activities and controls, see
+CITY-LISTINGS.txt. T in the atlas selects tram stops and your registered car.
+
+SAVE LOCATION AND MANUAL TRANSFER
+Windows: %LOCALAPPDATA%/DeadChannel.
+Linux: $XDG_DATA_HOME/DeadChannel when XDG_DATA_HOME is absolute;
+       otherwise ~/.local/share/DeadChannel.
+Both use the same career.dat, opening.dat and fresh-NNN.dat slots, with
+the same historical Rev2-9 import and Rev10 format. The package does
+not migrate folders or sync devices. Close both copies and back up
+existing saves before copying the specific slots you want to transfer.
+The Linux save folder must be writable and support normal POSIX file
+links and atomic renames. The game saves a live career on normal close.
 
 CAREER FILES
 F3 / Pause > Save Menu: open the save list from a live career.
@@ -34,12 +59,14 @@ Your choices show on the save card and on the player in the game.
 CITY CONTROLS
 WASD or arrow keys: move, steer, accelerate and brake
 E: interact, get into a stopped or slow nearby car, or get out
-Job actions, doors and ATMs take priority. Stand clear of them to board.
+Job actions, doors and ATMs take priority. Newly staged cars prefer
+a curb away from the door. Stand clear of competing interactions.
 Enter: confirm menus or board a tram at its timetable
 X: punch. Space: fists or equipped weapon
 Shift: sprint / handbrake. T: accept another unlocked taxi fare
 M: map; left click sets a pin, right click clears it
-F1: field guide. F2: low FX. F5: save. Esc: pause / back
+F1: field guide, then Esc to return to the same room or map.
+F2: low FX. F5: save. Esc: pause / back
 The gold job marker leads to the assigned vehicle. F5 also saves with the
 atlas open.
 Each healthy car has a lower top speed and still outpaces walking.

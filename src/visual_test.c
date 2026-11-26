@@ -117,7 +117,30 @@ static void smaller_world_figures(void){
  assert(arrows==0x769095b8u&&portraits==0xffda14e5u);
  puts("Passed: 768 smaller live player/NPC poses, fixed foot anchors, and pixel-identical facing arrows and career portraits.");
 }
+static void guide_round_trip(int view){
+ const int probe=274*W+19; /* Always outside the guide's frame and shadow. */
+ assert(scene==view);paint();U backdrop=pixels[probe];
+ tick(HELP);assert(scene==2&&helpBack==view);
+ float day=sv.dayClock;tick(0);assert(sv.dayClock==day);
+ paint();assert(pixels[probe]==((backdrop>>1)&0x7f7f7fu)+0x050a0du);
+ tick(ESC);assert(scene==view);tick(0);
+ paint();assert(pixels[probe]==backdrop);
+}
+static void guide_and_borders(void){
+ init_city();
+ open_interior(12);interior_fade=0;
+ guide_round_trip(3);assert(interior_active_loc==12);
+ for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){walkin_open(i);break;}
+ int building=walkin_active;guide_round_trip(4);assert(walkin_active==building);
+ scene=1;sv.intro=4;p.x=1024;p.y=1024;p.car=-1;
+ tick(MAP);tick(0);assert(mapOn);pointer_input(580,303,1);paint();assert(navHasManual);
+ pointer_input(-1,-1,2);assert(navHasManual);
+ pointer_input(W,190,2);assert(navHasManual);
+ guide_round_trip(1);assert(mapOn&&navHasManual);
+ pointer_input(580,303,2);assert(!navHasManual);
+ puts("Passed: the field guide preserves apartment, storefront and atlas views; off-frame clicks do not clear pins.");
+}
 int main(void){
- test_cards();turns();atlas_sweep();clock_surfaces();smaller_world_figures();
+ test_cards();turns();atlas_sweep();clock_surfaces();smaller_world_figures();guide_and_borders();
  puts("Passed: full-width notifications and objective text, field-guide columns, bend direction / countdown / arrival, small clock renders and all 78 atlas entries.");
 }

@@ -2,12 +2,14 @@
 No real user data. These byte lengths are a compatibility contract, not sizeof(Save).
 """
 from pathlib import Path
+import os
 import struct
 import subprocess
 import sys
 import tempfile
 
-host, game, seed_path = map(Path, sys.argv[1:])
+linux = len(sys.argv) > 1 and sys.argv[1] == "--linux"
+host, game, seed_path = (Path(x).resolve() for x in sys.argv[2 if linux else 1:])
 seed = seed_path.read_bytes()
 assert len(seed) == 304 and struct.unpack_from("<II", seed) == (0x44433131, 10)
 
@@ -23,8 +25,19 @@ with tempfile.TemporaryDirectory() as tmp:
         struct.pack_into("<I", blob, len(blob)-4, checksum(blob[:-4]))
         src.write_bytes(blob)
         dst.unlink(missing_ok=True)
-        subprocess.run([host, game, src, dst], check=True, stdout=subprocess.DEVNULL)
-        data = dst.read_bytes()
+        if linux:
+            xdg = Path(tmp) / "xdg-data"
+            linux_file = xdg / "DeadChannel/career.dat"
+            linux_file.parent.mkdir(parents=True, exist_ok=True)
+            linux_file.write_bytes(blob)
+            env = dict(os.environ, XDG_DATA_HOME=str(xdg), SDL_VIDEODRIVER="dummy",
+                       SDL_RENDER_DRIVER="software", LD_PRELOAD=str(host),
+                       DC_LINUX_REPLAY="resave")
+            subprocess.run([game], env=env, check=True, stdout=subprocess.DEVNULL, timeout=20)
+            data = linux_file.read_bytes()
+        else:
+            subprocess.run([host, game, src, dst], check=True, stdout=subprocess.DEVNULL)
+            data = dst.read_bytes()
         assert len(data) == 304 and struct.unpack_from("<II", data) == (0x44433131, 10)
         assert struct.unpack_from("<I", data, 300)[0] == checksum(data[:-4])
         assert src.read_bytes() == blob
@@ -92,4 +105,4 @@ with tempfile.TemporaryDirectory() as tmp:
         owned, _, cooldown, pending = struct.unpack_from("<iffi", data, offset)
         assert (owned, pending) == (1, amount)
         assert abs(cooldown - (closing - elapsed if closing else 0)) < .002
-print("PE entrypoint: synthetic Rev2–10 careers loaded and re-saved as Rev10; obsolete audits discarded, confirmed cases migrate with a five-minute timer, and stored countdown, bank, ledger and next/following closing migration are preserved.")
+print(("Linux ELF" if linux else "PE") + " entrypoint: synthetic Rev2–10 careers loaded and re-saved as Rev10; obsolete audits discarded, confirmed cases migrate with a five-minute timer, and stored countdown, bank, ledger and next/following closing migration are preserved.")

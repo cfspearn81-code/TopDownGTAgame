@@ -1,13 +1,25 @@
 # Dead Channel
 
-An original top-down, single-player Windows 11 x64 arcade crime sandbox set in
+An original top-down, single-player arcade crime sandbox for Windows 11 x64
+and x86-64 Linux, set in
 Port Vanta. This is not GTA, a GTA port, or a browser game. The city, art and
 code are original to this project; see the [bundled font license](docs/FONT-LICENSE.txt).
 
-**Play:** [Download Easy Entry for Windows 11 x64](downloads/Dead-Channel-Easy-Entry-Windows-11-x64.zip?raw=true).
-Extract the ZIP and open `DeadChannel.exe`. The title reads `Dead Channel | Easy Entry`.
-No installer, network or account is required. Press **E** to board or exit cars.
-**Enter** still confirms menus and boards trams. [ZIP checksums](downloads/SHA256SUMS.txt) and [older builds](downloads/).
+**Play Port Vanta Sessions:** the Windows ZIP contains `DeadChannel.exe`; the native
+Linux tarball contains the executable `DeadChannel`. Extract the appropriate
+archive and run its executable. The title on both reads `Dead Channel | Port Vanta Sessions`.
+After the first courier shift, press **F6** to open 17 city listings. Start with **Side B Before Sign-Off** at the DJ rack in Blue Hour Tram Hall. [City listings and controls](docs/CITY-LISTINGS.txt).
+
+Press **E** to board or exit cars. **Enter** still confirms menus and boards trams.
+
+- **Windows:** [download the Windows 11 x64 ZIP](downloads/Dead-Channel-Port-Vanta-Sessions-Windows-11-x64.zip).
+- **Linux:** [download the Linux x86-64 tarball](downloads/Dead-Channel-Port-Vanta-Sessions-Linux-x64.tar.gz)
+  or build below. The package needs an x86-64 glibc desktop with glibc
+  **2.34 or newer** and the SDL2 runtime (`libSDL2-2.0.so.0`). It does not
+  need Wine, a browser, SDL headers, or an account. The ELF's measured
+  version floor is not a certification of every Linux distribution.
+
+[Verify downloads with SHA-256](downloads/SHA256SUMS.txt). Both executables run offline. See [platform-specific launch, controls and saves](docs/START-HERE.txt).
 
 Create a character, start in Apartment 4 and take Mara's first courier job.
 Explore 78 enterable city buildings and four gated rear rooms. Earn clean cash
@@ -26,11 +38,23 @@ New careers have 360 editable starter looks; existing Rev2–10 saves are suppor
 On x86-64 Linux with GCC, Python 3 and GNU binutils supporting `i386pep`:
 
 ```sh
+# Native host (SDL2 runtime or SDL2 development package)
+bash scripts/build-linux.sh
+bash scripts/test-linux.sh
+
+# Windows cross-build
 bash scripts/build.sh
 bash scripts/test.sh --tour
 ```
 
-Output: `build/DeadChannel.exe`. The suite checks the native executable under
-simulated Win32 services on Linux. Physical Windows 11 input and display
-testing remains outstanding. Before publishing another build, update
-[HANDOFF.md](HANDOFF.md) with its changes and verify the matching ZIP and checksum.
+Outputs: `build/DeadChannel` and `build/DeadChannel.exe`. Both launchers use
+the same engine and Rev2–10 save reader. Windows saves use
+`%LOCALAPPDATA%/DeadChannel`; Linux saves use
+`${XDG_DATA_HOME:-$HOME/.local/share}/DeadChannel`. Close both builds and back up
+the target saves before copying between platforms. No automatic sync.
+
+Linux automated testing runs the exact ELF using SDL's software renderer and
+dummy video driver. Windows automated testing runs the exact PE with simulated
+Win32 on Linux. Interactive desktop/physical Windows testing remains open.
+Before publishing another build, update [HANDOFF.md](HANDOFF.md) for the next
+maintainer and verify the matching archives/checksums.

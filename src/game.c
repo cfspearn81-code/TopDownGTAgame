@@ -1,5 +1,6 @@
 #include "game.h"
 #include "font.inc"
+#include "verdict_api.inc"
 #ifdef DC_TEST
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,7 +65,10 @@ static int ordinaryDoorX[LEN(buildings)],ordinaryDoorY[LEN(buildings)];
 static void setup_ordinary_doors(void);
 static int zone_is_building(int i);
 static const char *walkin_name(int i);
-static int tram_hall(int i);
+static int tram_hall(int i),tram_destination(int i),a1_can_ride(void);
+static const char *tram_block(void);
+static const char *venue_address(int b);
+static const char *hud_line(const char *s,int limit,char out[130]);
 static void walkin_open(int building);
 static int contract_room(int kind,int x,int y,int exclude);
 static void walkin_tick(U keys,U tap);
@@ -98,6 +102,7 @@ static const Place originalLoc[]={
 };
 static Place loc[LEN(originalLoc)];
 static const char* district(int x,int y){if(y<545)return "GLASS MILE";if(y>1160)return x<900?"LANTERN WARD":"BREAKWATER";return x<850?"TIDE MARKET":x<1400?"NIGHTGLASS":"EAST FREIGHT";}
+static const char*venue_address(int b){return district(ordinaryDoorX[b],ordinaryDoorY[b]);}
 /* Forward caps use each model's former 10/100-condition speed at full
  * health. Keep throttle response and low-speed control unchanged. */
 /* Human locomotion follows one pace, across named/ordinary interiors,
@@ -119,7 +124,17 @@ static const CarSpec specs[]={
 };
 typedef struct{float x,y,a,s;int type,owner,cond,reported;}Car;
 typedef struct{float x,y,a,s;int hp,role,next;float life,cool;}Ped;
-static Car cars[42];static int nc;
+/* Two temporary customer slots can follow the unchanged stock actor count.
+ * Ordinary jobs still get their stock final slot when no listing is active. */
+static Car cars[44];static int nc;
+#if __has_include("verdict_driving.inc")
+static float vd_chess_rail_depth(const Car*);
+static void vd_shadow_sample(U keys),vd_shadow_gate(int step);
+#else
+#define vd_chess_rail_depth(c) 0.f
+#define vd_shadow_sample(keys) ((void)0)
+#define vd_shadow_gate(step) ((void)0)
+#endif
 static Ped peds[52];
 typedef struct{float x,y,vx,vy,t;U c;} Particle;
 static Particle fx[100];static int fn;
@@ -178,8 +193,14 @@ typedef struct{int kind,step,total,price;float time;int xs[6],ys[6],unpaid;}Job;
 static Job job={.kind=-1};
 static int jobRide=-1;
 enum{TAXI_WAIT,TAXI_BOARDING,TAXI_RIDING,TAXI_EXITING,TAXI_WALKING};
-typedef struct{float x,y,a,still,linger;int phase,ride,pickup,dropoff,rider,curb[2],meters,crashes,damage,rough;float roughHold,roughCooldown;} Taxi;
+typedef struct{float x,y,a,still,linger;int phase,ride,pickup,dropoff,rider,curb[2],meters,crashes,damage,rough;float roughHold,roughCooldown,contactSeconds,contactX,contactY;int copper;} Taxi;
 static Taxi taxi;
+enum{CAB_NONE,CAB_OFFER,CAB_DIRECT,CAB_VIA,CAB_SEEN,CAB_RANK_ACTION=151};
+static int cabRequested;
+static int taxi_authored_offer(int which);
+static int taxi_via_copper(void),taxi_copper_x(void),taxi_copper_y(void),taxi_detour_bonus(void);
+static const char *taxi_route_name(void);
+static void cab_choose_route(U tap),cab_passing_copper(void),cab_marquee_paint(void),cab_rank_counter(void);
 static int lastTaxiPickup=-1,lastTaxiDrop=-1,lastTaxiRider=-1;
 static U taxiSeed=0xc3b11d19u;
 static U taxi_random(void){taxiSeed^=taxiSeed<<13;taxiSeed^=taxiSeed>>17;taxiSeed^=taxiSeed<<5;return taxiSeed;}
@@ -215,13 +236,14 @@ static U prev;
 static int by=-1,near=-1,lastCar=-1,helpBack=1;
 #define CASH_GREEN 0x85F36Bu
 #define CASH_RED   0xFF535Cu
-static char notice[100];
+static char notice[192];
 static U noticeInk;
 static int storefrontCaption;
 static U notice_color(void){return noticeInk?noticeInk:PAPER;}
-static void tell(const char*s){storefrontCaption=0;append(notice,s);p.noticeT=4.4f;noticeInk=0;}
+static char*notice_copy(const char*s,int reserve){int n=0;while(s[n]&&n<(int)sizeof(notice)-reserve-1){notice[n]=s[n];n++;}notice[n]=0;return notice+n;}
+static void tell(const char*s){storefrontCaption=0;notice_copy(s,0);p.noticeT=4.4f;noticeInk=0;}
 static void wallet_note(const char*s,int a,int clean){
- storefrontCaption=0;char*q=append(notice,s);q=append(q,clean?"  CLEAN +$":"  DIRTY MONEY +$");number(q,a);
+ storefrontCaption=0;char*q=notice_copy(s,32);q=append(q,clean?"  CLEAN +$":"  DIRTY MONEY +$");number(q,a);
  p.noticeT=4.4f;noticeInk=clean?CASH_GREEN:CASH_RED;
 }
 static void cashNote(const char*s,int a){wallet_note(s,a,1);}
@@ -338,7 +360,7 @@ static void migrate_old_save(void){
 }
 #ifndef DC_TEST
 extern int disk_read(void*,unsigned);extern int disk_write(const void*,unsigned);
-#ifdef _WIN_NATIVE
+#if defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)
 extern void disk_slot(int);
 extern int disk_present(void);
 extern int disk_delete(void);
@@ -409,7 +431,7 @@ static void spawnPlayer(void){
  }
  p.hp=cl(sv.hp,15,100);p.car=-1;cars[0].type=sv.selection;cars[0].cond=sv.owned?cl(sv.carCond[sv.selection],0,100):0;
 }
-void init_city(void){revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};setupCity();bake_scenery();spawnCars();load_save();spawnPlayer();scene=0;menu=-1;mapOn=0;shelterT=0;job.kind=jobRide=-1;lastCar=near=by=-1;lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;profiles_init();}
+void init_city(void){vd_reset();revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};setupCity();bake_scenery();spawnCars();load_save();spawnPlayer();scene=0;menu=-1;mapOn=0;shelterT=0;job.kind=jobRide=-1;lastCar=near=by=-1;lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;profiles_init();}
 static void heat(float n){p.heat+=n;if(p.heat>300)p.heat=300;p.quiet=8.0f;}
 static void health(int n){
  if(p.hit>0)return;
@@ -417,7 +439,7 @@ static void health(int n){
  p.hp=max(0,p.hp-n);p.hit=.32f;
  if(!p.hp){
   if(p.car>=0)cars[p.car].s=0;
-  p.dead=1;menu=-1;deadAnim=0;particle(p.x,p.y,26,PINK);
+  vd_cancel();p.dead=1;menu=-1;deadAnim=0;particle(p.x,p.y,26,PINK);
  }
 }
 typedef struct {const char *n,*note;int action;U ink;} Option;
@@ -479,7 +501,7 @@ static int choose_place(int venue,int shell){
  if(shell<0)return 1;
  return d2(loc[venue].x-p.x,loc[venue].y-p.y)<=d2(ordinaryDoorX[shell]-p.x,ordinaryDoorY[shell]-p.y);
 }
-static int ownedJob(void){if(job.kind>=0){tell("Finish or abandon your current job first.");return 1;}return 0;}
+static int ownedJob(void){if(vd_locked()){tell("Close the city listing (F6) before taking another job.");return 1;}if(job.kind>=0){tell("Finish or abandon your current job first.");return 1;}return 0;}
 static int taxi_curb(int where,int *x,int *y,int *curb){
  *x=loc[where].x;int road=(loc[where].y/256+1)*256;*y=road-13;*curb=road-35;
  if(*x<45||*x>ROOM-45||*y<45||*y>ROOM-45)return 0;
@@ -498,10 +520,20 @@ static int taxi_tip_amount(int base,int hits,int severity,int rough){
  int percent=cl(26-9*hits-severity/3-4*rough,0,26);
  return (base*percent+50)/100;
 }
-static int taxi_occupied(void){return job.kind==1&&(taxi.phase==TAXI_RIDING||taxi.phase==TAXI_EXITING)&&p.car==taxi.ride;}
+static int taxi_occupied(void){return job.kind==1&&(taxi.phase==TAXI_RIDING||taxi.phase==TAXI_EXITING)&&p.car>=0&&p.car==taxi.ride;}
 static void taxi_quality(float dt,float before,float angleBefore,int impact){
  if(!taxi_occupied())return;
- if(impact>0){taxi.crashes++;taxi.damage+=impact;taxi.roughHold=0;taxi.roughCooldown=.7f;return;}
+ /* A rebound can hit the same bumper several times in one scrape. The
+  * passenger counts one incident, but every point of damage still counts. */
+ taxi.contactSeconds-=dt;
+ if(impact>0){
+  if(taxi.contactSeconds<=0||d2(p.x-taxi.contactX,p.y-taxi.contactY)>24.f*24.f){
+   taxi.crashes++;
+  }
+  taxi.damage+=impact;
+  taxi.contactSeconds=.35f;taxi.contactX=p.x;taxi.contactY=p.y;
+  taxi.roughHold=0;taxi.roughCooldown=.7f;return;
+ }
  Car*c=cars+p.car;
  taxi.roughCooldown-=dt;
  if(d2(p.x-job.xs[1],p.y-job.ys[1])<115.f*115.f){taxi.roughHold=0;return;}
@@ -511,6 +543,7 @@ static void taxi_quality(float dt,float before,float angleBefore,int impact){
  if((sudden||taxi.roughHold>.13f)&&taxi.roughCooldown<=0){taxi.rough++;taxi.roughCooldown=1.f;taxi.roughHold=0;}
 }
 static int taxi_offer(void){
+ if(cabRequested)return taxi_authored_offer(cabRequested-1);
  struct{int px,py,from,dx,dy,to,fromCurb,toCurb;} best={0};
  int chosen=0;
  for(int i=0;i<LEN(loc);i++){
@@ -538,6 +571,7 @@ static int taxi_offer(void){
  return 1;
 }
 static void next_fare(void){
+ if(vd_locked()){tell("Close the city listing (F6) before taking a fare.");return;}
  if(job.kind>=0){tell("Finish the current job first.");return;}
  if(!sv.taxiFares){tell("Complete a Taxi Fare from Mercury Dispatch first.");return;}
  if(p.car<0||!cars[p.car].owner){tell("Use an owned or licensed car for taxi calls.");return;}
@@ -554,9 +588,19 @@ static int taxi_walk_to(float x,float y,float dt){
  taxi.a=look(dx,dy);taxi.x+=dx*v/len;taxi.y+=dy*v/len;return 0;
 }
 static const char* taxi_objective(void){
- if(taxi.phase==TAXI_WAIT)return "Pick up the passenger. Pull over and stop.";
+ static char goal[112];
+ if(taxi.phase==TAXI_WAIT){
+  char *q=append(goal,"Pick up ");q=append(q,riders[taxi.rider].name);q=append(q," at ");
+  q=append(q,taxi_route_name());append(q,". Stop at the curb.");return goal;
+ }
  if(taxi.phase==TAXI_BOARDING)return "Passenger boarding. Hold still.";
- if(taxi.phase==TAXI_RIDING)return "Passenger on board. Follow GPS to the drop-off.";
+ if(taxi.phase==TAXI_RIDING){
+  if(taxi.copper==CAB_OFFER)return "To Vanta Police HQ. T: see Copper for +$20. Enter: go straight.";
+  if(taxi.copper==CAB_VIA)return "Drive past Copper Playhouse for +$20, then HQ. T: skip Copper.";
+  if(taxi.copper==CAB_SEEN)return "Mina's name was in lights. Finish at Vanta Police HQ for +$20.";
+  char *q=append(goal,"Drop off ");q=append(q,riders[taxi.rider].name);q=append(q," at ");
+  q=append(q,taxi_route_name());append(q,".");return goal;
+ }
  return "Passenger getting out. Hold still.";
 }
 static void taxi_tick(float dt){
@@ -577,9 +621,11 @@ static void taxi_tick(float dt){
    break;
  case TAXI_BOARDING:
    if(!nearStop||!stopped||p.car!=taxi.ride){taxi.phase=TAXI_WAIT;taxi.still=0;break;}
-   if(taxi_walk_to(p.x,p.y,dt)){taxi.phase=TAXI_RIDING;taxi.still=0;advanceJob();char msg[90];char*q=append(msg,"Passenger on board. Next stop: ");append(q,loc[taxi.dropoff].label);tell(msg);}
+   if(taxi_walk_to(p.x,p.y,dt)){taxi.phase=TAXI_RIDING;taxi.still=0;advanceJob();char msg[90];char*q=append(msg,"Passenger on board. Next stop: ");append(q,loc[taxi.dropoff].label);
+    tell(taxi.copper==CAB_OFFER?"Ren: My sister Mina's on the Copper Playhouse marquee. Pass it for $20 extra?":msg);}
    break;
  case TAXI_RIDING:
+   cab_passing_copper();
    if(nearStop&&stopped){if((taxi.still+=dt)>.27f){taxi.phase=TAXI_EXITING;taxi.x=p.x;taxi.y=p.y;tell("Passenger getting out.");}}
    else taxi.still=0;
    break;
@@ -587,7 +633,9 @@ static void taxi_tick(float dt){
    if(!nearStop||!stopped){taxi.phase=TAXI_RIDING;taxi.still=0;break;}
    if(taxi_walk_to(job.xs[1],taxi.curb[1],dt)){taxi.phase=TAXI_WALKING;taxi.linger=2.5f/FOOT_PACE;
     int base=job.price,tip=taxi_tip_amount(base,taxi.crashes,taxi.damage,taxi.rough);
-    advanceJob();char msg[96];char*q=append(msg,"Fare $");q=number(q,base);q=append(q," + tip $");q=number(q,tip);append(q,". New call available: T.");tell(msg);noticeInk=CASH_GREEN;}
+    advanceJob();char msg[96];char*q=append(msg,"Fare $");q=number(q,base);q=append(q," + tip $");q=number(q,tip);
+    if(taxi.copper!=CAB_NONE){q=append(q," + Copper $");q=number(q,taxi_detour_bonus());}
+    append(q,". New call available: T.");tell(msg);noticeInk=CASH_GREEN;}
    break;
  default:break;
  }
@@ -713,8 +761,9 @@ static void makeMenu(void){
  case 0:
  if(job_is_service(JOB_COURIER))add("COURIER ROUTE / UNPAID SERVICE","Deliver two parcels and return to Mara. Counts toward restitution and pays $0.",10);
  else add("COURIER ROUTE","Deliver two parcels and return the signed manifest to Mara.",10);
- add("TAXI FARE","Pick up a rider and drive to the drop-off.",11);
- add("BUSINESS OFFICE","Buy a legal courier franchise and check its account.",LEGAL_OPEN);break;
+ add("TAXI FARE","Quick dispatch: pick up a rider and drive to the drop-off.",11);
+ add("BUSINESS OFFICE","Buy a legal courier franchise and check its account.",LEGAL_OPEN);
+ add("CAB RANK / COMPARE TWO CALLS","Preview pickup, total distance and base fare. No call required.",CAB_RANK_ACTION);break;
  case 1:
  add("VAULT RUN","Take the sealed lockbox, lose the police and bring it back to Ivo.",14);
  add("HOT PROPERTY","Steal the marked Vectra and hand it off to Vera after losing the police.",15);
@@ -784,12 +833,14 @@ static void makeMenu(void){
  add("RESUME","Return to the game.",90);add("SAVE MANUALLY","Writes your career to your local save file.",91);
  if(job.kind>=0)add("ABANDON CURRENT CONTRACT","No payout. Free roam continues.",92);
  add("SAVE MENU","Switch careers or create a new character.",95);
- add("SHOW CONTROLS","Movement, action and menu keys.",93);break;
+ add("SHOW CONTROLS","Movement, action and menu keys.",93);
+ add("CITY LISTINGS  /  F6","Free-roam activities and neighborhood stories.",96);break;
  }
  if(menu!=PAUSE_MENU&&legal_menu_index(menu)<0&&legal_rear_index(menu)<0)add("BACK","Close this menu.",90);
  sel=cl(sel,0,max(0,nopt-1));
 }
 static void doOpt(int a){
+ if(a==CAB_RANK_ACTION){cab_rank_counter();return;}
  if(legal_opt(a,&menu))return;
  if(a>=10&&a<=17){beginJob(a-10);return;}
  if(a>=30&&a<=34){
@@ -799,7 +850,8 @@ static void doOpt(int a){
   int i=a-30,newCar=!(sv.owned&(1<<i));
   int cond=newCar?100:cl(sv.carCond[i],0,100);
   Car next={p.x,p.y,0,0,i,1,cond};
-  if(!street_find_car_space(0,&next,p.x,p.y,0)){
+  if(!street_find_car_space(0,&next,p.x,p.y,0,94)&&
+     !street_find_car_space(0,&next,p.x,p.y,0,0)){
    tell("No clear curb space. Try the garage again.");return;
   }
   if(newCar&&!canDirtyPurchase(specs[i].price))return;
@@ -860,6 +912,7 @@ static void doOpt(int a){
  case 93:helpBack=scene;scene=2;return;
  case 94:open_interior(12);return;
  case 95:profiles_open(0);return;
+ case 96:menu=-1;vdPanel=1;vdCursor=0;return;
  default:return;
  }
  finish_purchase();request_save();
@@ -950,6 +1003,7 @@ void tick(U keys){
  // Keep fractional frame precision during long sessions.
  anim+=dt;if(anim>=3600.f)anim-=3600.f;
  if(scene==0||scene==5){profiles_tick(tap);return;}
+ if(vd_input(tap))return;
  if(!p.dead&&(tap&(SLOT|NEW_SLOT))){profiles_open(!!(tap&NEW_SLOT));return;}
  if(saveFlash>0)saveFlash--;if(saveFlash<0)saveFlash++;
  if(!p.dead&&scene!=2&&menu!=PAUSE_MENU){
@@ -981,7 +1035,11 @@ void tick(U keys){
  if((tap&MAP)&&menu<0){mapOn=!mapOn;if(mapOn)navigation_input(tap);return;}
  if(mapOn){if(tap&ESC)mapOn=0;else navigation_input(tap);return;}
  if(tap&GFX){fastGfx=!fastGfx;tell(fastGfx?"Low FX on: rain and dynamic glows off.":"Full FX on.");}
- if((tap&TAXI_NEXT)&&menu<0)next_fare();
+ if(menu<0){
+  if(taxi_occupied()&&taxi.phase==TAXI_RIDING&&(taxi.copper==CAB_OFFER||taxi.copper==CAB_VIA))
+   cab_choose_route(tap);
+  else if(tap&TAXI_NEXT)next_fare();
+ }
  if(tap&ESC){if(menu>=0){menu=-1;return;}active(PAUSE_MENU);makeMenu();return;}
  p.secs+=dt;p.noticeT-=dt;
  if(menu>=0){makeMenu();if(tap&UP)sel=(sel+nopt-1)%nopt;if(tap&DOWN)sel=(sel+1)%nopt;if(tap&(USE|ENTER))doOpt(opt[sel].action);return;}
@@ -1003,6 +1061,7 @@ void tick(U keys){
   float healthFactor=.50f+.005f*c->cond;
   float limit=s->vmax*healthFactor,reverse=s->reverse*healthFactor;
   if(c->s>limit)c->s=limit;if(c->s<-reverse)c->s=-reverse;
+  if(vd_cross_player_stop(c,cs(c->a)*c->s*dt,sn(c->a)*c->s*dt))c->s=0;
   float f=absf(c->s);
   if(f>7&&x){
    /* On full throttle, lengthen the arc instead of rotating in place
@@ -1047,10 +1106,12 @@ void tick(U keys){
   stoppingToExit=0;
   if(!street_exit_car())tell("The door is blocked. Pull into a clear space.");
  }
+ vd_shadow_sample(keys);
  check_arrival(checkpointX,checkpointY);
  job_rival_encounter();
  taxi_tick(dt);
  by=placeNear();near=carNear();
+ if(vd_frame(keys,tap))tap&=~(USE|ENTER);
  if((tap&USE)&&!job_use_street()){
   if(p.car>=0)vehicle_use(-1);
   else {
@@ -1072,7 +1133,12 @@ void tick(U keys){
 }
 int get_scene(void){return scene;}
 void clear_input(void){prev=0;stoppingToExit=0;}
-void pointer_input(int sx,int sy,U clicks){if(scene==0||scene==5){profiles_pointer(sx,sy,clicks);return;}if(scene==1&&mapOn&&!p.dead)navigation_pointer(sx,sy,clicks);}
+void pointer_input(int sx,int sy,U clicks){
+ /* Host letterboxing/leave messages have no logical click target. */
+ if((U)sx>=W||(U)sy>=H){sx=sy=-1;clicks=0;}
+ if(scene==0||scene==5){profiles_pointer(sx,sy,clicks);return;}
+ if(scene==1&&mapOn&&!p.dead)navigation_pointer(sx,sy,clicks);
+}
 
 static int sx(float x){return(int)x-cx;}static int sy(float y){return(int)y-cy;}
 static int beam_block(int x,int y){return (U)x>=ROOM||(U)y>=ROOM||roofMask[y*ROOM+x];}
@@ -1413,10 +1479,12 @@ static void hud(void){
   if(job.kind==JOB_TAXI&&taxi_occupied()){
    a=append(a,"  FARE $");a=number(a,job.price);a=append(a,"  TIP $");
    a=number(a,taxi_tip_amount(job.price,taxi.crashes,taxi.damage,taxi.rough));
+   if(taxi.copper==CAB_SEEN)a=append(a,"  COPPER +$20");
   }
   if(job_has_clock())fmt(a,"  SEC ",(int)job.time);
   objective=job.kind==JOB_TAXI?(job_vehicle_target()>=0?"Enter the marked taxi or use your own car.":taxi_objective()):job_objective();
  }
+ else if(vdActive>=0){append(v,vdNames[vdActive]);objective=vdLine;}
  else if(sv.intro==1||sv.intro==2){append(v,"FIRST SHIFT");objective="Enter Mercury Dispatch. Talk to Mara.";}
  else if(sv.intro==3){append(v,"FIRST PAYCHECK");objective=sv.owned?"M: choose another job or a city destination.":"Your first car is $125 at Nightglass Motors.";}
  if(!objective&&sv.taxiFares&&p.car>=0&&cars[p.car].owner){append(v,"NEW CALL AVAILABLE");objective="T: accept the next taxi fare.";}
@@ -1444,7 +1512,7 @@ static void hud(void){
   StreetUse target=street_use_target(by,near);
   switch(target.kind){
   case STREET_USE_VENUE:a=append(v,"E  ENTER ");append(a,loc[target.id].label);use=v;break;
-  case STREET_USE_SHOP:a=append(v,"E  ENTER ");append(a,walkin_name(target.id));use=v;break;
+  case STREET_USE_SHOP:a=append(v,"E  ENTER ");a=append(a,walkin_name(target.id));a=append(a,"   /   ");append(a,venue_address(target.id));use=v;break;
   case STREET_USE_ATM:use="E  USE ATM";break;
   case STREET_USE_CAR:{
    const Car*c=cars+target.id;
@@ -1469,7 +1537,7 @@ static const GuideBinding guideStreet[]={
  {"M","Open / close atlas"},{"LMB / RMB","Set / clear GPS pin"},
  {"F1","Field guide"},{"F2","Toggle low FX"},
  {"F3 / F4","Saves / new career"},{"F5","Save current career"},
- {"ESC","Pause / back"}
+ {"ESC / F6","Pause / city listings"}
 };
 static void guide_column(int x,const char*title,const GuideBinding *rows,int count,int keyw){
  textat(x,153,title,TEAL,0);rect(x,177,367,1,0x39545e);
@@ -1521,6 +1589,7 @@ static void cover_behind_buildings(int x,int y){
  }
 }
 static void draw_street_actors(void){
+ vd_cross_paint();
  /* A viewport including sprite margins covers at most 6 x 4 city blocks. */
  static StreetSprite list[LEN(cars)+LEN(peds)+2+6*4*8+LEN(bankAtms)];int count=0;
  for(int i=0;i<nc;i++)if(i||sv.owned)add_sprite(list,&count,cars[i].x,cars[i].y,SPRITE_CAR,i);
@@ -1556,18 +1625,20 @@ static void draw_street_actors(void){
   if(v.kind!=SPRITE_TREE&&v.kind!=SPRITE_ATM)cover_behind_buildings(v.x,v.y);
  }
 }
-void paint(void){
- if(scene==0||scene==5){profiles_paint();return;}
- if(scene==3){interior_paint();bank_warning_draw();return;}
- if(scene==4){walkin_paint();bank_warning_draw();return;}
- if(scene==1&&mapOn){minimap();bank_warning_draw();return;}
+/* The field guide is an overlay. Pass its previous view to the renderer
+ * without changing the authoritative scene or resuming simulation. */
+static void paint_world(int view){
+ if(view==3){interior_paint();return;}
+ if(view==4){walkin_paint();return;}
+ if(mapOn){minimap();return;}
  cx=camera_left();cy=camera_top();
  typedef U V4 __attribute__((vector_size(16),aligned(1),may_alias));
  for(int y=0;y<H;y++){const V4 *q=(const V4*)(city+(cy+y)*ROOM+cx);V4 *r=(V4*)(pixels+y*W);for(int x=0;x<W/4;x++)r[x]=q[x];}
  roadFX_paint(cx,cy);
+ cab_marquee_paint();
  if(!fastGfx)for(int i=0;i<100;i++){int x=(i*197+((int)(anim*28))%W)%W,y=(i*233+((int)(anim*174))%H)%H;
    U c=mix(pixels[y*W+x],0x6e8d9d,2);line(x,y,x-2,y+5,c);}
- int introVenue=job.kind<0?nav_intro_venue():-1;
+ int introVenue=job.kind<0&&vdActive<0?nav_intro_venue():-1;
  for(int i=0;i<LEN(loc);i++){const Place*l=loc+i;int x=sx(l->x),y=sy(l->y);if(x<-110||y<-25||x>W+110||y>H+25)continue;
   if(i==by||i==introVenue){
     int w=textw(l->label,0)+16;box(x-w/2,y-40,w,23,DARK,mix(l->tint,DARK,3));center(x,y-40,l->label,l->tint,0);
@@ -1575,8 +1646,8 @@ void paint(void){
  }
  if(introVenue>=0){int tx=sx(loc[introVenue].x),ty=sy(loc[introVenue].y);mark(cl(tx,27,W-27),cl(ty,150,H-70),16+(int)(sn(anim*4)*3),LIME);}
  for(int i=0;i<nc;i++)if(i==p.car||absf(cars[i].s)>9)projectLights(cars+i);
- draw_street_actors();
- if(scene==1)atm_kiosk_hint();
+ draw_street_actors();vd_world();
+ atm_kiosk_hint();
  int x=sx(p.x),y=sy(p.y);
  if(p.trail>0)line(sx(trailX),sy(trailY),sx(trailEndX),sy(trailEndY),GOLD);
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0)disc(sx(fx[i].x),sy(fx[i].y),2,fx[i].c);
@@ -1584,6 +1655,11 @@ void paint(void){
   int x=sx(job.xs[0]),y=sy(job.ys[0]);
   box(x-10,y-7,20,14,0x594537,0x9e8163);
   rect(x-9,y-1,18,2,0x272b30);rect(x-2,y-4,4,8,0xd0a07a);
+ }
+ if(vdActive>=0&&vdGoalX>=0){
+  int gx=sx(vdGoalX),gy=sy(vdGoalY);
+  if(gx>=25&&gx<W-25&&gy>125&&gy<H-65)diamond(gx,gy,12,TEAL);
+  else{int ax=cl(gx,29,W-30),ay=cl(gy,138,H-80);if(ax>730&&ay>365)ax=730;mark(ax,ay,10,TEAL);}
  }
  if(job.kind>=0){
   int ride=job_vehicle_target();
@@ -1612,10 +1688,17 @@ void paint(void){
   }else if(job_venue()>=0||job_room()>=0)diamond(x,y,9,color);
   else mark(x,y,14+(int)(sn(anim*4)*4),color);
  }
- if(scene==1&&!mapOn)hud();if(scene==1)minimap();
- if(scene==2){field_guide();return;}
+ hud();minimap();
+ if(scene==2)return; /* No second modal underneath the guide. */
  if(p.dead){modal(240,149,480,212,PINK);textat(268,171,"DOWN IN VANTA",PINK,1);textat(269,231,sv.home?"Recover at your Breakwater safehouse.":"Tideway Clinic charges up to $35 for recovery.",PAPER,0);textat(269,284,"ENTER  /  RECOVER",LIME,0);return;}
  if(menu>=0){paint_active_menu();draw_wallet(650,16,294);}
  if(atmOpen>=0)atm_draw();
+}
+void paint(void){
+ if(scene==0||scene==5){profiles_paint();return;}
+ if(scene==2){paint_world(helpBack);field_guide();return;}
+ paint_world(scene);vd_draw();
  bank_warning_draw();
 }
+
+#include "verdict_activities.inc"

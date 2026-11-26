@@ -104,8 +104,15 @@ static void beginJob(int kind){
   break;
  default:break;
  }
- if(ride>=0&&!street_find_car_space(ride,&vehicle,x,y,kind==JOB_HOT?30:0)){
-  tell("The staging area is blocked. Try the job again shortly.");return;
+ if(ride>=0){
+  /* Loaners and purchased cars stage beyond the door's reach whenever
+   * that curb is available. E still prioritizes doors: approaching these
+   * loaners from their contact should not reopen the venue instead. */
+  int front=kind==JOB_TAXI||kind==JOB_SPRINT,departure=kind==JOB_HOT?30:0;
+  if(!(front&&street_find_car_space(ride,&vehicle,x,y,departure,94))&&
+     !street_find_car_space(ride,&vehicle,x,y,departure,0)){
+   tell("The staging area is blocked. Try the job again shortly.");return;
+  }
  }
  if(kind==JOB_VAULT){
   jobBuildings[0]=contract_room(kind,840,1460,-1);
@@ -174,7 +181,7 @@ static void advanceJob(void){
  if(job.kind<0||++job.step<job.total)return;
  int kind=job.kind,service=job_is_service(job.kind),unpaid=job.unpaid||service;
  int tip=kind==JOB_TAXI?taxi_tip_amount(job.price,taxi.crashes,taxi.damage,taxi.rough):0;
- int bonus=kind==JOB_COURIER&&sv.intro==2?25:0;
+ int bonus=kind==JOB_TAXI?taxi_detour_bonus():kind==JOB_COURIER&&sv.intro==2?25:0;
  char race[80];const char *result=jobNames[kind];
  if(kind<JOB_VAULT){
   sv.legal++;
@@ -212,7 +219,7 @@ static void advanceJob(void){
 static int interior_job_drop(int venue){
  if(job.kind<0||job_venue()!=venue)return 0;
  if(job.kind==JOB_VAULT&&p.heat>0){
-  tell("Ivo won't take the lockbox while police are looking for you.");return 1;
+  tell("Handoff closed. Go outside and lose pursuit, then return to Ivo.");return 1;
  }
  advanceJob();
  if(job.kind==JOB_COURIER)
@@ -305,7 +312,7 @@ static const char *job_objective(void){
      job.step==0?"Cross the start line to begin timing.":
      p.car!=jobRide?"Return to the car you started the sprint in.":"Follow the marked circuit to the finish.";
  case JOB_VAULT:return job.step==0?"Take the lockbox from the marked parcel counter.":
-     p.heat>0?"Lose the police with the lockbox.":"Hand the lockbox to Ivo at Vault 39.";
+     p.heat>0?"Go outside and lose pursuit. Then return to Ivo at Vault 39.":"Hand the lockbox to Ivo at Vault 39.";
  case JOB_HOT:return job.step==0?"Steal the marked Vectra.":
      p.car!=jobRide?"Return to the marked Vectra.":
      p.heat>0?"Lose the police with the marked car.":"Stop at Kiosk 09's marked bay and press E.";
@@ -326,6 +333,7 @@ static void check_arrival(float ox,float oy){
  float t=ds>0?((tx-ox)*dx+(ty-oy)*dy)/ds:0;
  if(t<0)t=0;if(t>1)t=1;
  if(d2(ox+t*dx-tx,oy+t*dy-ty)>34.f*34.f)return;
+ vd_shadow_gate(job.step);
  if(job.step==0){jobRide=p.car;tell("Sprint clock started. Follow the gates around the block.");}
  advanceJob();
 }

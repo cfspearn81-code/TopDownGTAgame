@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-bash scripts/build.sh
+[[ ${DC_QA_BUILT:-0} == 1 ]] || bash scripts/build.sh
 for t in test profiles_test economy_test road_test visual_test interior_routes_test bank_ui_test; do
   gcc -std=c11 -O1 -g -fsanitize=address,undefined,float-cast-overflow \
     -fno-omit-frame-pointer -fno-pie -no-pie "src/$t.c" -o "build/$t"
@@ -29,7 +29,7 @@ if [[ "${1:-}" == --soak || "${1:-}" == --extended ]]; then
   ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 ./build/stress_test "${soak_args[@]}"
 fi
 if [[ "${1:-}" == --tour ]]; then
-  gzip -dc scripts/qa/easy-entry-tour.txt.gz | build/check_pe build/DeadChannel.exe --tour
+  gzip -dc scripts/qa/curb-access-tour.txt.gz | build/check_pe build/DeadChannel.exe --tour
 fi
 if [[ "${1:-}" == --historical-tour ]]; then
   # Play the archived recording against the executable it was designed for.

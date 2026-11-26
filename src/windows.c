@@ -1,5 +1,6 @@
 /* Native Win32 window, DIB rendering, keyboard, and local save. No runtime DLL bundle. */
 #include "game.h"
+#include "radio_motif.h"
 typedef unsigned long long U64; typedef unsigned short U16;
 typedef void *Handle; typedef long long S64;
 typedef struct{int x,y;} Point;
@@ -21,6 +22,19 @@ F(Handle,LoadCursorW,Handle,const U16*);F(void,PostQuitMessage,int);F(int,SetPro
 F(int,TrackMouseEvent,void*);
 F(int,PatBlt,Handle,int,int,int,int,U);
 F(int,StretchDIBits,Handle,int,int,int,int,int,int,int,int,const void*,const Bitmap*,U,U);
+F(Handle,LoadLibraryExW,const U16*,Handle,U);
+F(void*,GetProcAddress,Handle,const char*);
+static void radio_audio(int track){
+ if(!track)return;
+ typedef int (*PlayFn)(const void*,Handle,U);
+ static int resolved;static PlayFn play;
+ if(!resolved){
+  resolved=1; /* System32 only. Missing multimedia support is not fatal. */
+  Handle lib=__imp_LoadLibraryExW(L"winmm.dll",0,0x800);
+  if(lib)play=(PlayFn)__imp_GetProcAddress(lib,"PlaySoundW");
+ }
+ if(play){const RadioWave *w=rm_record(track);if(w)play(w,0,7); /* SND_MEMORY | ASYNC | NODEFAULT */}
+}
 static U16 savePath[1024];static unsigned directoryEnd,stageSequence;
 static unsigned add(U16*d,unsigned pos,const U16*s){while(*s)d[pos++]=*s++;d[pos]=0;return pos;}
 static void make_fresh_path(int i){
@@ -116,7 +130,7 @@ static int key(int v){return (__imp_GetAsyncKeyState(v)&0x8000)!=0;}
 static U input(void){U r=0;
  if(key('W')||key(0x26))r|=UP;if(key('S')||key(0x28))r|=DOWN;if(key('A')||key(0x25))r|=LEFT;if(key('D')||key(0x27))r|=RIGHT;
  if(key('E'))r|=USE;if(key(0x20))r|=FIRE;if(key(0x10))r|=BRAKE;if(key(0x1b))r|=ESC;if(key('M'))r|=MAP;
- if(key(0x2e))r|=DELETE_SLOT;if(key(0x74))r|=SAVE;if(key(0x0d))r|=ENTER;if(key(0x70))r|=HELP;if(key(0x71))r|=GFX;if(key(0x72))r|=SLOT;if(key(0x73))r|=NEW_SLOT;if(key('X'))r|=PUNCH;if(key('T'))r|=TAXI_NEXT;return r;
+ if(key(0x2e))r|=DELETE_SLOT;if(key(0x74))r|=SAVE;if(key(0x75))r|=ACTIVITIES;if(key(0x0d))r|=ENTER;if(key(0x70))r|=HELP;if(key(0x71))r|=GFX;if(key(0x72))r|=SLOT;if(key(0x73))r|=NEW_SLOT;if(key('X'))r|=PUNCH;if(key('T'))r|=TAXI_NEXT;return r;
 }
 static int redraw=1;
 static Bitmap dib={40,W,-H,1,32,0,0,0,0,0,0,0};
@@ -125,18 +139,19 @@ void entry(void){
  static const U16 cls[]=L"DeadChannelNative11";
  Class k={sizeof(Class),0x23,wnd,0,0,instance,0,__imp_LoadCursorW(0,(void*)32512),0,0,cls,0};
  if(!__imp_RegisterClassExW(&k)){__imp_ExitProcess(1);return;}
- Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Easy Entry",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
+ Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Port Vanta Sessions",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
  if(!win){__imp_ExitProcess(2);return;}
  directories();set_session_seed((U)__imp_GetTickCount64());init_city();__imp_ShowWindow(win,1);
- U64 t=__imp_GetTickCount64(); unsigned acc=0;int wasFocused=1,lastW=0,lastH=0;
+ U64 t=__imp_GetTickCount64(); unsigned acc=0;int wasFocused=1,lastW=0,lastH=0;U focusBlocked=0;
  for(;;){Msg m;while(__imp_PeekMessageW(&m,0,0,0,1)){if(m.msg==0x0012){__imp_ExitProcess((U)m.wp);return;}__imp_TranslateMessage(&m);__imp_DispatchMessageW(&m);}
   U64 now=__imp_GetTickCount64(), elapsed=now-t;t=now;if(elapsed>60)elapsed=60;acc+=(unsigned)elapsed*60;
   int focus=__imp_GetForegroundWindow()==win,update=0;
-  if(!focus&&wasFocused){clear_input();acc=0;}wasFocused=focus;
-  while(acc>=1000){if(focus)tick(input());acc-=1000;update=1;}
+  if(!focus&&wasFocused){clear_input();acc=0;}
+  if(focus&&!wasFocused)focusBlocked=input();wasFocused=focus;
+  while(acc>=1000){if(focus){U down=input();focusBlocked&=down;tick(down&~focusBlocked);}acc-=1000;update=1;}
   if((update&&focus)||redraw){int repaint=redraw;redraw=0;Rect r;if(__imp_GetClientRect(win,&r)&&r.r>0&&r.b>0){
    View v=framebuffer(r);int sw=v.w,sh=v.h;
-   if(sw>0&&sh>0){paint();Handle dc=__imp_GetDC(win);
+   if(sw>0&&sh>0){radio_audio(take_radio_record());paint();Handle dc=__imp_GetDC(win);
     if(dc){if((sw!=r.r||sh!=r.b)&&(repaint||r.r!=lastW||r.b!=lastH))__imp_PatBlt(dc,0,0,r.r,r.b,0x00000042);
       __imp_StretchDIBits(dc,v.x,v.y,sw,sh,0,0,W,H,pixels,&dib,0,0x00cc0020);__imp_ReleaseDC(win,dc);
       lastW=r.r;lastH=r.b;}}

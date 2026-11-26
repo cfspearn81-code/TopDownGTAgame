@@ -58,7 +58,7 @@ def elf(infile,out):
     c.reloc(idx,p,sm[symbol],coff)
  c.emit(out)
 def imports(out):
- imports={'KERNEL32.dll':'ExitProcess GetModuleHandleW Sleep GetTickCount64 GetLastError GetCurrentProcessId GetEnvironmentVariableW CreateDirectoryW CreateFileW ReadFile WriteFile CloseHandle MoveFileExW DeleteFileW', 'USER32.dll':'RegisterClassExW CreateWindowExW DefWindowProcW ShowWindow PeekMessageW TranslateMessage DispatchMessageW GetAsyncKeyState GetClientRect GetDC ReleaseDC LoadCursorW PostQuitMessage SetProcessDPIAware GetForegroundWindow TrackMouseEvent', 'GDI32.dll':'StretchDIBits PatBlt'}
+ imports={'KERNEL32.dll':'ExitProcess GetModuleHandleW LoadLibraryExW GetProcAddress Sleep GetTickCount64 GetLastError GetCurrentProcessId GetEnvironmentVariableW CreateDirectoryW CreateFileW ReadFile WriteFile CloseHandle MoveFileExW DeleteFileW', 'USER32.dll':'RegisterClassExW CreateWindowExW DefWindowProcW ShowWindow PeekMessageW TranslateMessage DispatchMessageW GetAsyncKeyState GetClientRect GetDC ReleaseDC LoadCursorW PostQuitMessage SetProcessDPIAware GetForegroundWindow TrackMouseEvent', 'GDI32.dll':'StretchDIBits PatBlt'}
  c=COFF(); rw=0xc0300040; ro=0x40300040
  desc=c.section('.idata$2',b'\0'*(20*len(imports)),rw)
  c.section('.idata$3',b'\0'*20,rw)

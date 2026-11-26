@@ -1,0 +1,86 @@
+PORT VANTA SESSIONS | FIELD NOTES
+=================================
+Finish Mara's opening courier shift. On foot, in a vehicle, or inside an
+ordinary room, press F6 (or Esc > City Listings). Up/down browses; left/right
+moves six entries. Enter opens the selected listing. Your objective names
+the first contact; most listings involve a physical journey, not a teleport.
+The folder is not a second career: one listing or ordinary contract at a time.
+Reopen F6 to resume or drop a listing. For a native fare, Esc > Abandon.
+Leaving a choice with Esc declines it. Banks, assets, fares and case-service
+rules use the standard career. No new save-format revision is required.
+
+BLUE HOUR RECOMMENDATION: SIDE B BEFORE SIGN-OFF
+Inside Blue Hour Tram Hall, walk to the DJ's record rack in the middle aisle,
+not the timetable against the back wall. E lets you inspect two illustrated
+sleeves. Pick Seawall Nocturne or Last Tram Home. Harbourlight RADIO is your
+studio; Harbourlight TRAM HALL is just the arrival station. Walk anywhere,
+including all the way from Blue Hour, at $0. Or take a $5 clean-cash ticket
+at the departures board (Enter) and walk the last blocks from the west
+seawall. A personal pin stays yours, even when the new goal appears.
+Each sleeve has an original 3.5-second synthesized phrase, generated in
+the game without recordings. Captions and the light meters still work when
+the sound device is unavailable.
+Find the mixing desk and press E. The 36-second slot uses active play time;
+being late gives an encore rather than a failure. Either path and either
+slot pays $95 clean once. Step back outside to read the track's headline.
+
+OTHER LISTINGS
+A2  One-Take Corner: collect a film Mote at West Quay. Drive through ACTION.
+    Stop on the inside or wide painted mark, nose south at the camera.
+    Enter retakes. The two title cards depend on where and how you stop.
+A3  One More Stop: pick up Ren. Go straight to Police HQ or take T to add
+    Copper Playhouse on the way for $20. Enter turns the detour down. Passing
+    the marquee twice still pays once. The ordinary tip is a separate item.
+For A4 and B3, Enter inspects dedicated story props. E keeps normal room,
+plaque and fixture functions.
+A4  Sunday Supper: visit Low Tide Rooming House. Take the note from the
+    residents' table. Look for the braided loaf on bakery sidewalk signs;
+    return to the shared table after visiting the right oven.
+B1  Cab Rank: compare the two tickets before accepting. Pickup is the empty
+    trip to the rider; the total includes it. Esc declines both without moving
+    your map pin. The compare board is also available at Mercury Dispatch.
+B2a Nightglass Valet: take two customers' keys in turn. Choose a curb bay,
+    park and step out; return to the key stand for the other car.
+B2b Curb Chess: at West Quay, fit a van and Mote in the tandem apron. Deep
+    berth first, mouth berth second. Enter resets the loaners, not your car.
+B3a City in Focus: at Bluebird Reading Room, get the picture brief. Locate
+    the described aquarium installation, set the light, then face the tank
+    from the camera rail. The new edition appears at the newspaper rack.
+B3b Poster Detective: inspect the faulty artwork at Mariner Print Shop. Read
+    a playhouse plaque, return and correct the printed venue slug.
+B3c Dial Hunter: borrow a captioned receiver at Low Tide Radio. Sample three
+    distinct marked blocks, then follow the strongest reading and bearing to
+    the unmarked transmitter. You do not need to hear tones or identify colors.
+B4  The Block Bill: choose an act or supper at Mariner Records and revisit
+    the named block. The bill changes the marquee you see there.
+B5  Switchboard Drop: optional street work. Take the cassette at East
+    Freight and choose a contact. West opens after eight seconds; East is
+    farther and ready immediately. Finish on foot; no fighting is required.
+B6a Crossing Keeper: at East Freight's signal desk, release the queues one
+    at a time. Read the pedestrian signal. Enter grants a requested WALK before freight.
+    Leaving the junction hands the signals back to automatic control.
+B6b Freight Crossing: approach that crossing as a driver. Wait for OPEN or
+    take the signed parallel street west. Nothing changes citywide priority.
+B7  Dead Air Live: at Low Tide Radio, choose one of two live calls. Board
+    the studio van, park in the marked camera bay, pan with A/D and hold
+    the moving subject in frame for two seconds. Press Enter to go live.
+B8  Harbor Proof: at the Bluebird Print Shop letterpress, choose a story.
+    Lock each moving plate with Enter. An imperfect print still goes up.
+B9  The Second Shadow: start at the Glass Mile timekeeper. Finish a real
+    lap, then choose whether to keep it as your next, non-colliding rival.
+    The shadow uses the same race clock as the gates. Enter toggles it.
+
+READING THE MAP
+M shows the atlas. Purple belongs to the source shown under PURPLE LINE:
+a personal pin, a contract, your listing or a career goal. Job/listing
+markers remain visible even when purple follows your personal pin.
+T cycles Blue Hour Tram Hall, Harbourlight Tram Hall, then the registered
+car (if owned). Enter places a route to what you selected. A bought car
+stays where you park in the current session; after reload, ownership is
+intact and its marker shows the car's actual position at Mercury. Taking
+a tram doesn't move it across town. The door, room and atlas card agree on
+the venue's district even when the building spans a district boundary.
+The atlas advances city time and the Revenue countdown. It pauses activity
+and race/fare clocks. The field guide and F6 listings pause both. Goals,
+rivals, drafts and other session souvenirs do not survive a reload. Clean
+or dirty payments already made to the character use the normal saved wallet.

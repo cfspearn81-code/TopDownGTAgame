@@ -1,3 +1,43 @@
+PORT VANTA SESSIONS
+
+- 17 optional city listings. Two records, a legal radio slot, parking and
+  filming shifts, a passenger detour, neighborhood stories, a freight desk,
+  a news van, the letterpress and a non-colliding Glass Mile rival. F6 after
+  the first courier shift. CITY-LISTINGS.txt describes every listing.
+- Both radio sleeves have distinct original synthesized phrases, no recorded
+  assets, visual meters and on-air captions if audio is unavailable.
+- Both tram endpoints, destination neighborhoods and landmarks, eligibility
+  and the exact $5 clean-cash fare are visible before payment. Only the
+  signed-off record delivery adds a permit, never an exemption from pursuit.
+- Atlas labels the route owner separately from the job stop. Registered
+  car has a live map marker and the city's Revenue timer stays visible.
+  Ordinary venues use their physical doorway district inside and on the map.
+- Sustained cab contact is grouped for tip scoring, not physical damage.
+  Sprint start arrow remains visible with Low FX. Vault handoff explains
+  how to clear pursuit before offering the cargo interaction.
+- Save layout is still Rev10 (304 bytes), with Rev2-9 loaders intact.
+  Accepted activities, stories, shots and ghost laps are stored only in the
+  active session. Completed payouts and ordinary career data are saved.
+
+Previous update:
+EASY ENTRY HOTFIX
+
+- Opening F1 keeps the room or atlas behind the guide and returns
+  to it on close.
+- Mouse clicks in the black border no longer clear GPS pins.
+  Right-clicking inside the map still clears a pin.
+- Newly staged taxi, sprint and garage cars prefer spots away from
+  the doorway, so you can walk straight to the car and press E.
+- Save format and vehicle handling are unchanged.
+
+EASY ENTRY: WINDOWS + LINUX
+
+- New native x86-64 Linux SDL2 launcher alongside the unchanged Windows
+  executable. Gameplay and controls, including E for cars, are shared.
+- Both run offline. Linux stores compatible career files in the XDG
+  user data directory and replaces saves atomically.
+- No change to save revision, missions, vehicles, prices or clocks.
+
 EASY ENTRY
 
 - Press E to get into or out of cars. Enter still confirms menu choices

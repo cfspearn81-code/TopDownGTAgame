@@ -1,6 +1,107 @@
 # Dead Channel | Project handoff
 
-**Current release** — [Easy Entry for Windows 11 x64](downloads/Dead-Channel-Easy-Entry-Windows-11-x64.zip), November 26, 2026.
+## Current release: Port Vanta Sessions
+
+Downloads: [Windows 11 x64](downloads/Dead-Channel-Port-Vanta-Sessions-Windows-11-x64.zip) ·
+[Linux x86-64](downloads/Dead-Channel-Port-Vanta-Sessions-Linux-x64.tar.gz) ·
+[SHA-256 checksums](downloads/SHA256SUMS.txt).
+
+The public download archives are the same tested packages distributed in
+chat. Each includes the runnable executable, rebuildable source and player
+docs. The top-level README and handoff add the repository download links.
+
+Cumulative update based on Easy Entry Hotfix. The new city listings and their world consequences are session-only. Ordinary jobs, all save slots and the 304-byte Rev10 layout remain compatible. Verification details below and in docs/QA-REPORT.txt.
+
+### Release scope and verification
+- F6 / Pause > City Listings exposes 17 playable entries across all named
+  A/B groups. Session goals and personal pins are tracked separately.
+  The original first shift, regular jobs, banking and Revenue remain intact.
+- src/verdict_api.inc defines events, mission ownership and goal semantics.
+  Group fragments compile into the shared native game. A1 generates original
+  audio; Linux queues PCM via SDL2 and Windows dynamically opens system
+  WinMM. Audio is optional. No recordings, new tram line or bundled DLL.
+- Session souvenirs, footage, posters and ghost laps reset on actual
+  career activation/relaunch. Already-earned wallet outcomes remain saved;
+  Rev2-9 migrations and the 304-byte Rev10 layout have not changed.
+- docs/CITY-LISTINGS.txt is the full player guide. docs/QA-REPORT.txt
+  lists tested binary hashes, exercise-by-exercise results, and limits.
+  The downloads manifest identifies archive checksums outside the embedded
+  source (to avoid self-referential hashes). Earlier downloads and manifest
+  entries are retained.
+
+## Easy Entry Hotfix: Windows + Linux
+
+This cumulative hotfix includes the three verified fixes from the ongoing
+40-hour playtest. Both launchers read `Dead Channel | Easy Entry Hotfix`.
+No GitHub update is part of this chat delivery.
+
+1. **Field guide:** F1 dims the room or atlas you actually opened it from.
+   The previous view remains visible, clocks/route state remain paused,
+   and returning restores that room/map. It is not painted over an
+   unrelated street scene.
+2. **Map controls:** clicks in the black letterbox margin do not set or
+   clear atlas GPS pins. A real right-click inside the framebuffer still
+   clears the pin. Shared logical bounds protect both launchers.
+3. **Vehicle staging:** taxi and sprint loaners and garage cars prefer a
+   clear curb outside the immediate E-door reach. E still prioritizes
+   job steps, doors and ATMs. The previous staging search is the fallback
+   when every preferred spot is unavailable.
+
+Both platform launchers share the same economy, vehicle handling and
+304-byte Rev10 saves with Rev2–9 migration. Manual Windows/Linux transfer
+remains safe after closing both copies and backing up any target slots.
+Linux continues to require x86-64 glibc 2.34+ and SDL2 runtime.
+
+The hotfix `--tour` tape is `scripts/qa/curb-access-tour.txt.gz`. The
+3,664-frame run approaches the car directly, completes the courier and
+taxi shifts with $318 clean cash, 100 HP and one fare, and hits explicit
+save digest `a6727845` on both launchers. Keep the original Easy Entry
+input tape as historical; do not change its digest to fake a pass.
+See the current QA report for details and limits. The release explicitly
+does not include the later ATM candidate.
+
+Verified executable hashes (archive hashes ship in the separate manifest):
+- Windows x64 PE SHA-256: `93bb63de65c438e076534b3ac3a09e68fc2b7579f0791f94e71af480b2187e50`.
+- Linux x86-64 ELF SHA-256: `acdef8ed101e2c33c070263fc91518adf7f35aad2b60b7876b969e94aab9acdf`.
+
+## Previous Easy Entry: Windows + Linux build
+
+The game now has two native x86-64 launchers. `src/linux.c` presents the
+same 960×540 CPU framebuffer through SDL2 with black letterboxing, maps
+window mouse coordinates through the actual drawable size, routes
+keyboard/ASCII text, and pauses simulation and clears held inputs when
+unfocused. A key repeat after focus regain cannot generate a new
+interaction. `src/windows.c` maintains the existing native PE entry.
+No shared gameplay rules or title changed; both windows read
+`Dead Channel | Easy Entry`.
+
+- `bash scripts/build-linux.sh` builds `build/DeadChannel`; the tested ELF
+  requires x86-64 glibc 2.34+ and `libSDL2-2.0.so.0`. The SDL2 SDK is
+  optional for builds: `src/sdl2_linux.h` offers an x86-64 SDL2 ABI
+  fallback when SDK headers/pkg-config are unavailable. Neither platform
+  needs Wine, a browser, an account, or a network at runtime.
+- `src/linux_save.c` uses the private user-data folder
+  `$XDG_DATA_HOME/DeadChannel` (absolute XDG paths only), otherwise
+  `~/.local/share/DeadChannel`. It shares exact slot names and the Rev10
+  layout / Rev2–9 migrations with Windows. Read must match exact file size.
+  Stage files are exclusive and private; writes flush before commit.
+  Rename replaces existing saves; an atomic hard link commits a new slot
+  without replacing another copy's save. Keep the target filesystem's
+  POSIX link/rename semantics. Existing-slot simultaneous writes are
+  still last-successful-write; backups and transfers are manual.
+- Use `bash scripts/test-linux.sh` for the exact ELF event/render/save
+  check under SDL dummy video and POSIX disk tests. The current
+  `bash scripts/test.sh --tour` checks its existing Windows PE.
+  See `docs/QA-REPORT.txt` for the verified results and exclusions.
+- These local Windows/Linux archives have not been pushed. Before
+  publishing another build, update this handoff for both targets,
+  record both archive digests, verify matching binaries, and keep
+  the exact save compatibility and test environment explicit.
+- Linux binary SHA-256: `335e00c965f935970a283a4f2eae54a175bcbd20c26d307e6e77825b162d12f0`.
+  Windows binary SHA-256 remains `d22b3cf14e7b5a0a106d665f4e3e06e44217776c96abcc72daa108a5c018900b`.
+  Archive hashes accompany the distributed files separately.
+
+**Previously published Windows release** — [Easy Entry for Windows 11 x64](downloads/Dead-Channel-Easy-Entry-Windows-11-x64.zip), November 26, 2026.
 Cumulative Lantern Fix build, based on City Rhythm
 (`98b10f29a03c0b910be4e696ae76fdacdceeb746`). Earlier download files and
 their checksums are retained.
