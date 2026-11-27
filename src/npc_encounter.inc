@@ -11,6 +11,13 @@ typedef struct{
  const char*name;
 } NpcRef;
 static int outer_person_ref(int id,NpcRef*r,int*step);
+/* Club/aquarium symbols are defined later; these adapters keep the shared
+   input, dialogue, sightline and combat state machine independent of art. */
+static int npc_other_room_key(void),npc_other_room_ref(int id,NpcRef*r);
+static int npc_other_player(float*x,float*y,float**heading);
+static PulseRoomSolid npc_other_solid(void);
+static void npc_other_death(void);
+static int street_extra_ref(int id,NpcRef*r,int*step);
 typedef struct{
  NpcRef actor;
  int phase,room,ticks,prize,hp,surrender;
@@ -20,7 +27,9 @@ static unsigned char npcLetters[N_ACT_MAX],npcSpent[N_ACT_MAX];
 static NpcRef npcTalk;
 static int npcTalkOn,npcTalkRoom,npcChoice;
 typedef struct {float x,y,a;int room;} NpcRejoin;
-static NpcRejoin npcRejoin[N_ACT_GROW-N_ACT_DANCE+1];
+static NpcRejoin npcRejoin[N_ACT_MAX-N_ACT_DANCE];
+typedef struct {short room;unsigned char damage;float down,flash;NpcRef body;} NpcRoomCondition;
+static NpcRoomCondition npcRoomCondition[N_ACT_MAX-N_ACT_FRONT];
 static NpcEncounter npcEnc;
 static int npcTraceTicks;
 static PulsePose npcTracePose;
@@ -39,20 +48,32 @@ _Static_assert(LEN(npcStreetNames)==LEN(peds),"live street identities must map o
 static int npc_room_key(void){
  if(scene==1)return 1;
  if(scene==3&&interior_active_loc>=0)return 32+interior_active_loc*2+interior_subroom;
- return 0;
+ return npc_other_room_key();
 }
 static void npc_player_point(float*x,float*y){
- if(scene==3){*x=interior_x;*y=interior_y;}else{*x=p.x;*y=p.y;}
+ if(scene==3){*x=interior_x;*y=interior_y;}else{float*h;if(!npc_other_player(x,y,&h)){*x=p.x;*y=p.y;}}
 }
+static float npc_player_heading(void){
+ if(scene==3)return interior_a;
+ float x,y,*h;return npc_other_player(&x,&y,&h)&&h?*h:p.a;
+}
+static void npc_point_heading(float a){
+ if(scene==1){p.a=a;return;}
+ if(scene==3){interior_a=a;return;}
+ float x,y,*h;if(npc_other_player(&x,&y,&h)&&h)*h=a;
+}
+static PulseRoomSolid npc_room_solid(void){return scene==3?int_solid:npc_other_solid();}
 static int npc_clear(float x,float y,float tx,float ty){
- return pulse_path(x,y,tx,ty,scene==3?int_solid:0);
+ return pulse_path(x,y,tx,ty,npc_room_solid());
 }
 static int npc_spot(NpcRef*r,int id,int kind,const char*name,float x,float y,float a,int model,int hue,U coat){
  *r=(NpcRef){id,kind,model,hue,x,y,a,x,y,coat,name};return 1;
 }
 static int npc_raw_ref(int id,NpcRef*r){
  if(scene==1){
-  if(id>=N_ACT_OUTER&&id<N_ACT_MAX)return outer_person_ref(id,r,0);
+  if(id>=N_ACT_OUTER&&id<N_ACT_OUTER_END)return outer_person_ref(id,r,0);
+  if(id>=N_ACT_OUT_QUEUE&&id<N_ACT_OUT_EXTRA_END)return street_extra_ref(id,r,0);
+  if(street_extra_down(id))return 0;
   if(id>=N_ACT_STREET&&id<N_ACT_STREET+LEN(peds)){
    int i=id-N_ACT_STREET;Ped*q=peds+i;if(q->hp<=0)return 0;
    U coat=q->role==1?0x668df0:q->role==2?PINK:(i%2)?0x92b7b4:0xca8c71;
@@ -68,7 +89,8 @@ static int npc_raw_ref(int id,NpcRef*r){
   #endif
   return 0;
  }
- if(scene!=3||interior_active_loc<0||interior_active_loc>=LEN(loc))return 0;
+ if(scene!=3)return npc_other_room_ref(id,r);
+ if(interior_active_loc<0||interior_active_loc>=LEN(loc))return 0;
  int n=interior_active_loc,k=loc[n].kind;
  if(k==15&&(id==N_ACT_CHIEF||id==N_ACT_HQ1||id==N_ACT_HQ2)){
   if(id==N_ACT_CHIEF){
@@ -117,7 +139,7 @@ static int npc_holds(int id){
  return npcTalkOn&&id==npcTalk.id&&npcTalkRoom==npc_room_key();
 }
 static NpcRejoin *npc_rejoin_for(int id){
- return id>=N_ACT_DANCE&&id<=N_ACT_GROW?&npcRejoin[id-N_ACT_DANCE]:0;
+ return ((id>=N_ACT_DANCE&&id<=N_ACT_GROW)||(id>=N_ACT_ROOM_BASE&&id<N_ACT_ROOM_END))?&npcRejoin[id-N_ACT_DANCE]:0;
 }
 /* Called by both the picker and the live actor painter, so the person
    selected, displayed and handed into the draw is the same pose. */
@@ -135,8 +157,16 @@ static int npc_present_pose(int id,float*x,float*y,float*a,int*step){
  }
  return 0;
 }
+static NpcRoomCondition *npc_room_condition(int id){
+ int room=npc_room_key();
+ if(room<32||id<N_ACT_FRONT||id>=N_ACT_MAX)return 0;
+ NpcRoomCondition*c=npcRoomCondition+id-N_ACT_FRONT;return c->room==room?c:0;
+}
+static int npc_room_downed(int id){NpcRoomCondition*c=npc_room_condition(id);return c&&c->down>0;}
 static int npc_ref(int id,NpcRef*r){
- if(!npc_raw_ref(id,r))return 0;
+ NpcRoomCondition*c=npc_room_condition(id);
+ if((c&&c->down>0)||!npc_raw_ref(id,r))return 0;
+ if(c&&c->flash>0)r->coat=0xffcfac;
  int direct=r->tx==r->x&&r->ty==r->y,step=0;
  npc_present_pose(id,&r->x,&r->y,&r->a,&step);
  if(direct){r->tx=r->x;r->ty=r->y;}
@@ -168,9 +198,9 @@ static int npc_rejoin_goal(int id,float x,float y,float tx,float ty,float *gx,fl
 }
 static void npc_resume_room_actors(void){
  int room=npc_room_key();
- for(int id=N_ACT_DANCE;id<=N_ACT_GROW;id++){
+ for(int id=N_ACT_DANCE;id<N_ACT_MAX;id++){
   NpcRejoin*q=npc_rejoin_for(id);
-  if(!q->room)continue;
+  if(!q||!q->room)continue;
   NpcRef r;if(q->room!=room||!npc_raw_ref(id,&r)){q->room=0;continue;}
   if(npc_holds(id)||npc_replaces(id))continue;
   float dx=r.x-q->x,dy=r.y-q->y;
@@ -194,18 +224,18 @@ static void npc_end_talk(int rejoin){
  }
  npcTalkOn=0;
 }
-static int npc_replaces(int id){return npcEnc.phase!=NPC_IDLE&&npcEnc.actor.id==id&&npcEnc.room==npc_room_key();}
+static int npc_replaces(int id){return (npcEnc.phase!=NPC_IDLE&&npcEnc.actor.id==id&&npcEnc.room==npc_room_key())||npc_room_downed(id);}
 static int npc_near_ref(NpcRef*out,int context){
  if(!npc_room_key()||p.car>=0||p.dead||mapOn||atmOpen>=0||wheelOpen)return 0;
  float x,y;npc_player_point(&x,&y);float best=100000.f;int found=0;
- float a=scene==3?interior_a:p.a;
- for(int id=0;id<N_ACT_MAX;id++){
-  if(scene==3&&id<N_ACT_FRONT)continue;
+ float a=npc_player_heading();
+ for(int id=0;id<(scene==1?N_ACT_OUT_EXTRA_END:N_ACT_MAX);id++){
+  if(scene!=1&&id<N_ACT_FRONT)continue;
   if(scene==1&&id>=N_ACT_FRONT&&id!=N_ACT_CROSS&&id<N_ACT_OUTER)continue;
   NpcRef r;if(npc_replaces(id)||!npc_ref(id,&r))continue;
   float dx=r.x-x,dy=r.y-y,d=d2(dx,dy);
   int touch=d<NPC_NEAR*NPC_NEAR&&npc_clear(x,y,r.x,r.y);
-  if(!touch&&context&&scene==3&&(r.tx!=r.x||r.ty!=r.y)){
+  if(!touch&&context&&scene!=1&&(r.tx!=r.x||r.ty!=r.y)){
    dx=r.tx-x;dy=r.ty-y;d=d2(dx,dy);
    touch=d<46*46&&npc_clear(x,y,r.tx,r.ty);d+=380.f;
   }
@@ -229,7 +259,7 @@ static int npc_open_near(void){
    if(npc_ref((interior_subroom?N_ACT_REAR:N_ACT_FRONT)+interior_active_loc,&r))return npc_start_talk(r);
   }
  }
- return npc_near_ref(&r,scene==3)&&npc_start_talk(r);
+ return npc_near_ref(&r,scene!=1)&&npc_start_talk(r);
 }
 static int npc_front_ref(NpcRef*r){
  if(scene!=3||interior_active_loc<0||!int_at_desk())return 0;
@@ -251,7 +281,7 @@ static void npc_forget_encounter(void){
 }
 static void npc_reset(void){
  npc_forget_encounter();npcTalkOn=0;npcSuppressed=0;z(npcRejoin,sizeof npcRejoin);
- z(npcLetters,sizeof npcLetters);z(npcSpent,sizeof npcSpent);
+ z(npcLetters,sizeof npcLetters);z(npcSpent,sizeof npcSpent);z(npcRoomCondition,sizeof npcRoomCondition);street_extra_reset();
 }
 /* Independent full-period 32-bit stream; rejecting the short tail avoids
  * bias in the uniform 141-value integer credit interval. */
@@ -270,7 +300,7 @@ static void npc_hello(NpcRef r){
  char line[112];append(append(append(line,r.name),": "),greeting);tell(line);
 }
 static int npc_stage(NpcRef *r,float x,float y,float *angle){
- PulseRoomSolid collision=scene==3?int_solid:0;
+ PulseRoomSolid collision=npc_room_solid();
  float heading=look(r->x-x,r->y-y);
  /* The existing compact pose supports close actors; only true sprite
     overlap lacks a useful facing. Preserve wall and counter guards. */
@@ -280,7 +310,7 @@ static int npc_stage(NpcRef *r,float x,float y,float *angle){
  }
  /* A staffed counter is a conversation anchor, not a line through the
     furniture. Only start if there is room to step onto the public side. */
- if(scene!=3||(r->tx==r->x&&r->ty==r->y))return 0;
+ if(scene==1||(r->tx==r->x&&r->ty==r->y))return 0;
  static const int turn[]={0,1,-1,2,-2,3,-3,4};
  for(int i=0;i<LEN(turn);i++){
   float a=wrap(heading+.785398f*turn[i]),tx=x+32.f*cs(a),ty=y+32.f*sn(a);
@@ -296,13 +326,14 @@ static int npc_begin(NpcRef r){
  float x,y,a;npc_player_point(&x,&y);
  if(!npc_stage(&r,x,y,&a)){tell("No clear line. Step into open space before drawing.");return 0;}
  npcSpent[r.id]=1;
+ NpcRoomCondition*injury=npc_room_condition(r.id);
  npcEnc=(NpcEncounter){.actor=r,.phase=NPC_DRAW,.room=npc_room_key(),.ticks=23,
-   .prize=15+(int)npc_roll_bound(141),.hp=3,.bornX=x,.bornY=y,.cool=.4f};
+   .prize=15+(int)npc_roll_bound(141),.hp=injury?max(1,3-injury->damage):3,.bornX=x,.bornY=y,.cool=.4f};
  npcEnc.surrender=npc_roll_bound(100)<35;
  npcEnc.actor.a=look(x-r.x,y-r.y);
  wheelFists=0;
  if(scene==3)interior_cache_loc=-2;
- if(scene==1)p.a=a;else interior_a=a;
+ npc_point_heading(a);
  /* End only this rider's active booking. Other contacts remain available
     and a greeting or failed draw must not void a legitimate fare. */
  if(scene==1&&job.kind==JOB_TAXI&&r.id==N_ACT_RIDER+taxi.rider){
@@ -376,16 +407,16 @@ static int npc_attack(U keys,float x,float y,float a){
  NpcRef *r=&npcEnc.actor;float dx=r->x-x,dy=r->y-y,co=cs(a),si=sn(a),f=dx*co+dy*si,l=absf(dy*co-dx*si);
  int melee=(keys&PUNCH)||!pistol_equipped();
  if(melee){
-  if(f<3||l>13||d2(dx,dy)>=27*27||!npc_clear(x,y,r->x,r->y))return scene==3;
+  if(f<3||l>13||d2(dx,dy)>=27*27||!npc_clear(x,y,r->x,r->y))return scene!=1;
   p.shot=.34f;punchFlash=.21f;npcEnc.hp--;
  }else{
   int range=sv.gear>0?165:112,damage=sv.gear>0?2:1;
   float cooldown=sv.gear>0?.21f:.33f;U ink=GOLD;
   nvk_stats(&range,&damage,&cooldown,&ink);
-  PulsePose g=scene==1?pulse_pose(2.5f):npc_local_aim(x,y,a,player_gait(),2.5f,int_solid);
+  PulsePose g=scene==1?pulse_pose(2.5f):npc_local_aim(x,y,a,player_gait(),2.5f,npc_room_solid());
   if(g.hand)return 1;
   if(f<=0||f<g.extent-.01f||f>=range||l>=13.f+f*.12f||
-     !npc_clear(x,y,r->x,r->y)||!npc_clear(g.mx,g.my,r->x,r->y))return scene==3;
+     !npc_clear(x,y,r->x,r->y)||!npc_clear(g.mx,g.my,r->x,r->y))return scene!=1;
   if(!night_venue_apply_pulse(&range,&damage,&cooldown,&ink))return 1;
   p.shot=cooldown;npcEnc.hp-=damage;
   if(scene==1){
@@ -405,7 +436,8 @@ static int npc_attack(U keys,float x,float y,float a){
   if(scene==1&&r->id>=N_ACT_STREET&&r->id<N_ACT_STREET+LEN(peds)){
    Ped *q=peds+r->id-N_ACT_STREET;q->x=r->x;q->y=r->y;q->hp=0;q->life=12;q->s=0;
   }
-  if(scene==1&&r->id>=N_ACT_OUTER&&r->id<N_ACT_MAX)outer_injure(r->id,3,r->x,r->y);
+  if(scene==1&&r->id>=N_ACT_OUTER&&r->id<N_ACT_OUTER_END)outer_injure(r->id,3,r->x,r->y);
+  else if(scene==1)street_extra_injure(r->id,3,r->x,r->y);
   tell("They dropped their cash. Walk over it to collect it.");
  }
  return 1;
@@ -413,7 +445,7 @@ static int npc_attack(U keys,float x,float y,float a){
 static void npc_encounter_tick(float dt){
  if(npcEnc.phase==NPC_IDLE)return;
  if(p.dead||p.car>=0||npcEnc.room!=npc_room_key()){npc_forget_encounter();return;}
- if(scene==3){p.shot-=dt;p.hit-=dt;punchFlash-=dt;if(npcTraceTicks>0)npcTraceTicks--;}
+ if(scene!=1){p.shot-=dt;p.hit-=dt;punchFlash-=dt;if(npcTraceTicks>0)npcTraceTicks--;}
  npcEnc.flash-=dt;npcEnc.strike-=dt;
  float x,y;npc_player_point(&x,&y);
  NpcRef*r=&npcEnc.actor;float dx=x-r->x,dy=y-r->y,d=d2(dx,dy);
@@ -453,15 +485,16 @@ static void npc_encounter_tick(float dt){
    street_actor_move(&temp,dx*v,dy*v,7);
    r->x=temp.x;r->y=temp.y;
   }else{
-   if(!int_solid(ox+dx*v,oy))r->x+=dx*v;
-   if(!int_solid(r->x,oy+dy*v))r->y+=dy*v;
+   PulseRoomSolid blocked=npc_room_solid();
+   if(blocked&&!blocked(ox+dx*v,oy))r->x+=dx*v;
+   if(blocked&&!blocked(r->x,oy+dy*v))r->y+=dy*v;
   }
  }
  npcEnc.cool-=dt;
  if(d<26*26&&npcEnc.cool<=0&&npc_clear(r->x,r->y,x,y)){
   npcEnc.cool=.85f;npcEnc.strike=.20f;health(8);
   if(scene==1)particle(p.x,p.y,4,PINK);
-  else if(p.dead){npc_forget_encounter();int_leave();}
+  else if(p.dead){npc_forget_encounter();if(scene==3)int_leave();else npc_other_death();}
  }
 }
 static void npc_body_paint(int dx,int dy){
@@ -522,4 +555,84 @@ static void npc_panel_paint(void){
                  sv.gear<0?"Requires an owned pistol.":npcSpent[npcTalk.id]?"This person won't risk another encounter this session.":"Draw on this person. They might give up cash or fight.";
  textat(left+25,top+189,tip,PAPER,0);
  textat(left+25,top+234,"UP / DOWN     E OR ENTER SELECT     ESC CLOSE",MUTED,0);
+}
+
+/* Direct hits on authored indoor people use the same cone and wall checks
+ * as street combat. Downed actors, hit flashes and cooldowns are transient;
+ * only a resolved robbery earns a payout. */
+static void npc_room_hurt(NpcRef r,int hit){
+ NpcRoomCondition*c=npcRoomCondition+r.id-N_ACT_FRONT;
+ if(c->room!=npc_room_key())*c=(NpcRoomCondition){.room=(short)npc_room_key()};
+ c->damage+=hit;c->flash=.19f;
+ if(c->damage>=3){c->down=12.f;c->body=r;heat(30);tell("Knockdown. No cash was taken.");}
+ if(scene==3)interior_cache_loc=-2;
+}
+static int npc_room_direct(U keys,float x,float y,float a){
+ if(!(keys&(PUNCH|FIRE))||p.shot>0||npc_room_key()<32||npcEnc.phase!=NPC_IDLE)return 0;
+ PulseRoomSolid room=npc_room_solid();if(!room)return 0;
+ int melee=(keys&PUNCH)||!pistol_equipped(),range=sv.gear>0?165:112,damage=sv.gear>0?2:1;
+ float cooldown=sv.gear>0?.21f:.33f;U ink=GOLD;
+ PulsePose g={.co=cs(a),.si=sn(a)};if(!melee){nvk_stats(&range,&damage,&cooldown,&ink);g=pulse_room_pose(x,y,a,player_gait(),room);if(g.hand)return 0;}
+ NpcRef target={.id=-1};PulsePose base=g;float rank=melee?27.f*27.f:(float)range;
+ for(int id=scene==3?N_ACT_FRONT:N_ACT_ROOM_BASE,end=scene==3?N_ACT_GROW+1:N_ACT_ROOM_END;id<end;id++){
+  NpcRef r;if(npc_replaces(id)||!npc_ref(id,&r))continue;
+  float dx=r.x-x,dy=r.y-y,f=dx*base.co+dy*base.si,l=absf(dy*base.co-dx*base.si);
+  float d=melee?d2(dx,dy):f;
+  if(f<3.f||d>=rank||l>(melee?13.f:13.f+f*.12f)||!npc_clear(x,y,r.x,r.y))continue;
+  PulsePose candidate=base;
+  if(!melee){
+   if(f<base.extent&&base.extent>0){
+    float k=(f-2.f)/base.extent;candidate.mx=x+(base.mx-x)*k;
+    candidate.my=y+(base.my-y)*k;candidate.extent=base.extent*k;
+   }
+   if(!npc_clear(x,y,candidate.mx,candidate.my)||!npc_clear(candidate.mx,candidate.my,r.x,r.y))continue;
+  }
+  g=candidate;rank=d;target=r;
+ }
+ if(melee){p.shot=.34f;punchFlash=.21f;}
+ else{
+  if(!night_venue_apply_pulse(&range,&damage,&cooldown,&ink))return 0;
+  p.shot=cooldown;npcTraceTicks=7;npcTracePose=g;npcTracePlayerX=x;npcTracePlayerY=y;npcTraceFacing=a;
+  float reach=rank>g.extent?rank-g.extent:0;
+  if(target.id>=0){npcTraceEndX=target.x;npcTraceEndY=target.y;}
+  else{
+   for(float d=1;d<=reach;d+=1.f)if(room(g.mx+d*g.co,g.my+d*g.si)){reach=d-1;break;}
+   npcTraceEndX=g.mx+g.co*reach;npcTraceEndY=g.my+g.si*reach;
+  }
+ }
+ if(target.id>=0){npc_room_hurt(target,melee?1:damage);heat(melee?26.f:24.f);}
+ return 1;
+}
+static void npc_room_conditions_tick(float dt){
+ for(int i=0;i<LEN(npcRoomCondition);i++){
+  NpcRoomCondition*c=npcRoomCondition+i;if(!c->room)continue;
+  if(c->flash>0){c->flash-=dt;if(c->flash<=0&&c->room==npc_room_key()&&scene==3)interior_cache_loc=-2;}
+  if(c->down>0){c->down-=dt;if(c->down<=0){*c=(NpcRoomCondition){0};if(scene==3)interior_cache_loc=-2;}}
+ }
+}
+static void npc_room_step(U keys,float x,float y,float*a){
+ if(npc_room_key()<32)return;
+ const float dt=1.f/60.f;
+ if(npc_other_room_key()==98&&p.noticeT>0)p.noticeT-=dt;
+ npc_stance(x,y,a);PulseRoomSolid wall=npc_room_solid();
+ pulse_guard_tick(scene,x,y,*a,wall);
+ if(npcEnc.phase==NPC_IDLE){
+  p.shot-=dt;p.hit-=dt;punchFlash-=dt;if(npcTraceTicks>0)npcTraceTicks--;
+  npc_room_direct(keys,x,y,*a);
+ }else{
+  npc_attack(keys,x,y,*a);npc_encounter_tick(dt);
+ }
+ npc_resume_room_actors();
+}
+static void npc_private_step(U keys,float x,float y,float*a){npc_room_step(keys,x,y,a);}
+static int npc_private_use(U keys,U tap,int reserved){
+ return (tap&USE)&&((keys&BRAKE)||!reserved)&&npc_open_near();
+}
+static void npc_private_bodies(int dx,int dy){
+ for(int id=scene==3?N_ACT_FRONT:N_ACT_ROOM_BASE,end=scene==3?N_ACT_GROW+1:N_ACT_ROOM_END;id<end;id++){
+  NpcRoomCondition*c=npc_room_condition(id);if(!c||c->down<=0)continue;
+  const NpcRef*r=&c->body;int x=(int)r->x-dx,y=(int)r->y-dy;
+  line(x-7,y-3,x+7,y+3,mix(r->coat,0x121c28,3));disc(x-7,y-4,3,0x987b73);
+ }
+ npc_body_paint(dx,dy);npc_room_trace(dx,dy);
 }

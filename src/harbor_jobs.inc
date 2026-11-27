@@ -235,7 +235,7 @@ static void hj_land_art(NavPoint q,int kind){
  int x=sx(q.x),y=sy(q.y);if(x<-62||x>W+65||y<-55||y>H+46)return;
  if(kind==0){box(x-41,y-39,83,22,0x1b3039,hj_blue);center(x,y-39,"HARBOR OFFICE",hj_blue,0);
   box(x-18,y-16,36,12,0x685646,0x9b896a);rect(x-14,y-14,11,4,0x91a2a3);
-  person(x+24,y-3,0x718da0,0,1.57f,1,2);return;}
+  return;}
  if(kind==1){
   int disabled=hj_phase()==HJ_RELAY_LIFT;
   if(!disabled){

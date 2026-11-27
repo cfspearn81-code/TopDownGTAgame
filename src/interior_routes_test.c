@@ -57,7 +57,7 @@ static int axis(float *a,int cap,float start,float size,int end,int *origin){
  for(int j=i+1;j<cap;j++){a[j]=a[j-1]+size;if(a[j]>end)return j;}
  fail("test grid exceeded framebuffer");return 0;
 }
-static void go(enum Goal g){
+static int go_plan(enum Goal g,int walking3d){
  int shop=scene==4;float *cx=shop?&wi_x:&interior_x,*cy=shop?&wi_y:&interior_y;
  float sx=*cx,sy=*cy,v=shop?WALKIN_WALK_STEP:NAMED_WALK_STEP;int ix,iy;
  int ww=axis(pxs,NX,sx,v,W,&ix),hh=axis(pys,NY,sy,v,H,&iy),start=iy*ww+ix;
@@ -80,9 +80,30 @@ static void go(enum Goal g){
  *cx=sx;*cy=sy;
  if(found<0){fprintf(stderr,"No path to %s; %d reachable nodes examined.\n",goals[g],read);fail("blocked interaction");}
  int count=0;for(int cur=found;cur!=start;){int d=came[cur]-1;rec[count++]=(unsigned char)d;cur-=delta[d];}
- for(int i=count;i>0;i--)tick(key[rec[i-1]]);
- tick(0);steps_taken+=count;route_count++;
- if(!matches(g)){fprintf(stderr,"replay did not arrive at %s after %d key ticks\n",goals[g],count);fail("physics / route mismatch");}
+ if(!walking3d){
+  for(int i=count;i>0;i--)tick(key[rec[i-1]]);
+  tick(0);steps_taken+=count;return matches(g);
+ }
+ /* A C view takes shorter real steps and eases from idle. Collapse
+    the lattice into straight waypoints and follow those coordinates via
+    actual keys; test progress, not a frozen count of old input frames. */
+ int cur=start;
+ for(int i=count;i>0&&!matches(g);){
+  int d=rec[--i];cur+=delta[d];while(i>0&&rec[i-1]==d){--i;cur+=delta[d];}
+  float dest=d%2?pys[cur/ww]:pxs[cur%ww],*anchor=d%2?cy:cx;
+  int sign=d<2?1:-1;
+  for(int n0=0;n0<800&&!matches(g)&&sign*(dest-*anchor)>.23f;n0++){
+   float before=*anchor;tick(key[d]);steps_taken++;
+   if(*anchor==before)break;
+  }
+  if(sign*(dest-*anchor)>2.2f&&!matches(g))break;
+ }
+ tick(0);return matches(g);
+}
+static void go(enum Goal g){
+ int use3d=ch_pref(),i=0;
+ for(;i<(use3d?5:1);i++)if(go_plan(g,use3d)){route_count++;return;}
+ fprintf(stderr,"replay did not arrive at %s after %d plans\n",goals[g],i);fail("physics / route mismatch");
 }
 
 static void frame(const char *group,int id,const char *title,const char *subtitle){

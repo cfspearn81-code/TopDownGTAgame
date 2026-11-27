@@ -21,7 +21,8 @@ static void paint_afterimage_front(void){
  const Building*b=buildings+ncFrontId;
  const int l=b->x,r=l+b->w,top=b->y-b->ht,end=b->y+b->h,x=ordinaryDoorX[ncFrontId];
  const U court=0x251d31,rose=0xffa5ca,blue=0x92e0e5,gold=0xf9d7a0;
- /* Stacked Art Deco marquee: a physically legible purpose above the name. */
+ /* Stacked marquee and painted façade belong in the overhead sprite. */
+ if(!bakeFloorOnly){
  box(l+13,top+14,b->w-26,51,0x342134,0x987385);
  box(l+16,top+17,b->w-32,45,0x2b2233,rose);
  zone_lettering((l+r)/2,top+22,"STRIP CLUB",rose,2);
@@ -36,8 +37,10 @@ static void paint_afterimage_front(void){
   rect(bx,top+68,2,9,i%3?0x845973:rose);
  }
  line(l+6,top+79,r-6,top+79,0x7e4e69);
+ }
  light(x,end+7,24,0xf093b4,4);
  for(int i=0;i<5;i++){int blade=9+i*2;rect(x-blade,end+i*3,blade*2+1,2,i&1?0x765475:0x644468);}
+ if(!bakeFloorOnly){
  box(x-15,end-21,31,23,court,blue);
  box(x-12,end-18,25,20,0x533849,rose);rect(x-10,end-16,9,13,0x755972);rect(x+2,end-16,9,13,0x755972);
  rect(x-3,end-8,2,3,gold);rect(x+3,end-8,2,3,gold);
@@ -45,6 +48,7 @@ static void paint_afterimage_front(void){
  for(int i=-1;i<=1;i+=2){
   disc(x+i*23,end-7,2,gold);rect(x+i*23,end-6,2,9,0x7b5769);
   rect(x+i*25,end+9,2,9,0x5b4359);disc(x+i*25,end+8,2,0xd1a583);
+ }
  }
  /* Local sidewalk graphic points at the same E threshold used by collision. */
  for(int i=0;i<4;i++)line(x-i,end+24+i,x+i,end+24+i,rose);

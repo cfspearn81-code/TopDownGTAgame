@@ -129,6 +129,7 @@ static void woodline_dirt(int i){
    int ash=outer_noise(x/2,y/2)%3;
    U ink=ds>13*13?mix(city[j],0x967853,2):mix(0x675845,0x947f58,ash);
    city[j]=ink;
+   if(x<BASE_ROOM&&y<BASE_ROOM)chaseFloor[j]=ds>13*13?mix(chaseFloor[j],0x967853,2):ink;
   }
 }
 static void woodline_prop(int x,int y,int r,int type,int height,int grade){
@@ -195,7 +196,7 @@ static void woodline_bake(void){
    U ink=woodline_ground_ink(x,y,k);
    if(x<BASE_ROOM&&y<BASE_ROOM){
     int n=cl((max(x,y)-(BASE_ROOM-36))*2/5,0,8);
-    city[i]=mix(city[i],ink,n);
+    city[i]=mix(city[i],ink,n);chaseFloor[i]=mix(chaseFloor[i],ink,n);
    }else city[i]=ink;
   }
  }
@@ -215,6 +216,7 @@ static void woodline_bake(void){
    if(roofMask[i])continue;
    if(outer_is_new(px,y))outerLand[i]=TILE_TRAIL;
    city[i]=mix(0x695f4f,0x92805a,outer_noise(px,y)%3);
+   if(y<BASE_ROOM)chaseFloor[i]=city[i];
   }
  }
 }
@@ -227,7 +229,7 @@ static void woodline_shadows(void){
    int i=(p->y+y)*ROOM+p->x+x;
    if(x*x*16+y*y*w<17*w*w&&!outerLane[i])city[i]=mix(city[i],0x101f20,2);
   }
-  if(p->kind==WOOD_TREE)rect(p->x-2,p->y-2,5,4,0x694e3a);
+  if(!bakeFloorOnly&&p->kind==WOOD_TREE)rect(p->x-2,p->y-2,5,4,0x694e3a);
  }
 }
 static U woodline_map_ink(int tile){

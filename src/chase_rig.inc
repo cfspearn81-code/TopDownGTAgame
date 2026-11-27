@@ -3,19 +3,64 @@
  * At the helm p mirrors the real hull; it never indexes the road-car array. */
 static float harbor_boat_speed(void);
 enum {CH_FOOT=-2,CH_HELM=-3};
-typedef struct {float x,y,a,dist,high,aim,anchor;int subject;} ChMount;
+typedef struct {float x,y,a,dist,high,aim,anchor;int subject;float look;} ChMount;
 static struct {int active,subject;float boom,yaw,lookX,lookY,x,y,rx,ry,ra,rd,rh;} chSpring;
+/* This is the road camera's own suspension, not the car mesh suspension.
+ * Road heading, signed speed and acceleration drive an actual boom/orbit;
+ * no screen distortion, per-pixel resampling, RNG or motion shake. */
+static struct {float prevSpeed,brake,lead,orbit;int cond;} chDrive;
 static int ch_mode_active(void){return ch_pref()&&!fastGfx;}
 static int ch_enabled(void){return ch_mode_active()&&!p.dead&&(scene==1||(scene==2&&helpBack==1));}
-static void ch_reset_spring(void){chSpring.active=0;ch.ride=-1;}
+static void ch_reset_spring(void){
+ chSpring.active=0;ch.ride=-1;chDrive.brake=chDrive.lead=chDrive.orbit=0;
+}
 static float ch_clampf(float x,float l,float h){return x<l?l:x>h?h:x;}
+static float ch_damp(float have,float want,float gain,float cap){
+ return have+ch_clampf((want-have)*gain,-cap,cap);
+}
+static void ch_motion(float speed,float err){
+ if(!ch_mode_active()){ch.ride=-1;return;}
+ const Car*c=cars+p.car;
+ if(ch.ride!=p.car||ngCamRide!=p.car||ch.range<1.f){
+  ch.range=79;ch.height=38;
+  chDrive.prevSpeed=speed;chDrive.cond=c->cond;
+  chDrive.brake=chDrive.lead=chDrive.orbit=0;
+ }
+ ch.ride=p.car;
+ /* Below one world unit/second the car is optically parked. Suppress
+    subpixel creep (e.g. after releasing the brake) rather than orbiting. */
+ float moving=ch_clampf(speed-1.f,0,205.f);
+ float pace=moving/205.f,corner=ch_clampf(absf(err),0,.78f)*ch_clampf(moving/7.f,0,1);
+ const float direction=c->s<-.75f?-1.f:1.f;
+ float decel=chDrive.prevSpeed-speed;
+ /* A single small compression from actual deceleration or a bump.
+    Release with no bounce; reversing at steady speed is not braking. */
+ float brake=ch_clampf((decel-.52f)*.15f,0,1);
+ if(c->cond+2<chDrive.cond&&brake<.64f)brake=.64f;
+ chDrive.brake=ch_damp(chDrive.brake,brake,brake>chDrive.brake?.30f:.105f,.26f);
+ chDrive.prevSpeed=speed;chDrive.cond=c->cond;
+ float stretch=direction>0&&moving>0?ngCamBurst:0;
+ float range=79.f+21.f*pace+18.f*stretch-10.f*corner-13.f*chDrive.brake;
+ float high=38.f+8.f*pace+10.f*corner-4.75f*chDrive.brake;
+ ch.range=ch_damp(ch.range,range,.097f,1.32f);
+ ch.height=ch_damp(ch.height,high,.107f,.74f);
+ /* 2D lead maps to a true look point ahead of (or behind) the chassis,
+    not moving the car or the camera's collision pivot into a wall. */
+ float forward=direction>0?22.f*pace+6.f*stretch-7.f*chDrive.brake:-9.f*ch_clampf(moving/60.f,0,1);
+ chDrive.lead=ch_damp(chDrive.lead,ch_clampf(forward,-9.f,24.f),.12f,.93f);
+ /* The 2D "roll" cue becomes a small real side orbit around the chassis
+    during the apex. The horizon stays stable, including when switching. */
+ float bank=ch_clampf(-err*direction*.27f*ch_clampf(moving/94.f,0,1),-.073f,.073f);
+ chDrive.orbit=ch_damp(chDrive.orbit,bank,.15f,.009f);
+}
 static int ch_subject(void){return harbor_boat_active()?CH_HELM:street_car_exists(p.car)?p.car:CH_FOOT;}
 static ChMount ch_mount(void){
  int id=ch_subject();
  if(id>=0){
   const Car*c=cars+id;
-  return(ChMount){c->x,c->y,ngCamRide==id?ngCamAngle:c->a,
-   ch.ride==id&&ch.range>1?ch.range:79.f,ch.ride==id&&ch.height>1?ch.height:38.f,4,.303f,id};
+  int motion=ch.ride==id&&ngCamRide==id;
+  return(ChMount){c->x,c->y,motion?wrap(ngCamAngle+chDrive.orbit):ngCamRide==id?ngCamAngle:c->a,
+   ch.ride==id&&ch.range>1?ch.range:79.f,ch.ride==id&&ch.height>1?ch.height:38.f,4,.303f,id,motion?chDrive.lead:0.f};
  }
  if(id==CH_HELM){
   float fast=ch_clampf(absf(harbor_boat_speed())/158.f,0,1);
@@ -94,8 +139,12 @@ static void ch_frame_rig(void){
  if(!sampled&&chSpring.active&&chSpring.subject==m.subject&&d2(p.x-chSpring.x,p.y-chSpring.y)<16.f&&chSpring.boom<fit)fit=chSpring.boom;
  float high=m.high+ch_clampf(34.f-fit,0,34.f)*.93f;
  chFit=fit;
- float target=m.anchor,ca=sq(1.f-target*target),hAim=high-m.aim,diag=sq(fit*fit+hAim*hAim);
- chSin=(hAim*ca-fit*target)/diag;chCos=(fit*ca+hAim*target)/diag;
+ /* When the boom is braced against a wall, keep the scene framed on
+    the chassis. In open space this is the actual new forward sightline. */
+ float optical=fit;
+ if(m.subject>=0)optical+=m.look*ch_clampf((fit-24.f)/48.f,0,1);
+ float target=m.anchor,ca=sq(1.f-target*target),hAim=high-m.aim,diag=sq(optical*optical+hAim*hAim);
+ chSin=(hAim*ca-optical*target)/diag;chCos=(optical*ca+hAim*target)/diag;
  ch.x=m.x-fit*ch.co;ch.y=m.y-fit*ch.si;ch.h=high;
 }
 static int ch_world_input_allowed(void){

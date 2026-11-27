@@ -1,11 +1,11 @@
 DEAD CHANNEL / PORT VANTA
-All-Area 3D for Windows 11 x64 and Linux x86-64
+Street Contact Update for Windows 11 x64 and Linux x86-64
 
 1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
    Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
    from the extracted Dead-Channel directory. If your extractor did not
    preserve execute permission, run chmod +x DeadChannel first.
-   Look for "Dead Channel | All-Area 3D" in the window title.
+   Look for "Dead Channel | Street Contact Update" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -46,7 +46,7 @@ and boats. Your selection carries between them. The map, phone and menu
 screens still use readable panels. F2 Low FX temporarily draws overhead
 without changing your C selection. M opens the atlas; F8 shows the whole
 road network. On foot, L loads reserve cells for your fitted Pulse frame.
-See ALL-AREA-3D.md for controls, coverage and testing limits.
+See STREET-CONTACT.md, 3D-STREET-MOTION.md and ALL-AREA-3D.md for controls and testing coverage.
 
 PEOPLE IN PORT VANTA
 Walk close to someone and press E. Up/Down picks Say Hello, Say Nothing,
@@ -62,7 +62,8 @@ chance and carries $15-$155 dirty cash. On refusal, fight with Space/X
 or run away. If they fall, walk over the marked cash to collect it once.
 Leaving the area forfeits the attempt; no repeat payouts from the same
 person in a session. Clerks and other contacts recover so jobs stay
-available. Indoor firing only works during a refusal from this feature.
+available. Direct hits also work on people in walkable venues. Ordinary hits do not
+produce a robbery payout.
 
 WEAPON WHEEL AND MED PATCHES
 Hold Tab during play. Move the mouse toward fists (bottom) or the pulse

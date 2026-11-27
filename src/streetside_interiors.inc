@@ -201,9 +201,12 @@ static void walkin_tick(U keys,U tap){
  if(menu>=0){makeMenu();if(!nopt){menu=-1;return;}if(tap&UP)sel=(sel+nopt-1)%nopt;if(tap&DOWN)sel=(sel+1)%nopt;if(tap&(USE|ENTER))doOpt(opt[sel].action);return;}
  int x=!!(keys&RIGHT)-!!(keys&LEFT),y=!!(keys&DOWN)-!!(keys&UP);
  float v=(keys&BRAKE?WALKIN_RUN_STEP:WALKIN_WALK_STEP)*(x&&y?.707107f:1.f);walking=x||y;
+ float ox=wi_x,oy=wi_y;
+ v*=gait_pace(GAIT_PUBLIC,walkin_active,ox,oy,wi_angle,walking,!!(keys&BRAKE));
  if(walking){wi_angle=look(x,y);footcycle=wrap(footcycle+.25f*FOOT_PACE);}
  if(!wi_solid(wi_x+x*v,wi_y))wi_x+=x*v;
  if(!wi_solid(wi_x,wi_y+y*v))wi_y+=y*v;
+ gait_finish(GAIT_PUBLIC,walkin_active,wi_x,wi_y,ox,oy,wi_angle);
  pulse_guard_tick(4,wi_x,wi_y,wi_angle,wi_solid);
  p.secs+=dt;job_clock_tick(dt);
  if(vd_frame(keys,tap))tap&=~(USE|ENTER);

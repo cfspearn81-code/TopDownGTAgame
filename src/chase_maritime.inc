@@ -37,8 +37,15 @@ static void ch_ship_pilot(const ChShip*b,int hero){
 enum {CH_BLUE_CABIN=4,CH_ORANGE_TRAINER=5};
 static void ch_sea_hull(const HarborHull*h,int skin,int hero){
  if(!ch_sea_visible(h->x,h->y,24,690))return;
- float swell=anim*1.8f+(h->x+h->y)*.023f;
- ChShip b={h->x,h->y,cs(h->a),sn(h->a),.95f+sn(swell)*.35f,sn(swell+.8f)*.021f,cs(swell*.84f)*.047f};
+ float swell=anim*1.65f+(h->x+h->y)*.017f,co=cs(h->a),si=sn(h->a);
+ float lateral=h->vy*co-h->vx*si;
+ float pace=cv_clamp(absf(h->s)/158.f,0.f,1.f);
+ /* A planing bow lifts with real throttle; the hull leans into visible
+  * sideslip rather than wobbling with an arbitrary screen-space keyframe. */
+ float aim=h->s<0.f?-.020f:pace*.054f;
+ ChShip b={h->x,h->y,co,si,.95f+pace*.29f+sn(swell)*.31f,
+           sn(swell+.8f)*.019f+aim,cs(swell*.84f)*.036f+cv_clamp(lateral*.00134f,-.096f,.096f)};
+ int detail=hero||d2(b.x-ch.x,b.y-ch.y)<197.f*197.f;
  static const U colors[]={0x54ae9f,0xca8e53,0x9b5a52,0x527996,0x437fa6,0xdc874b};
  U sides=colors[skin],rail=mix(sides,0xf1e8ca,5),deck=skin==HB_CARGO?0xab916d:0xb7ad91;
  float len=skin==HB_CARGO?18.f:skin==CH_ORANGE_TRAINER?12.4f:15.8f;
@@ -54,8 +61,20 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
   ch_quad(a,f,n,m,mix(sides,0x163844,s<0?4:6),1);
   ch_quad(m,n,e,d,s<0?sides:mix(sides,0x152c3c,2),1);
   ch_quad(ch_ship_pt(&b,u[k],v*.977f,lip[k]-.49f),ch_ship_pt(&b,u[k+1],next*.977f,lip[k+1]-.49f),e,d,rail,1);
+  if(detail){
+   /* Twin continuous rails connect into the same cross sections as the
+    * hull; hard turns never reveal floating outlines or detached panels. */
+   ch_quad(ch_ship_pt(&b,u[k],v*.862f,lip[k]*.38f),ch_ship_pt(&b,u[k+1],next*.862f,lip[k+1]*.38f),
+           ch_ship_pt(&b,u[k+1],next*.898f,lip[k+1]*.47f),ch_ship_pt(&b,u[k],v*.898f,lip[k]*.47f),
+           mix(sides,0x172d3a,5),1);
+  }
  }
- for(int k=0;k<4;k++)ch_ship_segment(&b,u[k],u[k+1],w[k],w[k+1],lip[k],lip[k+1],deck);
+ for(int k=0;k<4;k++){
+  ch_ship_segment(&b,u[k],u[k+1],w[k],w[k+1],lip[k],lip[k+1],deck);
+  if(detail)for(int s=-1;s<=1;s+=2)
+   ch_quad(ch_ship_pt(&b,u[k],s*w[k]*.95f,lip[k]+.045f),ch_ship_pt(&b,u[k+1],s*w[k+1]*.95f,lip[k+1]+.045f),
+           ch_ship_pt(&b,u[k+1],s*w[k+1]*.81f,lip[k+1]+.045f),ch_ship_pt(&b,u[k],s*w[k]*.81f,lip[k]+.045f),rail,1);
+ }
  ch_quad(ch_ship_pt(&b,u[0],-w[0]*.69f,.02f),ch_ship_pt(&b,u[0],w[0]*.69f,.02f),ch_ship_pt(&b,u[0],w[0],lip[0]),ch_ship_pt(&b,u[0],-w[0],lip[0]),sides,1);
  if(skin==HB_SKIFF){
   ch_ship_box(&b,-len-.8f,-len+1.f,0,1.68f,1,5.3f,.22f,0,0x253741,0x567079);
@@ -64,6 +83,17 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
   ch_ship_box(&b,2.8f,3.95f,0,4.25f,6.3f,9.f,.15f,-1.2f,0x82afb5,0xc2d5ca);
   ch_ship_box(&b,7.4f,11.f,0,1.8f,4.3f,4.9f,.2f,0,0xb79d75,0xe2cfab);
   if(hero||h->s!=0)ch_ship_pilot(&b,hero);
+  if(detail){
+   /* Outboard collar, distinct port/starboard rails, tied bow cleat. */
+   U metal=0xc3c8ad;
+   ch_ship_box(&b,-len-1.24f,-len+.66f,0,1.40f,3.55f,4.15f,.12f,0,0x324147,0xbcc5b2);
+   for(int s=-1;s<=1;s+=2){
+    ch_ship_box(&b,-10.4f,-8.8f,s*4.94f,.35f,3.46f,4.22f,.08f,0,metal,metal);
+    ch_ship_box(&b,-5.9f,.8f,s*5.9f,.25f,3.65f,4.07f,.02f,0,0x3e514e,rail);
+    ch_ship_box(&b,7.9f,10.7f,s*1.7f,.13f,4.31f,4.49f,.03f,0,0x766f5a,0xb2986f);
+   }
+   ch_ship_box(&b,len-2.3f,len-1.2f,0,.76f,4.72f,5.51f,.1f,0,metal,0xeddfb2);
+  }
  }else if(skin==HB_CARGO){
   for(int k=0;k<2;k++){
    float u0=-15+k*6.75f;
@@ -99,19 +129,44 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
   ch_ship_box(&b,u[2]-.7f,u[2]+.55f,v,.39f,lip[2],lip[2]+.55f,.10f,0,lens,lens);
  }
 }
+typedef struct {float x,y,co,si,width,time;} ChWakeTail;
+static ChVec ch_wake_point(ChWakeTail t,float along,float cross){
+ return (ChVec){t.x+along*t.co-cross*t.si,t.y+along*t.si+cross*t.co,.11f};
+}
+static int ch_wet_strip(ChVec a,ChVec b,ChVec c,ChVec d){
+ return harbor_ocean_cell(a.x,a.y)&&harbor_ocean_cell(b.x,b.y)&&
+        harbor_ocean_cell(c.x,c.y)&&harbor_ocean_cell(d.x,d.y)&&
+        harbor_ocean_cell((a.x+b.x+c.x+d.x)*.25f,(a.y+b.y+c.y+d.y)*.25f);
+}
 static void ch_sea_wakes(void){
  if(fastGfx)return;
- for(int i=0;i<HB_WAKE;i++){
-  const HarborWake*w=hbWakes+i;
-  if(w->time<.035f||!ch_sea_visible(w->x,w->y,28,330))continue;
-  float k=1.f-w->time,sp=w->span+k*10.f;
-  ChShip b={w->x,w->y,cs(w->a),sn(w->a),.19f,0,0};
-  U sea=chDark>.5f?0x2b4251:0x456675,light=chDark>.5f?0x80999a:0xc1d9cb;
-  U foam=mix(sea,light,cl((int)(w->time*6),1,6));
-  for(int s=-1;s<=1;s+=2){
-   ChVec a=ch_ship_pt(&b,-k*6-2,s*sp*.22f,0),b0=ch_ship_pt(&b,-k*6-6,s*sp*.70f,0);
-   ChVec c=ch_ship_pt(&b,-k*6-7.2f,s*sp,0),d=ch_ship_pt(&b,-k*6-4.65f,s*sp*.60f,0);
-   if(harbor_ocean_cell(c.x,c.y)&&harbor_ocean_cell(a.x,a.y))ch_quad(a,b0,c,d,foam,1);
+ ChWakeTail prev[HB_AMBIENT+1]={0};
+ float dark=chDark;
+ U water=nw_blend(0x264d60,0x203448,(int)(dark*218.f)),cream=nw_blend(0xaed1c4,0x7c9eaa,(int)(dark*213.f));
+ /* Old to new per hull. Stitch narrow foam trails between consecutive
+  * valid samples only, so turning or mooring at a pier never draws a
+  * bridge across the wharf. Keep the angular prop wash behind the stern. */
+ for(int j=0;j<HB_WAKE;j++){
+  const HarborWake*w=hbWakes+(hbWakeSlot+j)%HB_WAKE;
+  if((unsigned)w->owner>=LEN(prev)||w->time<.04f||!ch_sea_visible(w->x,w->y,25,335))continue;
+  float k=1.f-w->time,co=cs(w->a),si=sn(w->a);
+  ChWakeTail cur={w->x-co*(3+k*3.7f),w->y-si*(3+k*3.7f),co,si,1.3f+k*(w->span*.85f+5.f),w->time};
+  ChWakeTail old=prev[w->owner];prev[w->owner]=cur;
+  int tint=cl((int)(w->time*5.4f)+(w->owner==0),1,6);
+  U foam=mix(water,cream,tint);
+  if(old.time>0.f&&co*old.co+si*old.si>.65f&&d2(cur.x-old.x,cur.y-old.y)<16.f*16.f){
+   for(int side=-1;side<=1;side+=2){
+    float a=cur.width*side,b=old.width*side;
+    ChVec l=ch_wake_point(cur,0,a),r=ch_wake_point(old,0,b);
+    ChVec r1=ch_wake_point(old,0,b+side*(.32f+(1.f-old.time)*.44f)),l1=ch_wake_point(cur,0,a+side*(.30f+k*.44f));
+    if(ch_wet_strip(l,r,r1,l1))ch_quad(l,r,r1,l1,foam,1);
+   }
+  }
+  if(w->time>.54f){
+   float q=.32f+k*1.12f;
+   ChVec a=ch_wake_point(cur,1.3f,-q),b=ch_wake_point(cur,-2.3f,-q-.2f),
+         c=ch_wake_point(cur,-2.7f,q+.3f),d=ch_wake_point(cur,.85f,q);
+   if(ch_wet_strip(a,b,c,d))ch_quad(a,b,c,d,mix(water,cream,max(2,tint-2)),1);
   }
  }
 }
@@ -121,16 +176,16 @@ static void ch_sea_wakes(void){
 static void ch_sea_glints(void){
  if(fastGfx)return;
  int bx=(int)ch.x/45,by=(int)ch.y/38;
- float phase=anim*.9f;U gl=chDark>.5f?0x4b6a72:0x659093;
+ float phase=anim*.9f;U gl=chDark>.5f?0x3e5c69:0x506f76;
  for(int y=by-8;y<=by+8;y++)for(int x=bx-8;x<=bx+8;x++){
-  if((x^y)&1)continue;
   U seed=outer_noise(x,y);
-  float sx=x*45+7+(seed&15),sy=y*38+5+((seed>>8)&15);
+  if(seed%7u<3u)continue;
+  float sx=x*45+6+(seed%29),sy=y*38+5+((seed>>8)%25);
   if(!ch_sea_visible(sx,sy,9,280))continue;
   float wave=sn(phase+(int)((seed>>16)&15)*.8f);
   if(wave<-.6f)continue;
   sx+=wave*1.8f;sy+=wave*2.4f;
-  float w=2.6f+(seed%4)+wave*1.5f;
+  float w=2.0f+(seed%4)+wave*.78f;
   if(!harbor_ocean_cell(sx-w,sy)||!harbor_ocean_cell(sx+w+2,sy+1.2f))continue;
   ch_quad((ChVec){sx-w,sy,.13f},(ChVec){sx+w*.45f,sy+.54f,.13f},(ChVec){sx+w,sy+.22f,.13f},(ChVec){sx+w*.10f,sy+1.1f,.13f},gl,1);
  }
@@ -141,7 +196,6 @@ static void ch_sea_assignment(void){
   ChShip b={q.x,q.y,1,0,0,0,0};
   ch_ship_box(&b,-10,9,0,3.25f,0,6,.22f,0,0x705747,0xbb9e70);
   ch_ship_box(&b,-5,0,0,1.45f,6,7,.2f,0,0x3b535f,0x9eb2ac);
-  ch_character(&(StreetPerson){q.x+11,q.y-4,1.5f,0,MODEL_DISPATCH,2,0x718da0});
   for(int s=-1;s<=1;s+=2)ch_upright(q.x+s*12,q.y-10,.72f,0,16,0x53616a);
   ch_quad((ChVec){q.x-13,q.y-10,11},(ChVec){q.x+13,q.y-10,11},(ChVec){q.x+13,q.y-10,17},(ChVec){q.x-13,q.y-10,17},0x467185,1);
  }

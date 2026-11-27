@@ -12,14 +12,6 @@ static float chSin=.249f,chCos=.9685f;
 static float chFit;
 static int ch_pref(void){return nv.garage[60]==1u;}
 #include "chase_rig.inc"
-static void ch_motion(float speed,float err){
- float unit=speed/205.f;if(unit>1)unit=1;
- float bend=absf(err);if(bend>.8f)bend=.8f;
- float wanted=79.f+18*unit+30*ngCamBurst-20*bend;
- float high=38.f+5*unit+11*bend;
- if(ch.ride!=p.car||ngCamRide!=p.car||ch.range<1){ch.range=79;ch.height=38;}
- ch.ride=p.car;ch.range+=(wanted-ch.range)*.073f;ch.height+=(high-ch.height)*.071f;
-}
 static ChVec ch_local(ChVec q){
  float dx=q.x-ch.x,dy=q.y-ch.y,dz=q.z-ch.h,b=dx*ch.co+dy*ch.si;
  return (ChVec){dy*ch.co-dx*ch.si,dz*chCos+b*chSin,b*chCos-dz*chSin};
@@ -84,6 +76,7 @@ static void ch_ground(void){
  cf_road_prepare();
  const U seam=chDark>.5f?0x343c52:0x9cb0af;
  int wet=(int)(cl((int)(nwWet*100.f)-11,0,80)*.75f);
+ const unsigned wave=(unsigned)(anim*9.f);
  for(int y=0;y<H;y++){
   float ray=(CH_MY-y)*(1.f/CH_F),v=chSin-ray*chCos;
   if(v<=.048f){
@@ -97,8 +90,7 @@ static void ch_ground(void){
   unsigned tint=(unsigned)(100*chDark),fog=(unsigned)cl((int)(depth*(.14f+.29f*chFog)),0,227);
   for(int k=y*W;k<y*W+W;k++,xx+=ux,yy+=uy){
    unsigned x=(unsigned)(xx>>16),j=(unsigned)(yy>>16);
-   U c=x<ROOM&&j<ROOM?city[j*ROOM+x]:0x203540;
-   if(x>=ROOM-72||j>=ROOM-72)c=wl_ocean_edge(c,x,j);
+   U c=wl_terrain_sample(0x203540,x,j,depth,wave);
    if(x>=35&&x<BASE_ROOM-26&&j>=35&&j<BASE_ROOM-26)c=cf_road_sample(c,x,j);
    if(chDecals)c=ch_decal_pixel(c,x,j);
    if(tint)c=nw_blend(c,0x141d30,tint);
@@ -148,10 +140,9 @@ static void ch_props(void){
  for(int i=0;i<LEN(peds);i++)if(street_ped_pose(i,&actor))ch_character(&actor);
  if(street_rider_pose(&actor))ch_character(&actor);
  for(int i=0;i<min(SP_OUT_MAX,outer_walk_count());i++)if(street_outer_pose(i,&actor))ch_character(&actor);
- int marker;
- if(street_night_rider_pose(&actor,&marker)){
+ for(int id=N_ACT_OUT_QUEUE;id<N_ACT_OUT_EXTRA_END;id++)if(street_extra_pose(id,&actor)){
   ch_character(&actor);
-  if(marker&&d2(ch.x-actor.x,ch.y-actor.y)<480.f*480.f){
+  if(id==N_ACT_OUT_VOCAL&&d2(ch.x-actor.x,ch.y-actor.y)<480.f*480.f){
    float x=actor.x,y=actor.y,u=3.f*ch.si,v=-3.f*ch.co;
    ch_quad((ChVec){x,y,18.8f},(ChVec){x-u,y-v,16.5f},(ChVec){x,y,14.2f},
       (ChVec){x+u,y+v,16.5f},0xf18acb,0);
@@ -160,15 +151,10 @@ static void ch_props(void){
  wl_city_trees();
  StreetLamp fixture;
  for(int j=1;j<BASE_ROOM/256;j++)for(int i=1;i<BASE_ROOM/256;i++)
-  for(int k=0;k<2;k++)if(street_lamp_legacy(i,j,k,&fixture))ch_lamp(&fixture);
+  for(int k=0;k<2;k++)if(street_lamp_legacy(i,j,k,&fixture))cf_city_lamp(&fixture);
  for(int i=0;i<LEN(outerNodes);i+=2)if(street_lamp_outer(i,&fixture))ch_lamp(&fixture);
  for(int i=0;i<HARBOR_LAMPS;i++)if(street_lamp_harbor(i,&fixture))ch_lamp(&fixture);
  ch_field_sparks();
-}
-static void ch_road_glyph(float x,float y,U color){
- float w=12,h=30;
- ch_quad((ChVec){x-w,y-2,.25f},(ChVec){x+w,y-2,.25f},(ChVec){x+w,y+2,.25f},(ChVec){x-w,y+2,.25f},color,0);
- ch_quad((ChVec){x-1.25f,y,0},(ChVec){x+1.25f,y,0},(ChVec){x+1.25f,y,h},(ChVec){x-1.25f,y,h},color,0);
 }
 static void ch_outer(void){
 #ifdef BASE_ROOM
@@ -195,19 +181,12 @@ static void ch_outer(void){
    }
   }
  }
- for(int i=0;i<LEN(outerStops);i++){
-  const OuterPoint*q=outerNodes+outerStops[i].node;
-  if(d2(q->x-ch.x,q->y-ch.y)>500.f*500.f)continue;
-  float x=q->x+17,y=q->y+12;
-  ch_upright(x,y,.85f,0,19.6f,0x80998e);
-  ch_upright(x,y,7.5f,13.5f,20.5f,outerStops[i].tint);
-  ch_upright(x,y,4.7f,16.9f,17.8f,0x204453);
- }
- wl_wood();wl_shore_grass();wl_field();wl_life();
+ wl_wood();wl_forest_clusters();wl_shore_grass();wl_field();wl_life();
 #endif
 }
 #include "harbor_chase.inc"
 #include "chase_jobs.inc"
+#include "chase_route_props.inc"
 static int ch_draw(void){
  chProjected=0;if(!ch_enabled())return 0;
  ch_frame_rig();
@@ -218,16 +197,7 @@ static int ch_draw(void){
   ch_car(cars+i,i==p.car);
  ch_chalk_pixel_actor();ch_street_encounter();if(ch_subject()==CH_FOOT)ch_player_character();
  Car ghost;if(ng_ghost_car(&ghost)&&d2(ghost.x-ch.x,ghost.y-ch.y)<730.f*730.f)ch_car(&ghost,-1);
- int x,y,meet;
- if(ng_route_goal(&x,&y)){if(d2(x-ch.x,y-ch.y)<645.f*645.f)ch_road_glyph(x,y,GOLD);}
- else if((meet=night_garage_meet_site(&x,&y))>=0&&job.kind<0&&vdActive<0&&d2(x-ch.x,y-ch.y)<350.f*350.f)ch_road_glyph(x,y,TEAL);
- if(night_phone_lane_stop(2410,1024,2500,1024,4)&&d2(ch.x-2464,ch.y-1024)<685.f*685.f){
-  for(int y=974;y<1080;y+=17){
-   ch_upright(2464,y,1.7f,0,8,0x77504a);
-   ch_upright(2464,y,2.3f,7,9,0xf4bd66);
-   ch_quad((ChVec){2464,y,3},(ChVec){2464,y+13,3},(ChVec){2464,y+13,6},(ChVec){2464,y,6},0xb65f59,0);
-  }
- }
+ cr_copper_marquee();cr_outer_signs();cr_signal_cart();cr_garage_props();cr_road_closed();cr_job_props();
  if(nwStorm>.10f){
   int drops=(int)(nwStorm*132),u=(int)(anim*263)%W,v=(int)(anim*296)%H;
   for(int i=0;i<drops;i++){

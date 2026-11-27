@@ -88,7 +88,7 @@ static void night_world_bake(void){
    if(g>2)rect(x+1,yy+7+g/2,5,1,y?0x244756:0x3d4759);
   }
  }
- for(int i=0;i<7;i++){
+ if(!bakeFloorOnly)for(int i=0;i<7;i++){
   int x=108+i*267;
   if(i%3==1)x+=43;
   for(int j=0;j<3;j++){rect(x+j*15,BASE_ROOM-26,12,17-(i+j)%6,0x4b4d4b);rect(x+2+j*15,BASE_ROOM-24,7,2,0x7b6151);}

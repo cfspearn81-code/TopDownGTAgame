@@ -100,6 +100,7 @@ static void outer_stamp(int lane,int *extent){
   if(margin>=5&&margin<=10)c=r->kind==OUT_DOCK?0x50666a:0x4d5c63;
   if(edge)c=r->kind==OUT_DOCK?0x8c7761:0x70828e;
   U n=outer_noise(x,y)&1;city[i]=n?mix(c,0x728189,1):c;
+  if(x<BASE_ROOM&&y<BASE_ROOM)chaseFloor[i]=city[i];
  }
 }
 static int outer_nearest(float,float,int*,int*,int);
@@ -112,8 +113,12 @@ static void outer_bake(void){
     lane markings at major crossings. Road cells remain a geometric union. */
  int extent=0;
  for(int i=0;i<LEN(outerRoads);i++)outer_stamp(i,&extent);
- woodline_scatter();woodline_shadows();harbor_bake_structures();
- for(int i=0;i<LEN(outerStops);i++){
+ woodline_scatter();
+ for(int i=0;i<LEN(harborPieces);i++)harbor_place_piece(i);
+}
+static void outer_bake_art(void){
+ woodline_shadows();harbor_bake_structures();
+ if(!bakeFloorOnly)for(int i=0;i<LEN(outerStops);i++){
   const OuterLandmark*s=outerStops+i;OuterPoint p=outerNodes[s->node];
   if(i<6){
    int w=textw(s->label,0)+30;

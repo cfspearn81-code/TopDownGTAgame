@@ -13,7 +13,7 @@ static OutDriver outDriver[OUT_TRAFFIC_COUNT];
 static int outCrowdCount;
 static void out_prepare_lanes(void);
 typedef struct{int damage;float x,y,down,flash;} OuterCondition;
-static OuterCondition outBody[N_ACT_MAX-N_ACT_OUTER];
+static OuterCondition outBody[N_ACT_OUTER_END-N_ACT_OUTER];
 #define DC_OUTER_WALK_POSES 1
 /* Fixed world identities. Each walker stays on a surveyed shoulder/stroll
  * segment, then pauses at a distinct end point. No viewport-time loops. */
@@ -24,7 +24,7 @@ typedef struct{
 } OuterWalker;
 static OuterWalker outWalkers[OUT_WALK_COUNT];
 static int outWalkReady;
-_Static_assert(OUT_WALK_COUNT==N_ACT_MAX-N_ACT_OUTER,"each surveyed walker keeps its original regional NPC identity");
+_Static_assert(OUT_WALK_COUNT==N_ACT_OUTER_END-N_ACT_OUTER,"each surveyed walker keeps its original regional NPC identity");
 static int outer_walk_count(void);
 static int outer_walk_pose(int,float*,float*,float*,int*,U*);
 static int outer_walk_clear(float x,float y){
@@ -146,7 +146,8 @@ static int outer_walk_count(void){return outWalkReady?LEN(outWalkers):0;}
 /* 3HP for unarmoured civilians, as on the city blocks. These short-lived
    states, like the original downtown bodies, are not career data. */
 static int outer_injure(int id,int damage,float x,float y){
- if(id<N_ACT_OUTER||id>=N_ACT_MAX||damage<=0)return 0;
+ if(id<N_ACT_OUTER||id>=N_ACT_OUTER_END)return street_extra_injure(id,damage,x,y);
+ if(damage<=0)return 0;
  OuterCondition*b=outBody+(id-N_ACT_OUTER);
  if(b->damage>=3)return 0;
  b->damage+=damage;b->x=x;b->y=y;b->flash=.22f;
@@ -207,14 +208,14 @@ static int out_seen(const Car*c){
  /* Vehicle remains intact well beyond both the overhead and chase views. */
  return d2(p.x-c->x,p.y-c->y)<830.f*830.f;
 }
-static OutLanePoint outFeet[1+LEN(peds)+N_ACT_MAX-N_ACT_OUTER];
+static OutLanePoint outFeet[1+LEN(peds)+N_ACT_OUTER_END-N_ACT_OUTER];
 static int outFeetCount,outPlayerFoot;
 static void out_sample_feet(void){
  outFeetCount=0;outPlayerFoot=p.car<0&&!p.dead;
  if(outPlayerFoot)outFeet[outFeetCount++]=(OutLanePoint){p.x,p.y};
  for(int i=0;i<LEN(peds);i++)if(peds[i].hp>0&&outer_is_new(peds[i].x+60.f,peds[i].y+60.f))
   outFeet[outFeetCount++]=(OutLanePoint){peds[i].x,peds[i].y};
- for(int id=N_ACT_OUTER;id<N_ACT_MAX;id++){
+ for(int id=N_ACT_OUTER;id<N_ACT_OUTER_END;id++){
   NpcRef q;if(outer_person_ref(id,&q,0))outFeet[outFeetCount++]=(OutLanePoint){q.x,q.y};
  }
 }
@@ -320,7 +321,7 @@ static int outer_person_ref(int id,NpcRef*r,int*step){
   {"Wynn Hart","Rune Hale","Cal Firth","Emery Lin"}
  };
  _Static_assert(LEN(outerStops)>=N_OUTER_SITES,"preserve the six original regional identity groups");
- if(id<N_ACT_OUTER||id>=N_ACT_MAX||scene!=1)return 0;
+ if(id<N_ACT_OUTER||id>=N_ACT_OUTER_END||scene!=1)return 0;
  if(outBody[id-N_ACT_OUTER].damage==3)return 0;
  if(npc_holds(id)){*r=npcTalk;if(step)*step=0;return 1;}
  /* Static shoulder routes have no time-of-day or viewport discontinuity.
@@ -350,8 +351,8 @@ static int outer_walk_pose(int i,float*x,float*y,float*a,int*step,U*coat){
    their city equivalents so a nearer target from either group wins. */
 static OuterHit outer_pick(float x,float y,float co,float si,int melee,float limit,float minimum,float mx,float my){
  OuterHit best={-1,0,0,limit};
- if(scene!=1||!outCrowdCount)return best;
- for(int id=N_ACT_OUTER;id<N_ACT_MAX;id++){
+ if(scene!=1)return best;
+ if(outCrowdCount)for(int id=N_ACT_OUTER;id<N_ACT_OUTER_END;id++){
   NpcRef r;if(npc_replaces(id)||npc_holds(id)||!outer_person_ref(id,&r,0))continue;
   float dx=r.x-x,dy=r.y-y,f=dx*co+dy*si,l=absf(dy*co-dx*si),d=melee?d2(dx,dy):f;
   if(f<=0||f<minimum||d>=best.rank||(melee?l>13.f:l>=13.f+f*.12f))continue;
@@ -359,21 +360,22 @@ static OuterHit outer_pick(float x,float y,float co,float si,int melee,float lim
      (!melee&&(mx!=x||my!=y)&&!street_reach_open(mx,my,r.x,r.y,1,-1)))continue;
   best=(OuterHit){id,r.x,r.y,d};
  }
- return best;
+ OuterHit extra=street_extra_pick(x,y,co,si,melee,best.rank,minimum,mx,my);
+ return extra.id>=0?extra:best;
 }
 static int outer_car_hit(float x,float y,float co,float si){
- if(scene!=1||!outCrowdCount)return 0;
- for(int id=N_ACT_OUTER;id<N_ACT_MAX;id++){
+ if(scene!=1)return 0;
+ if(outCrowdCount)for(int id=N_ACT_OUTER;id<N_ACT_OUTER_END;id++){
   NpcRef r;if(npc_replaces(id)||npc_holds(id)||!outer_person_ref(id,&r,0))continue;
   float dx=r.x-x,dy=r.y-y;
   if(absf(dx*co+dy*si)<15.f&&absf(dy*co-dx*si)<6.5f)
    return outer_injure(id,3,r.x,r.y);
  }
- return 0;
+ return street_extra_car_hit(x,y,co,si);
 }
 static void outer_life_paint(void){
  if(outCrowdCount){
-  for(int id=N_ACT_OUTER;id<N_ACT_MAX;id++){
+  for(int id=N_ACT_OUTER;id<N_ACT_OUTER_END;id++){
    OuterCondition*b=outBody+(id-N_ACT_OUTER);
    if(npc_replaces(id))continue;
    if(b->damage==3&&b->down>0){

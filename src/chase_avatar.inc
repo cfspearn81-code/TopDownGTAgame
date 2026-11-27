@@ -1,7 +1,7 @@
 /* Local wardrobe/character surfaces for the street chase renderer. No map,
  * NPC, shot or gear state is advanced from paint, even on repeated presents. */
 static void av_q(ChRig r,ChVec a,ChVec b,ChVec c,ChVec d,U col){
- ch_quad(ch_joint(r,a.x,a.y,a.z),ch_joint(r,b.x,b.y,b.z),ch_joint(r,c.x,c.y,c.z),ch_joint(r,d.x,d.y,d.z),col,1);
+ ch_actor_quad(ch_joint(r,a.x,a.y,a.z),ch_joint(r,b.x,b.y,b.z),ch_joint(r,c.x,c.y,c.z),ch_joint(r,d.x,d.y,d.z),col);
 }
 static void av_front(ChRig r,float x,float l,float rr,float z,float zz,U col){
  av_q(r,(ChVec){x,l,z},(ChVec){x,rr,z},(ChVec){x,rr,zz},(ChVec){x,l,zz},col);
@@ -9,15 +9,22 @@ static void av_front(ChRig r,float x,float l,float rr,float z,float zz,U col){
 /* Chamfered head and jacket shoulders catch the world light on a real
  * diagonal face. Backface culling only skips the invisible half of each
  * convex ring; silhouettes remain legible at oblique camera angles. */
+enum {AV_STILL=-1,AV_DANCE,AV_CLAP,AV_SERVICE,AV_SEATED,AV_TEND};
+typedef struct {
+ float scale,floor,t,gait,recoil,tuck;
+ int activity,guard;
+ int styled,style,face,top;
+ U skin,hair,pants,trim;
+} AvPose;
 static void av_round(ChRig r,ChVec a,ChVec b,float aw,float bw,float ad,float bd,U col){
  static const float u[8]={1,1,.56f,-.56f,-1,-1,-.56f,.56f},v[8]={-.52f,.52f,1,1,.52f,-.52f,-1,-1};
  ChVec ring[8],top[8];float dx=ch.x-r.x,dy=ch.y-r.y,eu=dx*r.co+dy*r.si,ev=dy*r.co-dx*r.si;
  for(int i=0;i<8;i++){ring[i]=ch_joint(r,a.x+ad*u[i],a.y+aw*v[i],a.z);top[i]=ch_joint(r,b.x+bd*u[i],b.y+bw*v[i],b.z);}
  for(int i=0;i<8;i++){int k=(i+1)&7;
-  if((v[k]-v[i])*eu*aw-(u[k]-u[i])*ev*ad< -3.f)continue;
+  if(!ch_actor_target&&(v[k]-v[i])*eu*aw-(u[k]-u[i])*ev*ad< -3.f)continue;
   U c=i==0||i==7?mix(col,PAPER,1):i==3||i==4?mix(col,0x283549,2):col;
-  ch_quad(ring[i],ring[k],top[k],top[i],c,1);}
- for(int side=0;side<2;side++){ChVec q[5];for(int j=0;j<5;j++)q[j]=top[(side*4+j)&7];ch_face(q,5,mix(col,PAPER,1),1);}
+  ch_actor_quad(ring[i],ring[k],top[k],top[i],c);}
+ for(int side=0;side<2;side++){ChVec q[5];for(int j=0;j<5;j++)q[j]=top[(side*4+j)&7];ch_actor_face(q,5,mix(col,PAPER,1));}
 }
 static int av_visible(float x,float y,float z){
  ChVec m=ch_local((ChVec){x,y,z});return m.z>6&&m.z<690&&absf(m.x)<m.z*1.31f+14;
@@ -42,9 +49,14 @@ static void av_weapon(ChRig r,ChVec hand,int guarded,float recoil){
   av_front(r,tip.x+.036f,hand.y-.21f,hand.y+.21f,tip.z-.38f,tip.z-.12f,0x21303a);
  }
 }
-static void av_person(const StreetPerson*q,const Look*look,int phase,float strike,int armed,int guarded,float gait){
- if(!av_visible(q->x,q->y,8))return;
- ChRig r={q->x,q->y,cs(q->a),sn(q->a)};
+static void av_body(const StreetPerson*q,const Look*look,int phase,float strike,int armed,int guarded,float gait,const AvPose*pose){
+ if(!pose&&!av_visible(q->x,q->y,8))return;
+ GaitPose stridePose=look?gait_pose(pose?scene:GAIT_STREET,q->x,q->y,q->a):(GaitPose){0};
+ /* Aim and active strike stay aligned to the authoritative heading.
+  * On foot, visual torso heading eases into a turn without moving aim. */
+ float ang=q->a+((armed||strike>0)?0:stridePose.turn);
+ if(stridePose.turn!=0&&!armed&&strike<=0)stridePose=gait_pose(pose?scene:GAIT_STREET,q->x,q->y,ang);
+ ChRig r={q->x,q->y,cs(ang),sn(ang),pose?pose->scale:0,pose?pose->floor:0};
  int hue=(q->hue&255)%5,hero=look!=0,role=q->role,uniform=role==MODEL_OFFICER||role==MODEL_DISPATCH;
  const unsigned char*part=hero?look->part:defaultLook.part;
  int style=hero?part[HAIR]:(hue==0?5:hue==1?3:hue==2?1:hue==3?8:9);
@@ -54,10 +66,17 @@ static void av_person(const StreetPerson*q,const Look*look,int phase,float strik
  U skin=hero?charSkin[part[SKIN]]:npcSkin[hue],hair=hero?charHair[part[HAIR_TONE]]:npcHair[hue],cloth=q->coat;
  U pants=hero?charLeg[part[LEG_TONE]]:uniform?0x334764:role==MODEL_RIVAL?0x56405e:mix(cloth,0x2f3c50,6);
  U shoe=hero?charShoe[part[SHOES]]:0x293747,trim=mix(cloth,0xffe5bc,2),seam=mix(cloth,0x263544,3);
- cloth=headlamps_ground(cloth,(int)r.x,(int)r.y);skin=headlamps_ground(skin,(int)r.x,(int)r.y);
- float step=gait*.48f,bob=absf(step)*.08f,w=hero?1.88f+part[BUILD]*.30f:2.00f+(hue&1)*.22f,head=12.04f+bob;
- float near=d2(r.x-ch.x,r.y-ch.y)<210.f*210.f;
- ch_figure_shadow(r.x,r.y);
+ if(pose&&pose->styled){skin=pose->skin;hair=pose->hair;pants=pose->pants;trim=pose->trim;style=pose->style;face=pose->face;top=pose->top;}
+ if(!pose){cloth=headlamps_ground(cloth,(int)r.x,(int)r.y);skin=headlamps_ground(skin,(int)r.x,(int)r.y);}
+ int action=pose?pose->activity:AV_STILL;
+ float t=pose?pose->t:0,wave=sn(t),sway=action==AV_DANCE?.24f*wave:0;
+ float step=gait*.48f,bob=absf(step)*.08f,w=hero?1.88f+part[BUILD]*.30f:2.00f+(hue&1)*.22f;
+ if(stridePose.valid)bob=stridePose.bob;
+ if(pose)bob+=action==AV_SEATED?-3.02f:.13f*sn(t*.24f);
+ float lean=armed?stridePose.lean*.25f:stridePose.lean,shift=stridePose.sway;
+ float head=12.04f+bob;
+ float near=pose||d2(r.x-ch.x,r.y-ch.y)<210.f*210.f;
+ if(!pose)ch_figure_shadow(r.x,r.y);
  if(!near&&d2(r.x-ch.x,r.y-ch.y)>340.f*340.f){
   for(int s=-1;s<=1;s+=2)ch_link(r,(ChVec){step*s,s*.89f,.4f},(ChVec){0,s*.80f,6.6f},.62f,.70f,.66f,.7f,pants);
   ch_link(r,(ChVec){0,0,6},(ChVec){0,0,11.3f},w*.76f,w,1.14f,1.23f,cloth);
@@ -67,6 +86,15 @@ static void av_person(const StreetPerson*q,const Look*look,int phase,float strik
  for(int side=-1;side<=1;side+=2){
   float stride=step*side,lift=stride>0?stride*.55f:0,lat=side*.96f;
   ChVec hip={-.14f,lat,6.36f+bob},knee={stride*.53f+.16f,lat,3.42f+lift*.40f},heel={stride-.22f,lat,.53f+lift};
+  if(stridePose.valid){
+   const GaitFoot*f=stridePose.foot+(side>0);stride=f->fore;lat+=f->side;lift=f->lift;
+   hip.y+=shift;heel=(ChVec){stride-.20f,lat,.52f+lift};
+   float dx=hip.x-heel.x,dy=hip.y-heel.y,dz=hip.z-heel.z;
+   float leg=7.32f,delta=(leg*leg-dx*dx-dy*dy-dz*dz)*.25f;
+   float bend=(delta>0?sq(delta):0)*f->bend;
+   knee=(ChVec){(hip.x+heel.x)*.5f+bend,(hip.y+heel.y)*.5f,(hip.z+heel.z)*.5f+bend*.14f};
+  }
+  if(action==AV_SEATED){hip.x=-.9f;knee.x=2.02f;knee.z=2.96f;heel.x=2.15f;stride=2.66f;}
   U leg=side==1?pants:mix(pants,0x263449,1);
   ch_link(r,heel,knee,.49f,.62f,.53f,.62f,hero&&part[LEGS]==2?skin:leg);
   ch_link(r,knee,hip,.62f,.78f,.61f,.75f,leg);
@@ -78,28 +106,40 @@ static void av_person(const StreetPerson*q,const Look*look,int phase,float strik
   ch_link(r,(ChVec){stride+.20f,lat,.12f+lift},(ChVec){stride-.04f,lat,.93f+lift},.66f,.55f,.92f,.66f,shoe);
   if(near&&hero&&part[SHOES]!=0)ch_link(r,(ChVec){stride+.22f,lat,.09f+lift},(ChVec){stride+.17f,lat,.29f+lift},.67f,.66f,.95f,.87f,mix(shoe,PAPER,2));
  }
- av_round(r,(ChVec){-.15f,0,6.11f+bob},(ChVec){0,0,10.55f+bob},w*.75f,w,1.04f,1.30f,cloth);
- av_round(r,(ChVec){0,0,10.52f+bob},(ChVec){.03f,0,11.43f+bob},w,w*.72f,1.30f,.92f,cloth);
+ av_round(r,(ChVec){-.15f,shift,6.11f+bob},(ChVec){lean,shift*.65f,10.55f+bob},w*.75f,w,1.04f,1.30f,cloth);
+ av_round(r,(ChVec){lean,shift*.65f,10.52f+bob},(ChVec){.03f+lean,shift*.65f,11.43f+bob},w,w*.72f,1.30f,.92f,cloth);
  if(near){
-  av_round(r,(ChVec){-.15f,0,6.15f+bob},(ChVec){-.14f,0,6.49f+bob},w*.77f,w*.78f,1.07f,1.09f,seam);
+  ChRig body=r;float sz=r.scale>0?r.scale:1;
+  body.x+=sz*(r.co*lean-r.si*shift*.65f);body.y+=sz*(r.si*lean+r.co*shift*.65f);
+  av_round(body,(ChVec){-.15f,0,6.15f+bob},(ChVec){-.14f,0,6.49f+bob},w*.77f,w*.78f,1.07f,1.09f,seam);
   /* Yoke and collar wrap the rear shoulder line. This is what the
    * player actually sees in a trailing view; not just front chest badges. */
-  av_q(r,(ChVec){-1.23f,-w*.72f,10.56f+bob},(ChVec){-1.40f,0,10.31f+bob},(ChVec){-1.34f,0,9.93f+bob},(ChVec){-1.21f,-w*.70f,10.26f+bob},seam);
-  av_q(r,(ChVec){-1.40f,0,10.31f+bob},(ChVec){-1.23f,w*.72f,10.56f+bob},(ChVec){-1.21f,w*.70f,10.26f+bob},(ChVec){-1.34f,0,9.93f+bob},seam);
-  av_round(r,(ChVec){-.02f,0,11.25f+bob},(ChVec){.02f,0,11.57f+bob},.89f,.84f,.76f,.73f,top==5?trim:seam);
+  av_q(body,(ChVec){-1.23f,-w*.72f,10.56f+bob},(ChVec){-1.40f,0,10.31f+bob},(ChVec){-1.34f,0,9.93f+bob},(ChVec){-1.21f,-w*.70f,10.26f+bob},seam);
+  av_q(body,(ChVec){-1.40f,0,10.31f+bob},(ChVec){-1.23f,w*.72f,10.56f+bob},(ChVec){-1.21f,w*.70f,10.26f+bob},(ChVec){-1.34f,0,9.93f+bob},seam);
+  av_round(body,(ChVec){-.02f,0,11.25f+bob},(ChVec){.02f,0,11.57f+bob},.89f,.84f,.76f,.73f,top==5?trim:seam);
   if(top==3){ /* Hood drapes over the shoulder blades, not over the face. */
-   av_round(r,(ChVec){-1.06f,0,8.96f+bob},(ChVec){-.84f,0,11.41f+bob},.58f,1.38f,.27f,.58f,seam);
-  }else if(top==4||role==MODEL_WORKER){av_front(r,-1.29f,-w*.61f,w*.61f,9.81f+bob,10.23f+bob,role==MODEL_WORKER?0xe6c681:trim);}
-  if(uniform||role==MODEL_STAFF||top==5)av_front(r,1.31f,-1.12f,-.48f,9.70f+bob,10.30f+bob,uniform?0xe3c878:PAPER);
-  if(top==2||top==4||top==5)av_front(r,1.31f,-.10f,.10f,7.3f+bob,10.51f+bob,seam);
+   av_round(body,(ChVec){-1.06f,0,8.96f+bob},(ChVec){-.84f,0,11.41f+bob},.58f,1.38f,.27f,.58f,seam);
+  }else if(top==4||role==MODEL_WORKER){av_front(body,-1.29f,-w*.61f,w*.61f,9.81f+bob,10.23f+bob,role==MODEL_WORKER?0xe6c681:trim);}
+  if(uniform||role==MODEL_STAFF||top==5)av_front(body,1.31f,-1.12f,-.48f,9.70f+bob,10.30f+bob,uniform?0xe3c878:PAPER);
+  if(top==2||top==4||top==5)av_front(body,1.31f,-.10f,.10f,7.3f+bob,10.51f+bob,seam);
  }
- float rec=hero?av_recoil(p.trail):0;ChVec grip=av_grip(rec,guarded,step);
+ float rec=pose?pose->recoil:hero?av_recoil(p.trail):0;ChVec grip=av_grip(rec,guarded,step);
+ if(pose&&armed){
+  if(guarded<0)grip.y=-grip.y;
+  if(!guarded)grip.x-=pose->tuck;
+ }
  for(int side=-1;side<=1;side+=2){
-  float swing=-step*side;ChVec shoulder={.06f,side*(w-.07f),10.62f+bob},
+  float swing=stridePose.valid?stridePose.foot[side>0].swing:-step*side;
+  ChVec shoulder={.06f+lean,side*(w-.07f)+shift*.65f,10.62f+bob},
    elbow={.31f+swing*.48f,side*(w+.47f),8.55f+bob},hand={swing*.88f+.43f,side*(w+.28f),6.81f+bob};
+  if(action==AV_DANCE){elbow=(ChVec){.68f,side*(w+.72f+sway),10.22f+side*wave};hand=(ChVec){1.65f,side*(w+1.41f),11.45f+side*wave*1.4f};}
+  if(action==AV_CLAP){elbow=(ChVec){1.25f,side*(w+.12f),9.69f};hand=(ChVec){3.19f,side*(.48f+.42f*(1+wave)),11.48f};}
+  if(action==AV_SERVICE||action==AV_TEND||action==AV_SEATED){
+   elbow=(ChVec){.89f,side*(w+.15f),8.55f+bob};hand=(ChVec){2.22f+.27f*wave,side*1.11f,7.9f+bob+side*.37f*wave};
+  }
   if(phase==NPC_YIELD){elbow=(ChVec){.18f,side*(w+1.1f),11.9f};hand=(ChVec){.72f,side*(w+.89f),14.0f};}
   if(phase==NPC_FIGHT){elbow.x=1.08f;hand=(ChVec){2.34f,side*1.43f,10.68f+bob};}
-  if(armed&&(!guarded||side==1)){
+  if(armed&&(!guarded||side==(guarded<0?-1:1))){
    elbow=(ChVec){guarded?.20f:1.18f,side*(w+.66f),guarded?8.74f:9.28f+bob};
    hand=(ChVec){grip.x+(side<0?.56f:0),grip.y-(side<0?.56f:0),grip.z-(side<0?.17f:0)};
   }
@@ -109,6 +149,7 @@ static void av_person(const StreetPerson*q,const Look*look,int phase,float strik
   ch_link(r,(ChVec){hand.x,hand.y,hand.z-.32f},(ChVec){hand.x+.11f,hand.y,hand.z+.40f},.40f,.39f,.39f,.38f,skin);
  }
  if(armed)av_weapon(r,grip,guarded,rec);
+ float sz=r.scale>0?r.scale:1;r.x+=sz*(r.co*lean-r.si*shift*.65f);r.y+=sz*(r.si*lean+r.co*shift*.65f);
  ch_link(r,(ChVec){.02f,0,11.31f+bob},(ChVec){.08f,0,head+.32f},.66f,.70f,.62f,.68f,skin);
  av_round(r,(ChVec){.23f,0,head},(ChVec){.08f,0,head+1.91f},.89f,1.32f,.91f,1.12f,skin);
  U crown=uniform?0x435b7a:style==0?mix(skin,hair,2):hair;
@@ -128,6 +169,9 @@ static void av_person(const StreetPerson*q,const Look*look,int phase,float strik
  if(face==3||face==4||face==5)av_round(r,(ChVec){.29f,0,head-.06f},(ChVec){.23f,0,head+(face==5?.99f:.55f)},.82f,1.12f,.88f,1.05f,face==5?0x364952:mix(hair,skin,face==3?4:1));
  if(face==6)for(int side=-1;side<=1;side+=2)ch_link(r,(ChVec){.03f,side*1.26f,head+.61f},(ChVec){.03f,side*1.26f,head+.87f},.15f,.15f,.16f,.16f,0xddbd7d);
 }
+static void av_person(const StreetPerson*q,const Look*look,int phase,float strike,int armed,int guarded,float gait){
+ av_body(q,look,phase,strike,armed,guarded,gait,0);
+}
 static void ch_character(const StreetPerson*q){av_person(q,0,NPC_IDLE,0,0,0,q->step);}
 static void ch_player_character_at(float x,float y,float a){
  const Look*l=look_valid(&sv.look)?&sv.look:&defaultLook;
@@ -136,14 +180,16 @@ static void ch_player_character_at(float x,float y,float a){
  av_person(&hero,l,NPC_IDLE,punchFlash,armed,guarded,walking?5.f*sn(footcycle):0);
 }
 static void ch_player_character(void){if(!p.dead&&p.car<0)ch_player_character_at(p.x,p.y,p.a);}
-static void av_downed(float x,float y,float a,U coat){
- if(!av_visible(x,y,1.5f))return;ChRig r={x,y,cs(a),sn(a)};
+static void av_draw_downed(ChRig r,U coat){
  for(int s=-1;s<=1;s+=2){
   ch_link(r,(ChVec){3.23f,s*1.11f,.48f},(ChVec){5.53f,s*1.6f,1.08f},.69f,.64f,2.05f,2.0f,0x495364);
   ch_link(r,(ChVec){6.35f,s*1.68f,.22f},(ChVec){6.44f,s*1.68f,1.13f},.69f,.65f,1.09f,.97f,0x283542);
  }
  av_round(r,(ChVec){-.20f,0,.14f},(ChVec){-1.0f,0,2.07f},1.57f,1.9f,3,2.72f,coat);
  av_round(r,(ChVec){-4.95f,.12f,.2f},(ChVec){-4.90f,.22f,2.02f},1.23f,1.13f,1.38f,1.19f,0x9d776a);
+}
+static void av_downed(float x,float y,float a,U coat){
+ if(av_visible(x,y,1.5f))av_draw_downed((ChRig){x,y,cs(a),sn(a),0,0},coat);
 }
 static void av_mark(float x,float y,float z,U c){
  float u=1.17f*ch.si,v=-1.17f*ch.co;
@@ -172,6 +218,9 @@ static void ch_street_encounter(void){
  if(scene!=1)return;
  for(int i=0;i<LEN(peds);i++){const Ped*q=peds+i;if(q->hp<=0&&q->life>0&&!npc_replaces(i))av_downed(q->x,q->y,q->a,q->role==MODEL_OFFICER?0x587296:q->role==MODEL_RIVAL?0x9e6283:i&1?0x739691:0xae806f);}
  for(int i=0;i<OUT_WALK_COUNT;i++)if(outBody[i].damage==3&&outBody[i].down>0&&!npc_replaces(i+N_ACT_OUTER))av_downed(outBody[i].x,outBody[i].y,outWalkers[i].a,0x688a88);
+ StreetPerson fallen;
+ for(int id=N_ACT_RIDER;id<N_ACT_OUT_EXTRA_END;id++)
+  if(street_extra_fallen(id,&fallen))av_downed(fallen.x,fallen.y,fallen.a,fallen.coat);
  if(npcEnc.phase!=NPC_IDLE&&npcEnc.room==npc_room_key()){
   const NpcRef*r=&npcEnc.actor;int ph=npcEnc.phase;
   if(ph==NPC_DROP||ph==NPC_RECOVER){av_downed(r->x,r->y,r->a,r->coat);

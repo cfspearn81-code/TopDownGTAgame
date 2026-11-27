@@ -128,7 +128,7 @@ static void night_phone_contact_paint(void){
   int x=spot->x+dx[i],y=spot->y+dy[i];
   if(solid(x,y,7))continue;
   int xx=sx(x),yy=sy(y);
-  if(xx>18&&xx<W-18&&yy>12&&yy<H-13){person(xx,yy,np_color[j%NP_NAPP],0,look(p.x-x,p.y-y),1,j%3);disc(xx,yy-29,2,0xff9adb);}
+  if(xx>18&&xx<W-18&&yy>12&&yy<H-13)disc(xx,yy-29,2,0xff9adb);
   break;
  }
 }
@@ -208,6 +208,7 @@ static int night_phone_action(U tap){
  if(!j&&!np_get(NP_SAMPLE,1)){nv.phone[NP_SAMPLE]=1;if(np_tracking_slot==sideSlot&&np_tracking==v&&navHasManual&&navManualLoc==v){np_venue(np_job_dest());np_tracking=np_job_dest();}tell("Mara's sealed proof collected. Bring it to Mercury Dispatch. E on foot.");request_save();return 1;}
  if(j&&np_get(NP_BAG+b->id,99)<b->qty){tell("Signal / Not enough stock of that strain and grade. Visit Glasshouse and Stockroom.");return 0;}
  if(np_get(NP_HOLD,600)){tell("Contact delayed. Check Quest log for the remaining time.");return 1;}
+ if(j&&street_extra_down(N_ACT_OUT_SIGNAL+j-1)){tell("Contact recovering. The order is still active.");return 1;}
  /* A tense neighborhood can spawn the game's existing patrol response
      and a separate story interruption. Both are single-trigger per request. */
  int attention=night_phone_heat_at(loc[v].x,loc[v].y);

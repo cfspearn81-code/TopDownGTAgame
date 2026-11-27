@@ -307,14 +307,14 @@ static void interior_tick(U keys,U tap){
  }
  int x=!!(keys&RIGHT)-!!(keys&LEFT),y=!!(keys&DOWN)-!!(keys&UP);
  float v=(keys&BRAKE?NAMED_RUN_STEP:NAMED_WALK_STEP)*(x&&y?.707107f:1);
+ float ox=interior_x,oy=interior_y;int gaitKey=loc[interior_active_loc].kind*2+interior_subroom;
+ v*=gait_pace(GAIT_NAMED,gaitKey,ox,oy,interior_a,x||y,!!(keys&BRAKE));
  walking=x||y;if(walking){footcycle=wrap(footcycle+.25f*FOOT_PACE);interior_a=look(x,y);}
  if(!int_solid(interior_x+x*v,interior_y))interior_x+=x*v;
  if(!int_solid(interior_x,interior_y+y*v))interior_y+=y*v;
- npc_stance(interior_x,interior_y,&interior_a);
- pulse_guard_tick(3,interior_x,interior_y,interior_a,int_solid);
- npc_attack(keys,interior_x,interior_y,interior_a);
- npc_encounter_tick(dt);
+ npc_private_step(keys,interior_x,interior_y,&interior_a);
  if(scene!=3)return;
+ gait_finish(GAIT_NAMED,gaitKey,interior_x,interior_y,ox,oy,interior_a);
  interior_cam_x+=((interior_x-W/2)*.13f-interior_cam_x)*.11f;
  interior_cam_y+=((interior_y-282)*.08f-interior_cam_y)*.11f;
  p.secs+=dt;job_clock_tick(dt);
@@ -322,7 +322,6 @@ static void interior_tick(U keys,U tap){
  if((tap&USE)&&(keys&BRAKE)&&!int_at_door()&&!(k==1&&v39_staff_near())&&npc_open_near())tap&=~USE;
  if(vd_frame(keys,tap))tap&=~(USE|ENTER);
  if(k==1&&!interior_subroom)v39_bar_tick();
- npc_resume_room_actors();
  if(tap&USE){
   int li=legal_index_for_kind(k);
   if(int_at_door()){if(interior_subroom)int_switch_room(k,0);else int_leave();return;}
@@ -908,9 +907,9 @@ static void interior_paint(void){
   box(cx-lw/2-4,cy,lw+8,19,0x27383e,0x68797a);center(cx,cy,f->label,a,0);
  }
  if(k==1){vault39_live(interior_subroom,dx,dy);if(!interior_subroom)v39_actor_paint(dx,dy);}
- npc_body_paint(dx,dy);
+ npc_private_bodies(dx,dy);
  player_in_room(interior_x,interior_y,dx,dy,0xc6d979,player_gait(),interior_a,3,int_solid);
- npc_room_trace(dx,dy);
+
  interior_hud:;
  rect(0,0,W,81,0x111e28);rect(0,78,W,1,0x42616d);
  draw_day_clock(5);textat(DAY_BADGE_LABEL_X,10,t->line,a,0);int big=textw(t->banner,1)<610;textat(26,29,t->banner,PAPER,big);

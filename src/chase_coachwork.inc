@@ -1,9 +1,20 @@
 /* Port Vanta coachwork. Same five silhouettes/upgrade slots as the garage.
  * Stations and glass are in local chassis coordinates; no mutable model
- * state, simulation effects or dependencies. Far traffic loses subpixel trim. */
-typedef struct {float x,y,c,s,eyeU,eyeV,depth;int lod;} CvRig;
-static ChVec cv_p(const CvRig*r,float x,float y,float z){
+ * writes, simulation effects or dependencies. Far traffic loses subpixel trim. */
+#include "chase_transport_motion.inc"
+typedef struct {float x,y,c,s,eyeU,eyeV,depth;int lod;const CvMotion *motion;} CvRig;
+static ChVec cv_ground_pt(const CvRig*r,float x,float y,float z){
  return (ChVec){r->x+x*r->c-y*r->s,r->y+x*r->s+y*r->c,z};
+}
+static ChVec cv_p(const CvRig*r,float x,float y,float z){
+ if(r->motion){
+  const CvMotion*m=r->motion;
+  float z0=z+m->heave+x*m->pitch+y*m->roll;
+  /* Small-angle body rig; wheels keep their own pavement contact. */
+  x-=(z-2.9f)*m->pitch;y-=(z-2.9f)*m->roll;
+  z=z0;
+ }
+ return cv_ground_pt(r,x,y,z);
 }
 static void cv_quad(const CvRig*r,ChVec a,ChVec b,ChVec c,ChVec d,U ink,int tint){
  ch_quad(cv_p(r,a.x,a.y,a.z),cv_p(r,b.x,b.y,b.z),cv_p(r,c.x,c.y,c.z),cv_p(r,d.x,d.y,d.z),ink,tint);
@@ -24,7 +35,7 @@ static void cv_contact(const CvRig*r,float tail,float nose,float w){
  static const float corner[8][2]={{-1,-.68f},{-.79f,-1},{.77f,-1},{1,-.66f},{1,.66f},{.77f,1},{-.79f,1},{-1,.68f}};
  ChPlot p[8];int top=H,bt=-1;float mid=(tail+nose)*.5f,len=(nose-tail)*.5f+.7f;
  for(int j=0;j<8;j++){
-  ChVec v=ch_local(cv_p(r,mid+corner[j][0]*len,.32f+corner[j][1]*(w+.76f),.18f));
+  ChVec v=ch_local(cv_ground_pt(r,mid+corner[j][0]*len,.32f+corner[j][1]*(w+.76f),.18f));
   if(v.z<9.5f)return;p[j]=ch_screen(v);top=min(top,p[j].y);bt=max(bt,p[j].y);
  }
  for(int y=max(0,top);y<min(bt,H);y++){
@@ -37,24 +48,44 @@ static void cv_contact(const CvRig*r,float tail,float nose,float w){
    if(chZ[k]<=ground)pixels[k]=mix(pixels[k],0x101720,3);}
  }
 }
-static void cv_wheel(const CvRig*r,float u,float w,int s,float rad,U rim){
+typedef struct {const CvRig *body;float u,v,c,s;} CvWheel;
+static ChVec cv_wheel_pt(const CvWheel*w,float dx,float dy,float z){
+ return cv_ground_pt(w->body,w->u+dx*w->c-dy*w->s,w->v+dx*w->s+dy*w->c,z);
+}
+static void cv_wheel(const CvRig*r,float u,float w,int s,float rad,U rim,int front){
  static const float dx[]={-.56f,.56f,1,1,.56f,-.56f,-1,-1};
  static const float dz[]={-1,-1,-.51f,.51f,1,1,.51f,-.51f};
- float v=s*(w+.04f),inner=s*(w-1.34f),zc=rad+.05f;
- /* Face away from the eye is skipped, but the tire tread is visible even
-  * looking directly along the axle or straight down the boot. */
+ float v=s*(w-.04f),zc=rad+.045f,angle=r->motion&&front?r->motion->steer:0.f;
+ CvWheel local={r,u,v,cs(angle),sn(angle)};const CvWheel*wheel=&local;
+ float eye=(r->eyeU-u)*local.c+(r->eyeV-v)*local.s;
+ float eyeV=(r->eyeV-v)*local.c-(r->eyeU-u)*local.s;
+ float outer=s*.42f,inner=-s*1.29f;
+ /* Round black sidewalls, beveled shoulders and tread. At close range the
+  * tire face actually follows steering and spoke rotation follows travel. */
  for(int j=0;j<8;j++){
-  int k=(j+1)&7;float x=u+rad*dx[j],xx=u+rad*dx[k],h=zc+rad*dz[j],hh=zc+rad*dz[k];
-  if(((dx[j]+dx[k])*.5f*(r->eyeU-u)+(dz[j]+dz[k])*.5f*(ch.h-zc))<0)continue;
-  cv_quad(r,(ChVec){x,v,h},(ChVec){xx,v,hh},(ChVec){xx,inner,hh},(ChVec){x,inner,h},j==3||j==4?0x373d44:0x1e252d,1);
+  int k=(j+1)&7;float x=rad*dx[j],xx=rad*dx[k],h=zc+rad*dz[j],hh=zc+rad*dz[k];
+  if(((dx[j]+dx[k])*.5f*eye+(dz[j]+dz[k])*.5f*(ch.h-zc))<0)continue;
+  U tread=j==3||j==4?0x36414a:0x222b32;
+  ch_quad(cv_wheel_pt(wheel,x,outer,h),cv_wheel_pt(wheel,xx,outer,hh),
+          cv_wheel_pt(wheel,xx,inner,hh),cv_wheel_pt(wheel,x,inner,h),tread,1);
  }
- if(s*r->eyeV<w)return;
- /* Octagons split down the middle stay within the near clipper's 5-vertex input bound. */
+ if(s*eyeV<0.f)return;
+ /* Octagons split down the middle stay within the clipper's input bound. */
  for(int ring=0;ring<(r->lod==2?3:r->lod?2:1);ring++){
-  float scale=ring==0?1: ring==1?.66f:.37f,plane=v+s*(ring*.12f);
-  U color=ring==0?0x18222a:ring==1?rim:0x394952;
-  for(int half=0;half<2;half++){ChVec pts[5];for(int k=0;k<5;k++){int j=(half*4+k)&7;pts[k]=cv_p(r,u+rad*dx[j]*scale,plane,zc+rad*dz[j]*scale);}
+  float scale=ring==0?1:ring==1?.69f:.48f,plane=outer+s*(ring*.075f);
+  U color=ring==0?0x182027:ring==1?mix(rim,0xd4d9cd,3):0x2c3a43;
+  for(int half=0;half<2;half++){ChVec pts[5];for(int k=0;k<5;k++){int j=(half*4+k)&7;pts[k]=cv_wheel_pt(wheel,rad*dx[j]*scale,plane,zc+rad*dz[j]*scale);}
    ch_face(pts,5,color,1);}
+ }
+ if(r->lod<2)return;
+ float phase=r->motion?r->motion->phase:0.f,off=outer+s*.19f;
+ for(int j=0;j<5;j++){
+  float a=j*1.2566371f+phase,si=sn(a),co=cs(a);
+  float rad0=rad*.12f,rad1=rad*.57f,tip=rad*.060f;
+  ch_quad(cv_wheel_pt(wheel,si*rad0-co*.16f,off,zc+co*rad0+si*.16f),
+          cv_wheel_pt(wheel,si*rad1-co*tip,off,zc+co*rad1+si*tip),
+          cv_wheel_pt(wheel,si*rad1+co*tip,off,zc+co*rad1-si*tip),
+          cv_wheel_pt(wheel,si*rad0+co*.16f,off,zc+co*rad0-si*.16f),mix(rim,PAPER,4),1);
  }
 }
 /* Fitted shell/windscreens share all four corners. Trims are inset in
@@ -74,12 +105,12 @@ static void cv_glass(const CvRig*r,float a,float b,float w,float ww,float h,floa
   if(r->lod==2)cv_roof(r,u+dx*.59f,u+dx*.63f,-wb*.75f,wb*.74f,-wb*.75f,wb*.74f,z1+dz*.59f+.12f,z1+dz*.63f+.12f,0x6a8389,1);
  }
 }
-static void ch_car(const Car*c,int hero){
+static void ch_car_painted(const Car*c,int hero,U custom){
  ChVec view=ch_local((ChVec){c->x,c->y,6});if(view.z< -20||absf(view.x)>view.z*1.31f+29)return;
  int t=cl(c->type,0,4);const NgShape *g=ngShape+t;float co=cs(c->a),si=sn(c->a),dx=ch.x-c->x,dy=ch.y-c->y;
- CvRig rig={c->x,c->y,co,si,dx*co+dy*si,dy*co-dx*si,view.z,hero||view.z<155?2:view.z<315?1:0};const CvRig*r=&rig;
+ CvRig rig={c->x,c->y,co,si,dx*co+dy*si,dy*co-dx*si,view.z,hero||view.z<155?2:view.z<315?1:0,cv_motion(c)};const CvRig*r=&rig;
  NgMods m=c==cars&&c->owner==1?ng_installed(t):(NgMods){0};
- int live=c->cond>0,bits=road_lamps(c);U paint=hero<0?0x8bdbd0:!live?0x49555b:m.paint?ngPaint[m.paint]:specs[t].c;
+ int live=c->cond>0,bits=road_lamps(c);U paint=hero<0?0x8bdbd0:!live?0x49555b:custom?custom:m.paint?ngPaint[m.paint]:specs[t].c;
  U ink=0x24343c,edge=mix(paint,0xf6eee1,3),waist=mix(paint,0x28384b,3),deep=mix(paint,0x172532,5);
  U glass=live?0x1c323f:0x35434c,lip=mix(paint,0x607586,2);
  float w=g->width,tail=g->tail,nose=g->nose,h=g->hood+1.04f,rt=g->roofTail,rn=g->roofNose;
@@ -103,14 +134,20 @@ static void ch_car(const Car*c,int hero){
  }
  for(int s=-1;s<=1;s+=2){
   if(s*r->eyeV< -w-2)continue;
-  cv_wheel(r,tail+5.0f,w,s,t==3?2.35f:2.64f,ngRims[m.rim]);cv_wheel(r,nose-5.1f,w,s,t==3?2.35f:2.64f,ngRims[m.rim]);
+  cv_wheel(r,tail+5.0f,w,s,t==3?2.35f:2.64f,ngRims[m.rim],0);cv_wheel(r,nose-5.1f,w,s,t==3?2.35f:2.64f,ngRims[m.rim],1);
   cv_quad(r,(ChVec){back,s*(w-.66f),h},(ChVec){wind,s*(w-.66f),h},(ChVec){rn,s*rr,roof},(ChVec){rt,s*rr,roof},waist,1);
   if(r->lod){
    float mid=t==3?-.75f:-1.4f,wb=w-.66f-.10f,ww=rr+.28f;
    /* Side glazing separated by a body-color B-pillar; solid cargo walls. */
    if(t!=4)cv_quad(r,(ChVec){back+1.28f,s*wb,h+.86f},(ChVec){mid-.47f,s*wb,h+.86f},(ChVec){mid-.47f,s*ww,roof-.54f},(ChVec){rt+.65f,s*ww,roof-.54f},glass,1);
    cv_quad(r,(ChVec){mid+.36f,s*wb,h+.86f},(ChVec){wind-1.23f,s*wb,h+.86f},(ChVec){rn-.51f,s*ww,roof-.54f},(ChVec){mid+.36f,s*ww,roof-.54f},0x476675,1);
-   cv_side(r,s,-2,t==3?.85f:1.5f,w+.10f,w+.10f,2.51f,2.85f,edge);
+   /* Break the side into a sill, stamped shutlines and fingertip handles. */
+   cv_side(r,s,tail+6.9f,nose-6.0f,w-.21f,w-.21f,1.63f,2.05f,deep);
+   float jamb=t==4?rt+.4f:t==3?back+.42f:-1.08f;
+   cv_side(r,s,jamb,jamb+.17f,w-.21f,w-.22f,2.05f,h-.68f,deep);
+   cv_side(r,s,jamb+.35f,jamb+1.18f,w-.18f,w-.18f,h-1.13f,h-.86f,edge);
+   if(t==1||t==2)cv_side(r,s,back-.90f,back-.20f,w-.18f,w-.18f,h-1.00f,h-.74f,edge);
+   cv_side(r,s,-2,t==3?.85f:1.5f,w-.20f,w-.20f,2.51f,2.85f,edge);
    cv_side(r,s,wind-2.2f,wind-.88f,w+.77f,w+.94f,h+.33f,h+.91f,waist);
   }
  }
@@ -170,3 +207,5 @@ static void ch_car(const Car*c,int hero){
   if(rear&&live&&(bits&1)&&r->lod)cv_end(r,e+end*.17f,-1.42f,1.42f,z-.49f,z-.12f,0xff6555,0);
  }
 }
+
+static void ch_car(const Car*c,int hero){ch_car_painted(c,hero,0);}

@@ -16,3 +16,5 @@ fb8bdda1f50a7b03e6af3c6449df137f7b86a87deb639008466f8b7d9587b284  Dead-Channel-W
 764af00ed9c34a83174235aee86a7b2cd2476373f6e0db5b41ccf9d84abc1593  Dead-Channel-Woodline-Lantern-Quay-Stability-Linux-x64.tar.gz
 ba0e35ff0b8345ae19c99824bbe86e55a8056379b3fd320da4c22fd0c8968672  Dead-Channel-All-Area-3D-Windows-11-x64.zip
 46c15ba8272f39f383ba90dc13dbda9e5179669c780c7a39f1acdc1d61bd1a14  Dead-Channel-All-Area-3D-Linux-x64.tar.gz
+801e0f52365bc94a2da3f767b6d17578a38cd9efa5b9b9b4d0979c668d63a2b0  Dead-Channel-Street-Contact-Update-Linux-x64.tar.gz
+8ac3edde8adac513a0b17107db1edae3afbd75a2d2a9315c34d7dd4996b76f7e  Dead-Channel-Street-Contact-Update-Windows-11-x64.zip

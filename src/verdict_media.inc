@@ -172,14 +172,17 @@ static void vm_releasevan(void){
  else if(vm.van>0&&p.car==vm.van)vm.returnVan=vm.van;
  vm.van=-1;
 }
-static void vm_actor(int e,int x,int y,int t){
+static void vm_props(int e,int x,int y,int t,int humans){
  int facing=t<240?0:1;int stride=(int)(sn(t*.14f)*4);
  if(!e){
-  person(x-10,y+1,0x925d9d,-stride,facing?3.14159f:0.f,0,1);
-  person(x,y,0xd98569,stride,facing?3.14159f:0.f,0,4);
+  if(humans&&!street_extra_down(N_ACT_OUT_MEDIA)&&!npc_replaces(N_ACT_OUT_MEDIA))
+   person(x-10,y+1,0x925d9d,-stride,facing?3.14159f:0.f,0,1);
+  if(humans&&!street_extra_down(N_ACT_OUT_MEDIA+1)&&!npc_replaces(N_ACT_OUT_MEDIA+1))
+   person(x,y,0xd98569,stride,facing?3.14159f:0.f,0,4);
   box(x+5,y-8,10,7,0x46373d,0xc1a065);rect(x+7,y-10,4,1,PAPER);
  }else{
-  person(x-5,y-3,0xe8b876,stride,facing?3.14159f:0.f,0,2);
+  if(humans&&!street_extra_down(N_ACT_OUT_MEDIA+2)&&!npc_replaces(N_ACT_OUT_MEDIA+2))
+   person(x-5,y-3,0xe8b876,stride,facing?3.14159f:0.f,0,2);
   box(x+4,y-6,16,8,0x57696e,0xe1c295);disc(x+6,y+2,2,DARK);disc(x+17,y+2,2,DARK);
   line(x+8,y-6,x+12,y-16,GOLD);line(x+12,y-16,x+18,y-16,GOLD);line(x+18,y-16,x+18,y-10,PAPER);
  }
@@ -196,7 +199,7 @@ static void vm_world_news(void){
  if(x>=-100&&x<=W+100&&y>=-20&&y<=H+80){
   vmbracket(x-69,y-19,139,39,9,GOLD);line(x-56,y+19,x+56,y+19,0xb59e65);
   int ax=sx(vm_subject_x()),ay=sy(vm_subject_y());
-  vm_actor(vm.event,ax,ay,vm.phaseT);
+  vm_props(vm.event,ax,ay,vm.phaseT,0);
   if(p.car==vm.van||d2(p.x-vmBayX[vm.event],p.y-vmBayY[vm.event])<210*210)
     center(x,y+20,"UNIT 7   /   CAMERA BAY",GOLD,0);
  }
@@ -221,7 +224,7 @@ static void vm_viewfinder(void){
  static U cell[52*40];U *save=surface;int sw=rw,sh=rh;
  z(cell,sizeof cell);surface=cell;rw=52;rh=40;
  clipLeft=clipTop=0;clipRight=52;clipBottom=40;
- vm_actor(vm.event,22,27,vm.phaseT);
+ vm_props(vm.event,22,27,vm.phaseT,1);
  surface=save;rw=sw;rh=sh;clipLeft=x+7;clipRight=x+w-7;clipTop=y+30;clipBottom=y+112;
  for(int j=0;j<40;j++)for(int i=0;i<52;i++)if(cell[j*52+i])
   rect(mid+vm_pan_error()*2+2*(i-22),py+2*(j-27),2,2,cell[j*52+i]);
@@ -274,6 +277,13 @@ static int vd_b7(int ev,U keys,U tap){
  if(!cars[vm.van].cond){vm_releasevan();vm.newsPhase=0;vm_goal_room(VM_STUDIO);
   vd_status("Van out of service. Return to the Low Tide console to dispatch a replacement.");return 0;}
  if(scene!=1){vm.hold=0;return 0;}
+ int first=vm.event?N_ACT_OUT_MEDIA+2:N_ACT_OUT_MEDIA,n=vm.event?1:2;
+ for(int i=first;i<first+n;i++)
+  if(npc_holds(i)||npc_replaces(i)||street_extra_down(i)){
+   vm.hold=0;
+   if(p.car==vm.van&&p.noticeT<=0.f)tell("Live subjects are unavailable. Hold for the original feed to resume.");
+   return 0;
+  }
  vm.phaseT=(vm.phaseT+1)%480;
  if(p.car!=vm.van){
   if(vm.wasInside){vm.wasInside=0;vd_goal((int)cars[vm.van].x,(int)cars[vm.van].y,"UNIT 7 STUDIO VAN");

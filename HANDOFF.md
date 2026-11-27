@@ -1,3 +1,59 @@
+# Dead Channel | Street Contact Update
+
+Street Contact includes the intervening 3D Detail and 3D Street Motion
+work on top of the previous public All-Area 3D commit
+`223bf999494088d3a5eafcaad64a044143cbeaf6`. The exact tested
+Street Contact source is `eaaa012c05f750ab9ab61a4d9d0f15fc522e4746`
+and the two archives here are the originally delivered bytes.
+
+- [Linux x86-64](downloads/Dead-Channel-Street-Contact-Update-Linux-x64.tar.gz)
+- [Windows 11 x64](downloads/Dead-Channel-Street-Contact-Update-Windows-11-x64.zip)
+- [Checksums](downloads/SHA256SUMS.txt), [controls and verification](docs/STREET-CONTACT.md)
+
+Use `scripts/test-street-contact.sh` and the new 3,682-frame
+`scripts/qa/curb-lamp-tour.txt.gz` for the opening replay (both-host
+digest `7dfa7bce`); the historical tape crossed now-solid poles.
+All 107 lamppost bases passed collision checks; the two launchers passed
+the 402-frame impact/reverse replay with matching saves. Native Linux also
+passed outdoor and indoor interaction and combat replays. The Windows PE
+was checked under simulated Win32, not on physical Windows hardware.
+Existing saves and old archives remain compatible. Update this handoff
+before the next build, and independently verify both repository downloads
+and the GitHub Releases listing after publication.
+
+---
+
+# Dead Channel | 3D Street Motion Update
+
+This directly delivered follow-up starts from 3D Detail
+`08987268a56609b62293e62653dcda7b82d70283`. See the [change and
+verification notes](docs/3D-STREET-MOTION.md) before editing. The last
+verified GitHub main is All-Area 3D `223bf999494088d3a5eafcaad64a044143cbeaf6`;
+these are distinct revisions. Keep historical GitHub archives intact. Before
+any new upload, update this file and player-facing notes against current source,
+run the exact launchers, and record the verified archive checksums. Do not
+include test careers or local captures.
+
+---
+
+# Dead Channel | 3D Detail Update
+
+This direct-delivery build starts from the published All-Area 3D
+`223bf999494088d3a5eafcaad64a044143cbeaf6`. Six GPT-6.2 Astra Ultra lanes
+tested the shared C view and the indoor raster replacement. The room
+player and cast now use depth-tested geometry, with the exact old top-down
+renderer retained. Room framing, fixed-step transport animation and
+cache-backed exterior material changes do not alter collisions, jobs or
+save layout. Asset, controls and coverage details: [3D-DETAIL-UPDATE.md](docs/3D-DETAIL-UPDATE.md).
+
+Build both launchers and package with `python3 scripts/package-3d-detail.py`.
+No GitHub change was requested for this follow-up. For any future public
+release, write the correct source/handoff against live main, reuse exact
+verified downloads, preserve historical artifacts and verify the branch.
+Never include real or disposable test saves, personal files, or raw logs.
+
+---
+
 # Dead Channel | All-Area 3D
 
 This GitHub release starts from the published Woodline & Lantern Quay

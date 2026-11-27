@@ -87,6 +87,7 @@ static int ncr_car_stopped(NavPoint q){
 static void ncr_street_tick(void){
  if(!ncr.phase)return;
  if(p.dead){ncr_cancel(0);return;}
+ if(ncr.phase!=NCR_DRIVE&&(npc_holds(N_ACT_OUT_VOCAL)||npc_replaces(N_ACT_OUT_VOCAL)||street_extra_down(N_ACT_OUT_VOCAL)))return;
  if(ncr.phase==NCR_LEAVE){
   if(--ncr.walk<=0||ncr_walk(ncr.door.x,ncr.door.y))ncr.phase=NCR_OFF;
   return;
@@ -133,7 +134,7 @@ static int ncr_near(void){
  float best=33*33.f;int idx=-1;
  for(int i=0;i<LEN(ncr_cast);i++){
   const NcRegular*r=ncr_cast+i;
-  if(i==NCR_VOCALIST&&ncr_active())continue;
+  if((i==NCR_VOCALIST&&ncr_active())||!npc_club_regular_live(i))continue;
   float d=d2(ncX-r->x,ncY-r->y);
   if(d<best&&pulse_path(ncX,ncY,r->x,r->y,nc_solid)){best=d;idx=i;}
  }

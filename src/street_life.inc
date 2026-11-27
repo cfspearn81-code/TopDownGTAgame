@@ -28,7 +28,13 @@ static const StreetLoop streetLoops[]={
 typedef struct {int live,loop,next;float pace;} StreetDriver;
 enum{STREET_LEAVE,STREET_EN_ROUTE,STREET_ARRIVE};
 typedef struct {float x,y,cx,cy;} StreetAddress;
-typedef struct {int goal,visits,cross,leg;float tx,ty,mx,my,ax,ay,pause,crossX,crossY,blocked,fromX,fromY,stalled,crossWait;int detour,axis;} StreetWalk;
+enum{STREET_YIELD_NONE,STREET_YIELD_CROSSING,STREET_YIELD_SIDEWALK,STREET_YIELD_LAMP_SIDE,STREET_YIELD_LAMP_FORWARD};
+typedef struct {
+ int goal,visits,cross,leg;
+ float tx,ty,mx,my,ax,ay,pause,crossX,crossY,blocked,fromX,fromY,stalled,crossWait;
+ int detour,axis,yield,yieldPeer;
+ float yieldX,yieldY,yieldRest,yieldCool,yieldLease,gaitPhase,gaitWeight,lampX,lampY;
+} StreetWalk;
 static StreetDriver streetDrivers[LEN(cars)];
 static StreetWalk streetWalks[DISPATCH_FIRST+DISPATCH_UNITS];
 static int streetJunctionOwner[64];
@@ -137,6 +143,7 @@ static float street_wall_depth(const Car*c){
     if(a>depth)depth=a;
    }
   }
+ float lamp=street_lamp_car(c,co,si,rx,ry);if(lamp>depth)depth=lamp;
  float rail=vd_chess_rail_depth(c);return rail>depth?rail:depth;
 }
 static int street_hits_wall(const Car*c){return street_wall_depth(c)>0.f;}
@@ -151,14 +158,24 @@ static int street_car_clear(int id,const Car*old,const Car*next){
  }
  return 1;
 }
+static int streetDriveLamp,lampBumpRide=-1;
+static float lampBumpX,lampBumpY;
 static int street_move_car(int id,float dx,float dy){
  Car*c=cars+id,next=*c;next.x+=dx;next.y+=dy;
- if(!street_car_clear(id,c,&next))return 0;
+ if(!street_car_clear(id,c,&next)){
+  if(id==p.car){
+   float co=cs(next.a),si=sn(next.a),ac=absf(co),as=absf(si);
+   if(street_lamp_car(&next,co,si,STREET_HALF_L*ac+STREET_HALF_W*as,
+                     STREET_HALF_L*as+STREET_HALF_W*ac)>0)streetDriveLamp=1;
+  }
+  return 0;
+ }
  *c=next;return 1;
 }
 /* Fast cars can move more than a small obstacle's width per tick.
  * Check their travel in short pieces without changing the fixed clock. */
 static void street_drive_car(int id,float dx,float dy){
+ streetDriveLamp=0;
  int steps=d2(dx,dy)>3.95f*3.95f?2:1;
  dx/=steps;dy/=steps;
  for(int i=0;i<steps;i++)if(!street_move_car(id,dx,dy)){
@@ -532,17 +549,28 @@ static int street_can_start_leg(Ped*q,StreetWalk*w){
  }
  w->crossX=q->x;w->crossY=q->y;return 1;
 }
+static void street_walk_facing(Ped*q,float dx,float dy,float dt){
+ if(d2(dx,dy)<.0004f)return;
+ /* Keep the foot anchor authoritative. A new leg turns the body over
+    a few ticks instead of snapping at every changed traffic target. */
+ float a=wrap(look(dx,dy)-q->a),cap=7.5f*dt;
+ q->a=wrap(q->a+(a>cap?cap:a< -cap?-cap:a));
+}
+static int street_civ_lamp_detour(Ped*,StreetWalk*,float,float);
 static void street_walk_step(Ped*q,StreetWalk*w,float dt,float speed){
  speed*=FOOT_PACE;
  float dx=w->mx-q->x,dy=w->my-q->y,n=sq(d2(dx,dy));
  if(n<.001f)return;
- q->a=look(dx,dy);float step=speed*dt;if(step>n)step=n;
+ float step=speed*dt;if(step>n)step=n;
  float x=q->x+dx*(step/n),y=q->y+dy*(step/n);
  /* A car can pivot across a retreating walker's safety margin.
   * Let the walker back out without admitting any deeper overlap. */
  if(!solid(x,y,4)&&!vd_cross_foot(q->x,q->y,x,y,3.f)&&(w->cross==2?street_step_past_cars(q->x,q->y,x,y,3.f):
                                   street_foot_car_clear(x,y,-1,3.f))){
+  street_walk_facing(q,x-q->x,y-q->y,dt);
   q->x=x;q->y=y;q->s=speed;w->blocked=0;
+ }else if(street_lamp_foot(x,y,4)&&street_civ_lamp_detour(q,w,dx/n,dy/n)){
+  w->blocked=0;
  }else if(w->cross==1&&(w->blocked+=dt)>.40f){
   /* A car can turn toward a stripe after a civilian has started crossing.
    * Don't leave both users yielding forever: return to the same curb, then
@@ -550,34 +578,123 @@ static void street_walk_step(Ped*q,StreetWalk*w,float dt,float speed){
   w->mx=w->crossX;w->my=w->crossY;w->cross=2;w->blocked=0;w->pause=.15f;
  }
 }
-static int street_civ_gap(const Ped*q,float x,float y){
+static int street_civ_blocker(const Ped*q,float x,float y){
  for(int j=0;j<LEN(peds);j++){
   const Ped*r=peds+j;if(r==q||r->hp<=0)continue;
   if(absf(r->x-x)>13.f||absf(r->y-y)>13.f||npc_replaces(N_ACT_STREET+j))continue;
   float after=d2(r->x-x,r->y-y),before=d2(r->x-q->x,r->y-q->y);
-  if(after<12.f*12.f&&after<before-.0005f)return 0;
+  if(after<12.f*12.f&&after<before-.0005f)return j;
  }
+ return -1;
+}
+static int street_civ_gap(const Ped*q,float x,float y){
+ return street_civ_blocker(q,x,y)<0;
+}
+static int street_civ_yield_clear(const Ped*q,float x,float y){
+ /* The whole short detour must fit on a shoulder and avoid the same
+    stationary cars, crossings and closures as the ordinary step. */
+ return !solid(x,y,4)&&street_foot_car_clear(x,y,-1,3.f)&&
+        !vd_cross_foot(q->x,q->y,x,y,3.f)&&street_civ_gap(q,x,y);
+}
+/* A legacy secondary post may be centered on the old sidewalk marker.
+ * Take a short committed two-leg walk around that base, then rejoin the
+ * original authored route. Stay on the same legal crossing/sidewalk. */
+static int street_civ_lamp_segment(Ped*q,float x,float y,float xx,float yy){
+ float dx=xx-x,dy=yy-y;int n=1+(int)sq(d2(dx,dy));
+ for(int i=1;i<=n;i++)if(!street_civ_yield_clear(q,x+dx*i/n,y+dy*i/n))return 0;
  return 1;
 }
-static int street_civ_cede_zebra(Ped*q,StreetWalk*w,float dt){
- if(w->cross)return 0;
+static int street_civ_lamp_detour(Ped*q,StreetWalk*w,float u,float v){
+ /* First try the direction that moves deeper onto the lot, when the
+  * leg is parallel to the curb. This avoids diverting into a live lane. */
+ float curb=absf(u)>absf(v)?q->y:q->x,normal=absf(u)>absf(v)?u:-v;
+ int out=(curb-street_nearest_line(curb))*normal>=0?1:-1;
+ for(int side=out;side;side=side==out?-out:0)for(int d=6;d<=10;d+=2){
+  float x=q->x-v*side*d,y=q->y+u*side*d,xx=x+u*10,yy=y+v*10;
+  /* If the remaining leg is particularly short, return around the
+   * outside of the curb without overshooting into a different lane. */
+  float left=(w->mx-q->x)*u+(w->my-q->y)*v;
+  if(left<7)continue;
+  if(left<10){xx=x+u*left;yy=y+v*left;}
+  float nextCurb=absf(u)>absf(v)?y:x;
+  if(absf(curb-street_nearest_line(curb))>=31.f&&absf(nextCurb-street_nearest_line(nextCurb))<31.f)continue;
+  if(!street_civ_lamp_segment(q,q->x,q->y,x,y)||!street_civ_lamp_segment(q,x,y,xx,yy))continue;
+  w->yield=STREET_YIELD_LAMP_SIDE;w->yieldX=x;w->yieldY=y;w->lampX=xx;w->lampY=yy;
+  w->yieldLease=1.45f;w->yieldRest=0;return 1;
+ }
+ return 0;
+}
+static int street_civ_yield_pick(Ped*q,StreetWalk*w,int mode,int peer,float u,float v){
+ /* Reserve one physical sidestep. A one-tick nudge used to finish just
+    outside the active crossing's 12.4-unit buffer; next tick the old route
+    stepped right back inside it, sometimes turning a full 180° at 60 Hz. */
+ int crossing=mode==STREET_YIELD_CROSSING,dots=crossing?11:6;
+ float best=0,xBest=0,yBest=0;
+ for(int sign=1;sign>=-1;sign-=2){
+  float reach=0;
+  for(int n=1;n<=dots;n++){
+   float d=n*1.4f,x=q->x+sign*u*d,y=q->y+sign*v*d,curb=absf(u)>absf(v)?x:y;
+   if(absf(curb-street_nearest_line(curb))<31.f||!street_civ_yield_clear(q,x,y))break;
+   if(crossing){
+    const StreetWalk*r=streetWalks+peer;
+    if(d2(r->mx-x,r->my-y)<=d2(r->mx-q->x,r->my-q->y))break;
+   }
+   reach=d;
+  }
+  if(reach<2.7f)continue;
+  float x=q->x+sign*u*reach,y=q->y+sign*v*reach;
+  float score=crossing?d2(streetWalks[peer].mx-x,streetWalks[peer].my-y):reach;
+  if(score>best){best=score;xBest=x;yBest=y;}
+  if(!crossing)break;
+ }
+ if(best<=0)return 0;
+ w->yieldX=xBest;w->yieldY=yBest;
+ w->yield=mode;w->yieldPeer=peer;w->yieldRest=.24f;w->yieldLease=2.10f;return 1;
+}
+static int street_civ_yield_tick(Ped*q,StreetWalk*w,float dt){
+ if(!w->yield)return 0;
+ const int lamp=w->yield>=STREET_YIELD_LAMP_SIDE;
+ if(lamp&&w->yieldLease<=0){w->yield=STREET_YIELD_NONE;return 0;}
+ w->yieldLease-=dt;
+ float dx=w->yieldX-q->x,dy=w->yieldY-q->y,len=sq(d2(dx,dy));
+ if(len>.035f){
+  float speed=27.f*FOOT_PACE,m=speed*dt;if(m>len)m=len;
+  float x=q->x+dx*m/len,y=q->y+dy*m/len;
+  if(street_civ_yield_clear(q,x,y)){
+   street_walk_facing(q,x-q->x,y-q->y,dt);q->x=x;q->y=y;q->s=speed;return 1;
+  }
+  /* A different walker or a car used that shoulder meanwhile. Hold the
+     legal position instead of changing direction or pinning the lane. */
+  w->yieldX=q->x;w->yieldY=q->y;
+ }
+ if(lamp){
+  if(w->yield==STREET_YIELD_LAMP_SIDE){w->yield=STREET_YIELD_LAMP_FORWARD;w->yieldX=w->lampX;w->yieldY=w->lampY;return 1;}
+  w->yield=STREET_YIELD_NONE;return 0;
+ }
+ if(w->yield==STREET_YIELD_CROSSING){
+  const Ped*r=peds+w->yieldPeer;const StreetWalk*z=streetWalks+w->yieldPeer;
+  /* The remaining approach is measured to the crossing exit, not to the
+     waiter who just stepped farther out of the way. A retreat to the other
+     curb releases this wait; the lease still bounds a blocked crossing. */
+  if(!npc_replaces(N_ACT_STREET+w->yieldPeer)&&!npc_holds(N_ACT_STREET+w->yieldPeer)&&
+     r->hp>0&&z->cross&&d2(r->x-z->mx,r->y-z->my)<38.f*38.f&&
+     d2(w->yieldX-z->mx,w->yieldY-z->my)<30.f*30.f&&w->yieldLease>0){
+   w->yieldRest=.24f;return 1;
+  }
+ }
+ if((w->yieldRest-=dt)>0)return 1;
+ w->yield=STREET_YIELD_NONE;w->yieldCool=.9f;return 0;
+}
+static int street_civ_cede_zebra(Ped*q,StreetWalk*w){
+ if(w->cross||w->yieldCool>0)return 0;
  for(int j=0;j<LEN(streetWalks);j++){
   const Ped*r=peds+j;const StreetWalk*z=streetWalks+j;
-  if(r==q||r->hp<=0||!z->cross||!street_is_walker(j))continue;
+  if(r==q||r->hp<=0||!z->cross||!street_is_walker(j)||npc_holds(N_ACT_STREET+j)||npc_replaces(N_ACT_STREET+j))continue;
   if(d2(z->mx-q->x,z->my-q->y)>12.4f*12.4f||d2(r->x-q->x,r->y-q->y)>31.f*31.f)continue;
-  /* Give an existing crossing pedestrian space to exit. Normal traffic
-   * queue ordering resumes at the exact curb point after they pass. */
   float dx=z->mx-z->crossX,dy=z->my-z->crossY;
   if(z->cross==2){dx=z->mx-r->x;dy=z->my-r->y;}
-  float sideX=absf(dy)>absf(dx)?1.f:0,sideY=1.f-sideX,step=dt*27.f;
-  for(int n=1;n>=-1;n-=2){
-   float x=q->x+n*sideX*step,y=q->y+n*sideY*step;
-   float curb=sideX?x:y;
-   if(absf(curb-street_nearest_line(curb))<31.f||solid(x,y,4)||
-     !street_foot_car_clear(x,y,-1,3.f)||!street_civ_gap(q,x,y)||
-     d2(z->mx-x,z->my-y)<=d2(z->mx-q->x,z->my-q->y))continue;
-   q->x=x;q->y=y;q->a=look(n*sideX,n*sideY);q->s=27.f;return 1;
-  }
+  float sideX=absf(dy)>absf(dx)?1.f:0;
+  if(street_civ_yield_pick(q,w,STREET_YIELD_CROSSING,j,sideX,1.f-sideX))return 1;
  }
  return 0;
 }
@@ -604,19 +721,18 @@ static int street_civ_yield(Ped*q,StreetWalk*w,float dt,float speed){
  float dx=w->mx-q->x,dy=w->my-q->y,n=sq(d2(dx,dy));if(n<.001f)return 0;
  float stride=speed*FOOT_PACE*dt;if(stride>n)stride=n;
  float u=dx/n,v=dy/n,nx=q->x+u*stride,ny=q->y+v*stride;
- if(street_civ_gap(q,nx,ny))return 0;
- if(!w->cross&&w->leg==STREET_EN_ROUTE){
-  /* A crowded sidewalk can be wider on the storefront or on the curb
-   * side. Try a polite step to the right, then the left, never the lane. */
+ int blocker=street_civ_blocker(q,nx,ny);
+ if(blocker<0)return 0;
+ if(!w->cross&&w->leg==STREET_EN_ROUTE&&w->yieldCool<=0){
+  /* A pass is a real side leg with a small forward bias, not one tick
+     left and the next tick right. A narrow sidewalk falls back to its
+     usual queue and delayed replan instead of squeezing into traffic. */
   for(int side=1;side>=-1;side-=2){
-   float x=q->x+(u*.12f-v*side)*stride,y=q->y+(v*.12f+u*side)*stride;
-   float cross=absf(dx)>absf(dy)?y:x;
-   if(absf(cross-street_nearest_line(cross))<31.f||solid(x,y,4)||!street_civ_gap(q,x,y)||
-    !street_foot_car_clear(x,y,-1,3.f)||vd_cross_foot(q->x,q->y,x,y,3.f))continue;
-   q->x=x;q->y=y;q->a=look(u,v);q->s=speed*FOOT_PACE*.82f;return 1;
+   float x=u*.12f-v*side,y=v*.12f+u*side;
+   if(street_civ_yield_pick(q,w,STREET_YIELD_SIDEWALK,blocker,x,y))break;
   }
  }
- return 1; /* Let the lead walker occupy their space; don't overlap. */
+ return 1;
 }
 static void street_civ_replan(int i){
  Ped*q=peds+i;StreetWalk*w=streetWalks+i;
@@ -626,9 +742,11 @@ static void street_civ_replan(int i){
   * ordinary target selector can choose a new route immediately. */
  if(d2(q->x-w->mx,q->y-w->my)<.18f)w->pause=.47f;
 }
-static void street_tick_civilian(int i,float dt){
+static void street_tick_civilian_route(int i,float dt){
  Ped*q=peds+i;StreetWalk*w=streetWalks+i;q->s=0;
- if(street_civ_cede_zebra(q,w,dt))return;
+ if(w->yieldCool>0)w->yieldCool-=dt;
+ if(street_civ_yield_tick(q,w,dt))return;
+ if(street_civ_cede_zebra(q,w))return;
  if(w->pause>0){w->pause-=dt;return;}
  if(d2(w->mx-q->x,w->my-q->y)<.18f){
   if(!street_civ_gap(q,w->mx,w->my)){
@@ -673,6 +791,18 @@ static void street_tick_civilian(int i,float dt){
  }
  if(q->s>0)w->stalled=0;
  else if(!w->cross&&(w->stalled+=dt)>2.1f+(i%6)*.22f)street_civ_replan(i);
+}
+static void street_tick_civilian(int i,float dt){
+ Ped*q=peds+i;StreetWalk*w=streetWalks+i;
+ float x=q->x,y=q->y;
+ street_tick_civilian_route(i,dt);
+ /* Advance gait from accepted travel, not an unrelated wall-clock phase.
+    A short weight ramp takes the edge off stopping/starting in a queue. */
+ float d=sq(d2(q->x-x,q->y-y)),move=q->s>0&&d>.015f;
+ if(move)w->gaitPhase=wrap(w->gaitPhase+(d*.40f<.27f?d*.40f:.27f));
+ float weight=w->gaitWeight+(move?7.5f:-11.f)*dt;
+ w->gaitWeight=weight<0?0:weight>1?1:weight;
+ if(w->gaitWeight==0)w->gaitPhase=0;
 }
 static void street_spawn(void){
  roadFX_reset();

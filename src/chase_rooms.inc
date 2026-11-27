@@ -2,14 +2,16 @@
    Inverse-map horizontal planes at their real elevation. North walls are
    texture-mapped vertically; raised counters occlude the actor on the far
    side, never move the interactable or simulate it a second time. */
+#include "chase_room_rig.inc"
 typedef struct{int x,y,iz;float scale;} IrPoint;
 static struct{float x,y,h,mid;int top,end;const U*tex;} ir;
-enum{IR_F=443,IR_RES=1080000,IR_TILE=112,IR_FOOT=78};
+enum{IR_F=443,IR_RES=1080000};
 #define IR_S .51449576f
 #define IR_C .85749293f
-static U irTile[IR_TILE*IR_TILE],irAux[W*H];
+static U irAux[W*H];
 static void ir_begin(float x,float y,int top,int end,const U*tex){
- ir.x=480+(x-480)*.82f;ir.y=y+167;ir.h=135;ir.mid=258;ir.top=top;ir.end=end;ir.tex=tex;
+ RoomLens m=ch_room_lens(x,y);
+ ir.x=m.x;ir.y=m.y;ir.h=m.h;ir.mid=m.mid;ir.top=top;ir.end=end;ir.tex=tex;
  for(int j=top;j<end;j++){
   U c=nw_blend(0x233848,0x121d29,cl((j-top)*224/(end-top),0,224));
   for(int i=j*W;i<(j+1)*W;i++){pixels[i]=c;chZ[i]=0;}
@@ -80,16 +82,6 @@ static void ir_box(float x,float y,float w,float h,float z0,float ht,U c,int tex
  ir_hplane(x,y,x+w,y+h,z0+ht,c,tex);
 }
 static void ir_block(int x,int y,int w,int d,int h,U c){ir_box(x,y,w,d,0,h,c,0);}
-static int ir_height(int t){
- switch(t){
- case INT_PLANT:case INT_FERNS:case INT_GROWBED:return 9;
- case INT_BED:case INT_CLINIC:case INT_SOFA:case WI_SEATS:case WI_STAGE:return 12;
- case INT_CAR:return 14;case INT_GLASS:return 34;case INT_WALL:case INT_BARS:return 42;
- case INT_LOCKER:case INT_RACK:case WI_AQUA:case INT_COOLER:return 33;
- case INT_FEATURE:case WI_GALLERY:case WI_SCREEN:case WI_TIMETABLE:return 30;
- default:return 20;
- }
-}
 typedef struct{float x,y,z;}IrV;
 static void ir_face(IrV a,IrV b,IrV c,IrV d,U ink){
  IrPoint r[]={ir_proj(a.x,a.y,a.z),ir_proj(b.x,b.y,b.z),ir_proj(c.x,c.y,c.z),ir_proj(d.x,d.y,d.z)};
@@ -126,46 +118,6 @@ static void ir_display_car(const InteriorProp*f){
  ir_face((IrV){x1,mid+g,16},(IrV){x2,mid+g,16},(IrV){r,mid+h,25},(IrV){l,mid+h,25},0x314d5d);
  ir_face((IrV){l,mid-h,25},(IrV){r,mid-h,25},(IrV){r,mid+h,25},(IrV){l,mid+h,25},mix(p0,PAPER,2));
  for(int k=-1;k<=1;k+=2)ir_box(right-1,mid+k*hw*.50f-2,2,5,9,2,0xffdfa4,0);
-}
-static void ir_fixture(const InteriorProp*f,U a){
- int x=f->x,y=f->y,w=f->w,d=f->h,t=f->type,h=ir_height(t);U c=f->tint?f->tint:a;
- if(t==INT_CAR){ir_display_car(f);return;}
- ir_box(x,y,w,d,0,h,c,1);
- /* Edge bands/feet and individually modelled fixtures add vertical depth;
-    authentic address-specific artwork remains on the furniture itself. */
- if(w>28&&h>9){
-  ir_front(x+1,x+w-1,y+d+.12f,h-3,h-1,mix(c,PAPER,3),0,0,0,0,0);
-  ir_front(x+4,x+w-4,y+d+.15f,1,3,mix(c,0x141a25,5),0,0,0,0,0);
- }
- if(t==INT_DESK||t==INT_CONSOLE||t==INT_SETTLE||t==WI_PRINT||t==INT_DINER){
-  int xx=x+w*2/3;ir_box(xx-8,y+d/3,19,8,h,2,0x33414a,0);
-  ir_box(xx-3,y+d/3,6,3,h+2,6,0x445560,0);ir_box(xx-11,y+d/3-2,24,4,h+6,14,0x384c57,0);
-  ir_front(xx-9,xx+11,y+d/3+2.1f,h+8,h+18,mix(a,0x263b48,3),0,0,0,0,0);
- }else if(t==INT_SOFA||t==WI_SEATS){
-  ir_box(x,y,w,min(d/4,8),h,10,c,0);
-  ir_box(x,y,5,d,h,5,mix(c,PAPER,1),0);ir_box(x+w-5,y,5,d,h,5,c,0);
- }else if(t==INT_CAR){
-  ir_box(x+w/3,y+d/4,w/3,d/2,h,8,mix(c,0x283e50,4),0);
-  ir_box(x+w/3+4,y+d/4+4,w/3-8,d/2-8,h+8,2,c,0);
- }else if(t==INT_GUNCASE||t==WI_AQUA||t==INT_COOLER||t==INT_LAB){
-  for(int i=4;i<w-9;i+=max(21,w/4)){
-   int j=min(w-3,i+max(21,w/4)-4);
-   ir_front(x+i,x+j,y+d+.2f,5,h-5,t==WI_AQUA?0x367d82:mix(c,0x29455a,4),0,0,0,0,0);
-   ir_front(x+i+2,x+i+4,y+d+.25f,7,h-7,mix(c,0xc8e6d9,4),0,0,0,0,0);
-  }
- }else if(t==INT_PLANT||t==INT_FERNS){
-  int n=t==INT_PLANT?1:cl(w/38,2,6);
-  for(int i=0;i<n;i++){float u=x+(i+.5f)*w/n,v=y+d*.5f;ir_box(u-5,v-4,10,8,h,7,0xa37157,0);
-   ir_box(u-2,v-2,4,4,h+7,10,0x537456,0);
-   for(int j=0;j<5;j++){float an=j*1.256637f+i*.7f;
-    ir_box(u+cs(an)*5-3,v+sn(an)*4-2,7,5,h+10+(j&1)*4,4,j&1?0x80ac79:0x638c67,0);}}
- }else if(t==INT_RACK||t==INT_LOCKER||t==INT_SORTER||t==WI_OVEN){
-  int n=cl(w/24,1,8);for(int j=0;j<n;j++){
-   int l=x+3+j*(w-6)/n,r=x+3+(j+1)*(w-6)/n-2;if(r<=l)continue;
-   ir_front(l,r,y+d+.2f,5,h-5,mix(c,0x293b48,j%2?3:4),0,0,0,0,0);
-   ir_front(l+2,min(r,l+9),y+d+.3f,h/2,h/2+2,mix(c,PAPER,4),0,0,0,0,0);
-  }
- }
 }
 static void ir_rail(int x,int y,int w,int height,U c){
  ir_front(x,x+w,y,0,height,c,0,0,0,0,0);
@@ -207,22 +159,6 @@ static void ir_shell(int type,int top,int end,int l,int r,int wh,U wall,U neon,c
  }
  ir.tex=old;
 }
-static void ir_scratch(void){irCardPass=1;surface=irTile;rw=rh=IR_TILE;for(int i=0;i<IR_TILE*IR_TILE;i++)irTile[i]=0;}
-static void ir_put_scaled(float x,float y,float z0,float mul,float tall){
- surface=pixels;rw=W;rh=H;irCardPass=0;
- IrPoint q=ir_proj(x,y,z0);if(!q.iz)return;
- float scale=q.scale*mul;if(scale<.15f)return;
- int width=(int)(IR_TILE*scale),height=(int)(IR_TILE*scale*tall);
- int left=q.x-(int)(IR_TILE*.5f*scale),top=q.y-(int)(IR_FOOT*scale*tall),inv=(int)(65536.f/scale),iv=(int)(65536.f/(scale*tall));
- int xl=max(0,left),xr=min(W,left+width),yt=max(ir.top,top),yb=min(ir.end,top+height);
- for(int sy=yt;sy<yb;sy++){int v=min(IR_TILE-1,((sy-top)*iv)>>16);
-  float depth=IR_RES/(float)q.iz,worldHeight=(q.y-sy)/(scale*IR_C);
-  int zi=(int)(IR_RES/(depth-worldHeight*IR_S));
-  int u=(xl-left)*inv;const U*row=irTile+v*IR_TILE;
-  for(int sx=xl,i=sy*W+xl;sx<xr;sx++,i++,u+=inv){U c=row[min(IR_TILE-1,u>>16)];if(c&&zi>=chZ[i]){pixels[i]=c;chZ[i]=zi;}}
- }
-}
-static void ir_put(float x,float y,float z0,float mul){ir_put_scaled(x,y,z0,mul,1.f);}
 static void ir_label(float x,float y,int z0,const char*s,U c,int always){
  IrPoint q=ir_proj(x,y,z0);if(!q.iz||q.x<12||q.x>W-12||q.y<ir.top+6||q.y>ir.end-6)return;
  if(!always&&chZ[q.y*W+q.x]>q.iz+125)return;
@@ -234,38 +170,33 @@ static void ir_marker(float x,float y,U c){
  ir_hplane(x-u,y+u-1.5f,x+u,y+u,z0,c,0);
  ir_hplane(x-u,y-u,x-u+1.5f,y+u,z0,c,0);ir_hplane(x+u-1.5f,y-u,x+u,y+u,z0,c,0);
 }
-static void ir_hero(float x,float y,float a,int which){
- if(!pistol_equipped()&&which!=10){
-  float u=cs(a),v=sn(a),m=18;IrV l={x+u*m-v*3,y+v*m+u*3,.5f},r={x+u*m+v*3,y+v*m-u*3,.5f},tip={x+u*(m+7),y+v*(m+7),.5f};
-  ir_face(l,r,tip,tip,0xf2f1df);
- }
- ir_scratch();
- if(which==3||which==4)player_in_room(x,y,(int)x-IR_TILE/2,(int)y-IR_FOOT,which==3?0xc6d979:0x56baae,player_gait(),a,which==3?3:1,which==3?int_solid:wi_solid);
- else person(IR_TILE/2,IR_FOOT,0x67b0a1,which==11?(nt_walking?((int)(anim*15)&3):0):which==10?(nvs_rail_walk?(int)(nvs_frames%16)/4:0):player_gait(),a,MODEL_PLAYER,1);
- ir_put_scaled(x,y,0,1.14f,1.48f);
-}
-static void ir_actor(float x,float y,float z0,float a,U c,int model,int hue,int gait){
- ir_scratch();person(IR_TILE/2,IR_FOOT,c,gait,a,model,hue);ir_put_scaled(x,y,z0,1.15f,1.70f);
-}
-static void ir_trace(float x,float y,float xx,float yy,U c){
- int n=cl((int)(sq(d2(xx-x,yy-y))*.9f),2,550);
- for(int i=0;i<=n;i++){float t=(float)i/n;IrPoint q=ir_proj(x+(xx-x)*t,y+(yy-y)*t,11.5f);
-  if(q.x>=0&&q.x<W&&q.y>=ir.top&&q.y<ir.end&&chZ[q.y*W+q.x]<=q.iz+6)pixels[q.y*W+q.x]=c;}
-}
+#include "chase_room_cast.inc"
+#include "chase_room_detail.inc"
 static void ir_named(void){
  int n=interior_active_loc,k=loc[n].kind,li=legal_index_for_kind(k);
  const InteriorTheme*t=interior_theme(k);U a=t->neon;
  ir_begin(interior_x,interior_y,79,483,interior_back);
  ir_shell(0,145,440,146,814,45,t->wall,a,irNamedFloor);
- for(int i=0;i<interior_nprop;i++)ir_fixture(interior_props+i,a);
+ id_named_scene(k,li,t);
+ for(int i=0;i<interior_nprop;i++)id_fixture(interior_props+i,a,k,1);
+ if(k==1&&!interior_subroom){
+  id_bottle_row(544,155,103,34,11,2);
+  if(v39.tick>=V39_POUR&&v39.tick<V39_HANDOFF&&!v39.playerTick&&!npc_replaces(N_ACT_MIKA))
+   id_round(v39Px[v39.patron],V39_BAR_TOP+15,2.5f,2.4f,21,4,.5f,v39.patron?0xe0ab87:0xaee6cf);
+ }
  /* Harvest display uses the live unlocked pots and warehouse, not room level. */
  if(k==4&&interior_subroom){
   GrowBatch b=grow_batch(sv.b);float pct=growth_fraction(0);
   for(int j=0;j<b.count;j++){int x=b.pot[j].x,y=b.pot[j].y;
-   ir_box(x-6,y-5,12,10,9,4,0x785c4d,0);int h=3+(int)(pct*18);
-   ir_box(x-1,y-1,2,2,13,h,0x86a276,0);
-   for(int p0=0;p0<5;p0++){float f=p0*1.55f+j,k0=2+pct*4;
-    ir_box(x+cs(f)*k0-2,y+sn(f)*k0-2,5,4,13+h*(.38f+.13f*p0),3,p0&1?0x78ad77:0x68926a,0);}
+   id_round(x,y,4.3f,4.f,9,4,1.2f,0x9d7e68);
+   id_round(x,y,5.f,4.6f,13,.7f,0,0x6a544e);
+   if(sv.b[0].timer<=0)continue;
+   int h=3+(int)(pct*18.f);U leaf=b.product?0xb9a4d1:0x95b477;
+   ir_box(x-.6f,y-.6f,1.2f,1.2f,13.7f,h,mix(leaf,0x6f916c,4),0);
+   for(int m=0;m<6;m++){
+    float a0=m*1.6183f+j*.77f;
+    id_leaf(x,y,13.7f+h*(.22f+.13f*m),a0,2.3f+pct*(4.4f+(m%3)),1.4f+pct*.8f,mix(leaf,0x668673,m%4));
+   }
   }
   int cnt=grow_case_count(warehouse_units(0));for(int i=0;i<min(5,cnt);i++){
    int xx=GROW_RACK_X+3+(i%3)*34,zz=20+i/3*11;ir_box(xx,GROW_RACK_Y+4,27,13,zz,11,0xae956a,0);
@@ -283,7 +214,7 @@ static void ir_named(void){
  if(!interior_subroom&&(li>=0||k==4))ir_marker(GROW_GATE_X,GROW_GATE_Y,a);
  if(k==1&&!interior_subroom){ir_marker(V39_STAFF_X,V39_STAFF_Y,a);
   if(v39_staff_visible())ir_label(V39_STAFF_X,V39_STAFF_Y,19,"EMPLOYEES ONLY",a,1);
-  if(v39.playerServed)ir_box(V39_PLAYER_X-3,V39_BAR_TOP+V39_BAR_H-8,6,5,20,7,0xedba96,0);
+  if(v39.playerServed)id_round(V39_PLAYER_X,V39_BAR_TOP+V39_BAR_H-8,2.6f,2.45f,21,5,.5f,0xedba96);
  }
  if(k==15){ir_marker(CHIEF_X,CHIEF_Y,a);ir_marker(CUSTODY_X,CUSTODY_Y,GOLD);}
  for(int id=N_ACT_FRONT;id<=N_ACT_GROW;id++){NpcRef r;if(npc_replaces(id)||!npc_ref(id,&r))continue;
@@ -291,14 +222,7 @@ static void ir_named(void){
   npc_present_pose(id,&r.x,&r.y,&r.a,&step);
   ir_actor(r.x,r.y,0,r.a,r.coat,r.model,r.hue,step);
  }
- if(npcEnc.phase!=NPC_IDLE&&npcEnc.room==npc_room_key()){
-  NpcRef*r=&npcEnc.actor;
-  if(npcEnc.phase==NPC_DROP||npcEnc.phase==NPC_RECOVER){
-   ir_box(r->x-7,r->y-3,14,6,0,2,r->coat,0);if(npcEnc.prize){ir_box(r->x+2,r->y-4,10,5,2,3,LIME,0);ir_marker(r->x+7,r->y-1,GOLD);}
-  }else{modelExtraPunch=npcEnc.phase==NPC_FIGHT?npcEnc.strike:0;
-   ir_actor(r->x,r->y,0,r->a,npcEnc.flash>0?0xffdfbc:r->coat,r->model,r->hue,npcEnc.phase==NPC_FIGHT?(int)(sn(anim*18)*4):0);modelExtraPunch=0;
-   ir_marker(r->x,r->y,npcEnc.phase==NPC_FIGHT?PINK:GOLD);}
- }
+ ir_room_actors();
  if(k==4&&interior_subroom&&!npc_replaces(N_ACT_GROW)){
   GrowBatch b=grow_batch(sv.b);GrowPose g=grow_operator_pose(sv.b,&b,growth_fraction(0),grow_pack_left,anim);
   if(g.phase!=GROW_OFF&&!npc_holds(N_ACT_GROW)){
@@ -310,7 +234,7 @@ static void ir_named(void){
   }
  }
  ir_hero(interior_x,interior_y,interior_a,3);
- if(npcTraceTicks>0)ir_trace(npcTracePose.mx,npcTracePose.my,npcTraceEndX,npcTraceEndY,GOLD);
+ if(npcTraceTicks>0)ir_trace();
  if(!int_at_door())ir_label(interior_desk_x,interior_desk_y-13,18,t->counter,a,0);
 
  if(li>=0&&interior_subroom&&int_at_desk())ir_label(interior_desk_x,interior_desk_y,29,sv.legit[li].pending>0?(sv.legit[li].cooldown>0?"PROCESSING":"COLLECTION READY"):"ACCOUNT DESK",a,1);
@@ -321,15 +245,14 @@ static void ir_shop(void){
  /* UI overlays share the original north-up title and interaction rows. */
  rect(0,0,W,74,0x111e28);rect(0,477,W,H-477,0x111e28);
  ir_shell(1,wi_top,440,wi_left,wi_right,44,wiFinish[wi_role].wall,a,wi_back);
- for(int i=0;i<wi_n;i++)ir_fixture(wi_f+i,a);
+ id_arch(wi_shell_edge(wi_top,0),wi_shell_edge(wi_top,1),wi_top,44,wiFinish[wi_role].wall,a,1,0);
+ int lit=wi_sw[walkin_active];
+ id_floor_light(wi_f[0].x+wi_f[0].w*.5f,wi_f[0].y+wi_f[0].h+12,105,75,lit?a:0xb1a99b,lit?68:46);
+ id_floor_light(480,422,91,39,mix(a,0xc4bca1,4),39);
+ id_room_shadows(wi_f,wi_n);id_exit(480,429,a);
+ for(int i=0;i<wi_n;i++)id_fixture(wi_f+i,a,100+wi_role,i==0||wi_f[i].type==WI_SCREEN?lit:0);
  ir_marker(W/2,429,a);ir_marker(wi_plaque_x(),418,GOLD);
  ir_hero(wi_x,wi_y,wi_angle,4);
-}
-static void ir_club_guest(float x,float y,float z0,int id,int stance,float time,int face){
- ir_scratch();nc_guest_actor(IR_TILE/2,IR_FOOT,id,stance,time,face,100);ir_put(x,y,z0,1.f);
-}
-static void ir_crew(float x,float y,float z0,int id,int stance,float time){
- ir_scratch();nc_cast_actor(IR_TILE/2,IR_FOOT,110,ncHouseCast+id,stance,time,1);ir_put(x,y,z0,1.f);
 }
 static void ir_club_prop(int l,int t,int r,int b,int h,U c){
  ir_box(l,t,r-l,b-t,0,h,c,1);
@@ -338,40 +261,34 @@ static void ir_club_prop(int l,int t,int r,int b,int h,U c){
 static void ir_club(void){
  float time=nc_motion();ir_begin(ncX,ncY,78,455,ncBackdrop);
  ir_shell(2,155,435,74,887,55,0x46324b,ncRose,ncBackdrop);
+ id_club_lighting();
  if(ncRoom==NC_FLOOR){
-  ir_club_prop(290,157,671,228,20,0x614151);
-  ir_club_prop(78,158,234,263,22,0x615569);ir_club_prop(733,158,885,260,22,0x764959);
-  for(int i=0;i<2;i++){int x=i?721:143;ir_club_prop(x,305,x+96,345,12,0x80516a);x=i?836:82;ir_club_prop(x,302,x+42,374,24,0x4f4159);}
-  for(int i=0;i<3+nc_get(NC_ACT);i++){
-   ir_scratch();nc_stage_actor(IR_TILE/2,IR_FOOT,i,time);ir_put(480+(i*2-(3+nc_get(NC_ACT))+1)*30,209-(i&1)*5,20,1.f);
+  id_club_stage(time);
+  id_club_counter(78,158,234,263,0x65586e,0);id_club_counter(733,158,885,260,0x875762,1);
+  for(int i=0;i<2;i++){
+   int x=i?721:143;id_sofa(x,305,96,40,0x80516a,3);x=i?836:82;
+   id_door(x+21,339,39,27,i?ncGold:ncIce,1);
   }
-  /* The bars are working counters, so their crew stand behind the service edge. */
-  ir_crew(159,216,22,0,CA_WORKING,time*3.5f);ir_crew(800,216,22,1,CA_WORKING,time*2.9f);
-  static const short crowd[][3]={{391,264,5},{554,269,0},{620,275,14},{374,283,1},
-   {423,286,9},{529,294,7},{585,299,2},{324,306,11},{470,311,12},{608,320,8},
-   {344,327,3},{446,335,6},{513,339,13},{359,348,10},{567,351,4},{645,357,15}};
-  int guests=nc_owned()?cl(8+nc_get(NC_DOOR)/4,8,16):12;
-  for(int i=0;i<LEN(crowd);i++){int id=crowd[i][2];if(id<guests)ir_club_guest(crowd[i][0]+sn(time*.83f+id*4.2f)*7,crowd[i][1]+sn(time*1.9f+id)*2,0,id,id%3==0?CA_APPLAUSE:id%3==1?CA_SWAY:CA_WAITING,time*(2.6f+id*.07f)+id*1.7f,id%4>=2?-1:1);}
-  for(int i=0;i<LEN(ncr_cast);i++){if(i==NCR_VOCALIST&&ncr_active())continue;ir_scratch();
-   nc_regular_sprite(i,IR_TILE/2,IR_FOOT,ncr_near()==i);ir_put(ncr_cast[i].x,ncr_cast[i].y,0,1.f);}
-  for(int i=0;i<1+nc_get(NC_STAFF);i++)ir_crew(568+i*25,377+i*3,0,i?i+3:2,CA_WAITING,time*1.7f+i);
-  if(nc_get(NC_DISPUTE))for(int i=0;i<1+nc_get(NC_DISPUTE);i++)ir_club_guest(610+i*18,396+i*3,0,12+i,CA_APPLAUSE,time*2.6f+i,-1);
+  for(int id=NAR_STAGE;id<NAR_SUITE;id++)ir_club_actor(id);
   for(int i=0;i<7;i++)ir_box(300+i*60,222,7,2,20,1,(sn(time*2+i)>.2f)?ncIce:ncGold,0);
   ir_marker(160,354,ncRose);ir_marker(793,354,ncGold);
  }else if(ncRoom==NC_SUITE){
   for(int i=0;i<3;i++){
-   int x=210+i*266;ir_club_prop(x-106,154,x+92,248,11,ncBoothUph[i]);
-   ir_box(x-90,155,171,12,11,24,ncBoothUph[i],0);
-   for(int j=0;j<2;j++)ir_club_guest(x+(j?49:-49),213,11,2+i*3+j,CA_SEATED,time*1.5f+i+j,j?-1:1);
-   ir_box(x-26,218,52,13,11,4,0xa67b71,0);if(nc_get(NC_SHOWCASE)&(1<<i))ir_box(x-2,221,5,5,15,5,ncBoothInk[i],0);
+   int x=210+i*266;ir_box(x-106,154,198,94,0,4,mix(ncBoothUph[i],0x4d454e,4),1);
+   id_sofa(x-103,155,193,62,ncBoothUph[i],5);
+   ir_box(x-101,155,188,3,25,3,mix(ncBoothInk[i],ncBoothUph[i],5),0);
+   for(int j=0;j<2;j++)ir_club_actor(NAR_SUITE+i*2+j);
+   ir_box(x-25,217,50,16,9,2,0x766060,0);ir_box(x-2,222,4,6,4,5,0x776867,0);
+   id_round(x-10,223,2.7f,2.7f,11,4,.4f,ncBoothInk[i]);
+   if(nc_get(NC_SHOWCASE)&(1<<i))id_round(x+9,221,3,3,11,5,1,ncBoothInk[i]);
   }
-  ir_club_prop(80,304,210,372,16,0x7a546c);ir_club_prop(743,307,884,363,24,0x947785);
+  id_sofa(80,304,130,68,0x7a546c,3);
+  const InteriorProp stock={743,307,141,56,INT_LOCKER,0x947785};id_fixture(&stock,ncGold,-1,1);
  }else{
-  ir_club_prop(84,155,265,211,26,0x665d77);ir_club_prop(294,155,648,248,22,0x776260);
-  ir_club_prop(687,155,875,215,28,0x6b6577);ir_club_prop(97,302,240,358,16,0x8b667c);ir_club_prop(730,303,867,360,16,0x8b667c);
-  ir_crew(540,192,22,3,CA_WORKING,time*1.43f);
+  id_club_office();
+  ir_club_actor(NAR_OFFICE);
  }
- ir_marker(480,418,ncIce);ir_hero(ncX,ncY,ncAngle,7);
+ ir_room_actors();ir_marker(480,418,ncIce);ir_hero(ncX,ncY,ncAngle,7);if(npcTraceTicks>0)ir_trace();
 }
 static void ir_trap(void){
  /* Authored pixel art is the material atlas. Actors and service labels from
@@ -383,13 +300,18 @@ static void ir_trap(void){
     of shelves, shutter banks and relay hardware. */
  for(int i=0;i<12;i++)ir_hplane(101,222+i*19,856,223+i*19,.12f,0x505856,0);
  for(int i=0;i<14;i++)ir_hplane(110+i*55,220,111+i*55,447,.13f,0x3d4d50,0);
+ id_arch(100,857,220,78,0x465460,nt_amber,2,480);
+ id_floor_light(207,266,114,78,0xb3b096,78);id_floor_light(488,259,116,83,0xc4a877,76);
+ id_floor_light(716,259,111,83,0x86ac9f,78);id_exit(480,437,nt_amber);
+ for(int i=0;i<4;i++)id_floor_strip(nt_sz[i]-19,nt_sy[i]-11,38,22,0x738179);
  int rack=nt_level(NT_RACK);
- for(int i=0;i<3;i++){int x=119+i*20;ir_block(x,215,3,27,29+rack*12,0x536665);}
+ for(int i=0;i<4;i++){int x=120+i*57;
+  ir_block(x,215,3,27,16+rack*13,0x536665);
+  id_front(x,3,242.15f,0,15+rack*13,0x84928b);}
  for(int j=0;j<=rack;j++){ir_box(119,214,176,28,6+j*13,3,0x8e836a,0);
-  for(int i=0;i<5;i++)ir_box(125+i*31,218,19+i%3,16,9+j*13,6+(i*7+j)%5,i&1?0x7e9488:0xaf9169,0);}
+  for(int i=0;i<5;i++)id_parcel(125+i*32,219,19+i%3,16,9+j*13,6+(i*7+j)%5,i&1?0x7e9488:0xaf9169);}
  ir_club_prop(397,209,564,236,21,0x63767a);ir_club_prop(658,209,817,230,21,0x52666d);
- ir_box(463,215,42,5,21,17,0x40515d,0);ir_front(465,503,220.2f,25,36,nt_amber,0,0,0,0,0);
- ir_box(691,215,36,4,21,17,0x354650,0);ir_front(693,725,219.2f,26,36,nt_mint,0,0,0,0,0);
+ id_trap_kit(463,215,42,21,0);id_trap_kit(691,215,36,21,1);
  for(int i=0;i<4;i++)ir_marker(nt_sz[i],nt_sy[i],i==nt_nearest()?nt_mint:nt_amber);
  ir_hero(nt_x,nt_y,nt_angle,11);
  for(int i=0;i<3;i++)ir_label(nt_sz[i],nt_sy[i]-23,26,nt_station_name(i),i==nt_nearest()?nt_amber:0xc5c3b5,0);
@@ -399,16 +321,27 @@ static void ir_aqua(void){
     floor. Keep the exhibit's live fish and wildlife clock while walking
     the actual rail; the guided panel mechanics remain regular UI. */
  for(int y=84;y<332;y++)for(int x=42;x<918;x++)irAux[y*W+x]=pixels[y*W+x];
- ir_begin(nvs_position,332,73,347,0);ir.mid=281;ir.h=132;ir.y=510;
+ ir_begin(nvs_rail_point(),332,73,347,0);
  ir_hplane(30,220,940,374,0,0x465e5e,0);ir_front(30,940,221,0,111,0x344b53,0,0,0,0,0);
  ir_front(41,919,221.5f,22,108,0,42,876,84,248,irAux);
- for(int i=0;i<5;i++)ir_block(40+i*219,220,4,5,109,0x728883);
- ir_box(38,222,884,4,19,3,0xa0ab9a,0);ir_hplane(33,363,938,365,.1f,0xcfbe8c,0);
- for(int j=0;j<4;j++){int x=119+j*222;ir_box(x-2,257,4,4,0,21,0x849e98,0);
-  ir_box(x-11,256,22,4,21,9,nvs_bonus&(1<<j)?TEAL:GOLD,0);}
- ir_box(710,249,76,16,8,6,0x967b60,0);ir_block(715,251,5,9,8,0x687e7d);ir_block(776,251,5,9,8,0x687e7d);
- ir_actor(151,297,0,3.14f,0xbcb98a,MODEL_STAFF,1,0);
- ir_hero(nvs_position,332,nvs_rail_dir<0?3.14159f:0.f,10);
+ for(int i=0;i<5;i++){
+  int x=40+i*219;ir_block(x,220,5,7,109,0x728883);
+  id_front(x+1,1,227.15f,24,82,0x9ba99d);
+  if(i<4)id_floor_light(x+105,263,103,67,0x68a0a6,73);
+ }
+ for(int i=0;i<15;i++)id_lid(31+i*61,243,1,130,.16f,0x4c6464);
+ for(int i=0;i<5;i++)id_lid(31,251+i*25,910,1,.17f,0x4e6766);
+ ir_box(38,222,884,4,19,3,0xa0ab9a,0);ir_hplane(33,363,938,365,.2f,0xcfbe8c,0);
+ for(int j=0;j<4;j++){
+  int x=119+j*222;U c=nvs_bonus&(1<<j)?TEAL:GOLD;
+  ir_box(x-2,257,4,4,0,21,0x849e98,0);
+  ir_box(x-12,255,24,6,21,10,0x3d6066,0);id_front(x-10,20,261.2f,23,6,mix(c,0x648481,3));
+  for(int i=0;i<=j;i++)id_front(x-8+i*4,2,261.38f,25,2,0x334f59);
+  id_floor_strip(x-13,324,27,16,mix(c,0x608181,5));
+ }
+ id_sofa(709,249,77,16,0x9c8c6f,3);
+ NpcRef r;if(!npc_replaces(NAR_INEZ)&&npc_ref(NAR_INEZ,&r))ir_actor(r.x,r.y,0,r.a,r.coat,r.model,r.hue,0);
+ ir_room_actors();ir_hero(nvs_rail_point(),332,nvs_aim_angle,10);if(npcTraceTicks>0)ir_trace();
  int s=cl((nvs_position-8)/222,0,3);const char*names[]={"INEZ","LIGHTWELL","NURSERY","EAST BENCH"};
  ir_label(119+s*222,258,35,names[s],nvs_bonus&(1<<s)?TEAL:GOLD,0);
 }

@@ -1,11 +1,15 @@
 /* Render-only pose adapters. Live peds, held/rejoining positions, taxi riders,
    and the exterior lane snapshots keep their original simulation owners. */
 typedef struct {float x,y,a;int step,role,hue;U coat;} StreetPerson;
-static int street_night_rider_pose(StreetPerson*,int*);
+static int street_extra_pose(int,StreetPerson*);
+static int street_extra_fallen(int,StreetPerson*);
 static int street_ped_pose(int i,StreetPerson*out){
  const Ped*q=peds+i;int id=N_ACT_STREET+i;
  if(q->hp<=0||npc_replaces(id))return 0;
- *out=(StreetPerson){q->x,q->y,q->a,q->s<=2?0:(int)(sn(anim*FOOT_PACE*(q->role?16.f:11.f)+i)*4),q->role,i,
+ int step=!q->role&&i<STREET_CIVILIANS?
+     (int)(sn(streetWalks[i].gaitPhase)*4.f*streetWalks[i].gaitWeight):
+     q->s<=2?0:(int)(sn(anim*FOOT_PACE*16.f+i)*4);
+ *out=(StreetPerson){q->x,q->y,q->a,step,q->role,i,
    pedHit[i]>0?0xffdfbc:q->role==MODEL_OFFICER?(dispatch_posted(i)?0x668df0:(((int)(anim*9)&1)?0x668df0:PINK)):
       q->role==MODEL_RIVAL?PINK:(i%2)?0x92b7b4:0xca8c71};
  if(npc_present_pose(id,&out->x,&out->y,&out->a,&out->step)&&q->role==MODEL_OFFICER)out->coat=0x668df0;
@@ -13,7 +17,7 @@ static int street_ped_pose(int i,StreetPerson*out){
 }
 static int street_rider_pose(StreetPerson*out){
  if(!((job.kind==JOB_TAXI&&taxi.phase!=TAXI_RIDING)||(taxi.phase==TAXI_WALKING&&taxi.linger>0))||
-    (U)taxi.rider>=(U)LEN(riders)||npc_replaces(N_ACT_RIDER+taxi.rider))return 0;
+    (U)taxi.rider>=(U)LEN(riders)||npc_replaces(N_ACT_RIDER+taxi.rider)||street_extra_down(N_ACT_RIDER+taxi.rider))return 0;
  *out=(StreetPerson){taxi.x,taxi.y,taxi.a,taxi.phase==TAXI_WAIT?0:(int)(sn(anim*(15.f*FOOT_PACE))*5),
                     0,riders[taxi.rider].face,riders[taxi.rider].outfit};
  npc_present_pose(N_ACT_RIDER+taxi.rider,&out->x,&out->y,&out->a,&out->step);

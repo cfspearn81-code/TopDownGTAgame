@@ -11,6 +11,40 @@ static void wl_beacon(float x,float y,int i){
  wl_box(x-1.25f,y-1.25f,x+1.25f,y+1.25f,6.0f+bob,7.1f+bob,0xd2c9ab,0xbabd9d);
  wl_box(x-.83f,y-.83f,x+.83f,y+.83f,8.2f+bob,9.4f+bob,lamp,lamp);
 }
+/* Street paving meets the pier face at these authored deck tips. Braces,
+ * tires and the boarding ladder remain decorative: all E and collision
+ * queries continue to read the original berth and water masks. */
+static void wl_dock_face(int id,float x,float y){
+ static const float tip[]={12,13,12},half[]={20,16,17};
+ int n=id/2;float edge=y+tip[n],l=x-half[n],r=x+half[n];
+ wl_box(l,edge-1.2f,r,edge+.11f,-2.75f,.34f,0x766853,0xa79773);
+ wl_box(l+.88f,edge-.20f,r-.86f,edge+.27f,-1.9f,-1.46f,0x544a42,0x726352);
+ for(int i=-1;i<=1;i+=2){
+  float u=x+i*(half[n]-3.f);
+  wl_box(u-.93f,edge-1.65f,u+.93f,edge+.64f,-3.8f,1.35f,0x504942,0xa99372);
+  float ox=x+i*8.3f;
+  /* Tired rubber fender, inset lighter hub reveals the ring shape. */
+  for(int j=0;j<8;j++){
+   float t=j*.785398163f,f=t+.785398163f,a=cs(t),b=sn(t),c=cs(f),d=sn(f);
+   ch_quad((ChVec){ox+2.25f*a,edge+.78f,-1.1f+2.48f*b},(ChVec){ox+2.25f*c,edge+.78f,-1.1f+2.48f*d},
+           (ChVec){ox+.96f*c,edge+.85f,-1.1f+1.14f*d},(ChVec){ox+.96f*a,edge+.85f,-1.1f+1.14f*b},0x303b44,1);
+  }
+ }
+ for(int s=-1;s<=1;s+=2){
+  float u=x+s*2.58f;
+  wl_box(u-.26f,edge+.25f,u+.26f,edge+.88f,-3.9f,2.66f,0x867844,0xd3ad69);
+  wl_box(u-.26f,edge-.98f,u+.26f,edge+.51f,2.32f,2.68f,0xaa915b,0xe1c07f);
+  wl_box(u-.28f,edge-1.02f,u+.28f,edge-.48f,.28f,2.37f,0x9f8b59,0xcdaf78);
+ }
+ for(int j=0;j<4;j++){float z=.12f-j*1.20f;
+  wl_box(x-2.61f,edge+.51f,x+2.61f,edge+.89f,z-.18f,z+.09f,0xa08d5d,0xd4b47b);
+ }
+ /* Blunt anti-skid boarding strip reads from the pilot's back and
+  * straight down the walking deck. */
+ for(int j=0;j<5;j++){float u=x-9.f+j*3.8f;
+  ch_quad((ChVec){u,edge-2.9f,.24f},(ChVec){u+1.4f,edge-2.9f,.24f},(ChVec){u+2.25f,edge-1.9f,.24f},(ChVec){u+.83f,edge-1.9f,.24f},0xc4a669,1);
+ }
+}
 static void ch_harbor_props(void){
  /* The player can steer beyond the decorative quay's draw bounds. */
  ch_sea_boats();
@@ -52,6 +86,7 @@ static void ch_harbor_props(void){
  for(int i=0;i<HARBOR_N_DOCK_POINTS;i+=2){
   float x=harborDockPoints[i].x,y=harborDockPoints[i].y;
   if(wl_visible(x,y,4,34,680)<-9900)continue;
+  wl_dock_face(i,x,y);
   for(int k=-1;k<=1;k+=2){
    float u=x+(i?13:15)*k;
    for(int j=0;j<2;j++){float v=y-17+j*7;

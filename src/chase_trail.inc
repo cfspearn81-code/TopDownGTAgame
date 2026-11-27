@@ -42,8 +42,16 @@ static void wl_ranger(void){
  }
  ch_quad((ChVec){x-22,y-11,20.3f},(ChVec){x+22,y-11,20.3f},(ChVec){x+22,y-6,23},(ChVec){x-22,y-6,23},0x5f7057,1);
  ch_quad((ChVec){x-22,y-6,23},(ChVec){x+22,y-6,23},(ChVec){x+22,y-1,20.3f},(ChVec){x-22,y-1,20.3f},0x526456,1);
- StreetPerson ranger={x+24,y+8,1.570796f,0,MODEL_CIVILIAN,1,0xa5b882};
- ch_character(&ranger);
+}
+/* Two-sided route sign shapes read from the street as well as the trail.
+ * The app uses the exact same site to actually pin a map route. */
+static void wl_stamp_face(float x,float y,float z,int cleared){
+ U trail=cleared?0xadc798:0xe9c489;
+ /* A diamond is a route blaze, not a direction unavailable on this face. */
+ wl_sheet_ink(x-3.4f,y,z,x,z+1.4f,.30f,trail);
+ wl_sheet_ink(x,y,z+1.4f,x+3.4f,z,.30f,trail);
+ wl_sheet_ink(x+3.4f,y,z,x,z-1.4f,.30f,trail);
+ wl_sheet_ink(x,y,z-1.4f,x-3.4f,z,.30f,trail);
 }
 static void wl_field(void){
  if(ch.x>1510||ch.y<1550)return;
@@ -60,8 +68,10 @@ static void wl_field(void){
   if(wl_visible(x,y,8,14,380)<-9900)continue;
   U c=(wf_stamps_done()&(1u<<i))?0x87b68b:0xe3b177;
   wl_box(x-1,y-1,x+1,y+1,0,13.5f,0x806950,0x9a835e);
-  wl_box(x-4,y-1.3f,x+4,y+1.3f,11,16,c,mix(c,PAPER,2));
-  wl_box(x-1,y-1.45f,x+1,y+1.45f,12,14,0x465e4c,0x597060);
+  wl_box(x-5.4f,y-1.4f,x+5.4f,y+1.4f,10.8f,16.15f,c,mix(c,PAPER,2));
+  wl_box(x-4.7f,y-1.52f,x+4.7f,y+1.52f,11.4f,15.35f,0x415d50,0x597060);
+  wl_stamp_face(x,y-1.65f,13.28f,(wf_stamps_done()&(1u<<i))!=0);
+  wl_stamp_face(x,y+1.65f,13.28f,(wf_stamps_done()&(1u<<i))!=0);
  }
  for(int i=0;i<LEN(wf_chests);i++){
   OuterPoint q=wf_point(wf_chests+i);if(wl_visible(q.x,q.y,7,18,400)>-9900)wl_cache(i,q.x,q.y);
@@ -100,12 +110,6 @@ static void wl_animal(const WildActor*w,int i,int alert){
 }
 static void wl_life(void){
  if(ch.x>1480||ch.y<1520)return;
- for(int i=0;i<WW_HIKERS;i++)if(!ww_hikers[i].away){
-  const WildHiker*h=ww_hikers+i;
-  if(wl_visible(h->x,h->y,10,19,500)<-9900)continue;
-  StreetPerson v={h->x,h->y,sn(p.secs*.56f+i*2.5f+.93f)>0?0:3.14159f,(int)(sn(p.secs*4.7f+i)*2.8f),MODEL_CIVILIAN,2+i,i?0x7ca8a0:0xc4a16f};
-  ch_character(&v);
- }
  if(ww_inc.state!=WW_QUIET){
   WildActor w={.active=1,.x=ww_inc.x,.y=ww_inc.y,.a=ww_inc.a,.phase=ww_inc.phase,.glide=64};
   wl_animal(&w,ww_inc.species,0);

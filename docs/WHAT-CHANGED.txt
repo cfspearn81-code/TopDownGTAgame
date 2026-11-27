@@ -1,3 +1,12 @@
+3D DETAIL UPDATE
+
+The indoor player and cast now use real 3D models instead of enlarged
+sprites, with smoother room framing and more detailed room and outdoor
+assets. Cars and boats show motion without changing driving physics.
+See 3D-DETAIL-UPDATE.md for details and tested coverage.
+
+--- EARLIER CHANGE LOG ---
+
 STREET LIFE STABILITY UPDATE
 
 Protects graded shelf counts and earned payouts. Also repairs stuck

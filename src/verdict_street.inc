@@ -171,7 +171,7 @@ static int cr_release(int side){
 static void cr_move(void){
  cr.ticks++;
  if(cr.worker){
-  if(npc_holds(N_ACT_CROSS))return;
+  if(npc_holds(N_ACT_CROSS)||npc_replaces(N_ACT_CROSS)||street_extra_down(N_ACT_CROSS))return;
   float dest=cr.worker==1?CR_Y+41:CR_Y-41;
   float sign=cr.worker==1?1.f:-1.f,ny=cr.workerY+sign*.72f;
   if(cr_native_car_at(CR_X+28,ny,4,4))return;
@@ -230,7 +230,7 @@ static void vd_cross_paint(void){
   float wx=CR_X+28,wy=cr.workerY,wa=cr.worker==2?-1.57f:1.57f;
   int step=cr.worker?(cr.ticks/9)%4:0;
   npc_present_pose(N_ACT_CROSS,&wx,&wy,&wa,&step);
-  if(!npc_replaces(N_ACT_CROSS))person(x+28,sy(cr.workerY),0xc0dc8d,step,wa,0,2);
+  if(!npc_replaces(N_ACT_CROSS)&&!street_extra_down(N_ACT_CROSS))person(sx(wx),sy(wy),0xc0dc8d,step,wa,0,2);
   if(cr.worker||cr.request)sw_label(CR_X+28,(int)cr.workerY-20,cr.worker?"WALK / HOLD":"WALK REQUEST",PAPER);
  }
 }

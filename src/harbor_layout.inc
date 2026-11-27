@@ -118,16 +118,22 @@ static void harbor_edge_art(void){
   }
  }
 }
-static void harbor_draw_piece(int id){
+static void harbor_place_piece(int id){
  const HarborPiece*b=harborPieces+id;
- int x=b->x,y=b->y,w=b->w,h=b->h,ht=b->height;
+ int x=b->x,y=b->y,w=b->w,h=b->h;
  int clear=1;
  for(int yy=y;yy<y+h&&clear;yy++)for(int xx=x;xx<x+w;xx++)
   if(outerLane[yy*ROOM+xx]||outerLand[yy*ROOM+xx]!=TILE_HARBOR){clear=0;break;}
  harborPiecePlaced[id]=(unsigned char)clear;if(!clear)return;
  for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++){outerLand[yy*ROOM+xx]|=TILE_BLOCK;roofMask[yy*ROOM+xx]=1;}
+}
+static void harbor_draw_piece(int id){
+ if(!harborPiecePlaced[id])return;
+ const HarborPiece*b=harborPieces+id;
+ int x=b->x,y=b->y,w=b->w,h=b->h,ht=b->height;
  U edge=0x283447,shade=mix(b->body,edge,3);
  rect(x+3,y+h-1,w+4,5,0x303e48);
+ if(bakeFloorOnly)return;
  box(x,y-ht/2,w,h+ht/2,b->body,edge);
  rect(x+2,y+h-4,w-4,2,mix(b->body,0xf0dcc4,3));
  box(x,y-ht/2,w,h,b->roof,edge);
@@ -152,7 +158,9 @@ static void harbor_dock_bollards(int which,int half){
  /* Stripes and lanterns lie on the deck but do not block boarding. */
  for(int row=0;row<2;row++)for(int side=-1;side<=1;side+=2){
   int a=x+side*half,b=y+row*7-17;
-  disc(a,b+1,4,0x344354);box(a-2,b-3,5,7,0x43404a,0xcab18b);rect(a-1,b-1,3,1,0xf0d195);
+  disc(a,b+1,4,0x344354);
+  if(bakeFloorOnly)continue;
+  box(a-2,b-3,5,7,0x43404a,0xcab18b);rect(a-1,b-1,3,1,0xf0d195);
   if(!row)rect(a-1,b-5,3,2,0xed8c7d);
  }
  box(x-4,y-4,9,9,0x2d454d,0x9cd3ba);line(x-4,y+6,x+4,y+6,0xaec8be);

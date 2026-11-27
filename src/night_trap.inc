@@ -106,8 +106,11 @@ static void night_trap_tick(U keys,U tap){
   return;
  }
  int dx=!!(keys&RIGHT)-!!(keys&LEFT),dy=!!(keys&DOWN)-!!(keys&UP);float pace=keys&BRAKE?3.15f:2.05f;
+ float ox=nt_x,oy=nt_y;
+ pace*=gait_pace(GAIT_TRAP,0,ox,oy,nt_angle,dx||dy,!!(keys&BRAKE));
  nt_walking=!!(dx||dy);if(nt_walking){nt_angle=look(dx,dy);if(dx&&dy)pace*=.7071f;
   float ax=nt_x+dx*pace,ay=nt_y+dy*pace;if(ax>113&&ax<846)nt_x=ax;if(ay>228&&ay<449)nt_y=ay;}
+ gait_finish(GAIT_TRAP,0,nt_x,nt_y,ox,oy,nt_angle);
  if(tap&(USE|ENTER)){int at=nt_nearest();if(at==NT_EXIT_DOOR){scene=1;return;}
   if(!night_trap_owned()){if(at==NT_DESK_DOOR)nt_open(NT_VISIT);else if(at>=0)nt_note("Deed required. Find the center build desk.");return;}
   if(at>=0)nt_open(at==NT_STOCK_DOOR?NT_STOCK:at==NT_DESK_DOOR?NT_BUILD:NT_DISPATCH);}

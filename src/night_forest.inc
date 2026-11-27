@@ -233,7 +233,6 @@ static void woodline_street_paint(void){
    box(x-24,y-27,48,17,0x273e3d,0xb0ab7b);rect(x-21,y-13,42,4,0x605c49);
    rect(x-18,y-9,3,8,0x8c7651);rect(x+16,y-9,3,8,0x8c7651);
    for(int i=0;i<4;i++){int xx=x-17+i*9;rect(xx,y-24,5,8,i%2?0x98ad94:0xe5c58b);}
-   person(x+24,y+8,0xa5b882,0,1.570796f,1,1);
   }}
 }
 static void woodline_hint(void){

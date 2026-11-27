@@ -48,6 +48,7 @@ static void wl_crown(const WlRing*f,float x,float y,float z,float width,float ys
   if(ch.h<z+.10f*width)wl_tri(p0[j],p0[i],(ChVec){x,y,z-width*.115f},mix(color,0x1d302d,3));
  }
 }
+#include "chase_organics.inc"
 static const U wl_spruce[]={0x426954,0x537963,0x496f5a,0x52766c,0x3f6659,0x55745d};
 static const U wl_broad[]={0x638362,0x839060,0x65816d,0x788c58,0x6d8860,0x6b8878};
 static void wl_tree(float x,float y,float h,unsigned seed,int broad,int town,float dist){
@@ -60,9 +61,10 @@ static void wl_tree(float x,float y,float h,unsigned seed,int broad,int town,flo
  float d=((int)(seed%5)-2)*.025f*h;
  WlRing f=wl_ring(seed);
  U c=broad?wl_broad[(seed>>5)%6]:wl_spruce[(seed>>4)%6];
- if(town)c=nw_blend(c,0x647e70,46);
+ c=wl_canopy_ink(x,y,c,broad,town);
  float stem=h*(town?.048f:.044f)*far;
  wl_box(x-stem,y-stem,x+stem,y+stem,0,h*(broad?.55f:.53f),broad?0x75634d:0x615243,0x957852);
+ if(!town)wl_bark(x,y,h,stem,&f,dist,0x756047);
  if(dist<265.f){
   /* A fork shows between the foliage and the bare trunk at street level.
    * Branches attach to the same world offsets in every view. */
@@ -80,16 +82,12 @@ static void wl_tree(float x,float y,float h,unsigned seed,int broad,int town,flo
   /* Distinct fork and a smaller off-axis crown: not a stack of discs. */
   wl_crown(&f,x-d*.65f-w*.26f,y+w*.13f,h*.40f,w*.94f,.91f,h*.36f,1,mix(c,0x334c3d,1));
   wl_crown(&f,x+d+w*.24f,y-w*.13f,h*.50f,w,.85f,h*.41f,1,c);
-  /* One outward-facing limb breaks the spherical silhouette; it grows
-   * continuously out of the primary crown rather than switching LOD. */
-  if(dist<465.f){
-   float k=wl_sat((465.f-dist)/120.f),dx=f.dx[1]*w,dy=f.dy[1]*w;
-   wl_crown(&f,x+dx*.73f,y+dy*.73f,h*.47f,w*k*.48f+.05f,.89f,h*.23f*k,1,mix(c,0x869b71,1));
-  }
+  wl_hanging_bough(&f,x,y,h,w,c,dist,1,seed);
  }else{
   wl_crown(&f,x,y,h*.25f,w,1,h*.41f,0,mix(c,0x244137,1));
   wl_crown(&f,x+d*.4f,y,h*.47f,w*.79f,.94f,h*.36f,0,c);
   wl_crown(&f,x+d,y,h*.66f,w*.51f,1.03f,h*.34f,0,mix(c,0x9aac85,1));
+  if(!town)wl_hanging_bough(&f,x,y,h,w,c,dist,0,seed);
  }
 }
 static void wl_city_trees(void){
@@ -117,20 +115,16 @@ static void wl_wood(void){
   const WoodProp*q=&woodProps[j];float x=q->x,y=q->y,h=q->height,r=q->radius;
   float limit=q->kind==WOOD_UNDERGROWTH?235.f:q->kind==WOOD_TREE?910.f:660.f;
   float d=wl_visible(x,y,h*.45f,r+h*.75f,limit);if(d<-9900.f)continue;
-  unsigned g=outer_noise(q->x,q->y);WlRing f;
+  unsigned g=outer_noise(q->x,q->y);
   switch(q->kind){
    case WOOD_TREE: wl_tree(x,y,h,g,q->grade%3==1,0,d);break;
    case WOOD_UNDERGROWTH:wl_brush(x,y,h,g,d);break;
    case WOOD_ROCK:{
-    f=wl_ring(g);U granite=q->grade%3?0x7a867b:0x849282;
-    wl_crown(&f,x,y,r*.12f,r*1.12f,.78f,h*.67f,1,granite);
+    wl_strata_rock(x,y,r,h,g,q->x>2000,d);
     if(d<230&&q->x>2000)wl_brush(x-r*.72f,y-r*.31f,7.f,g,d);break;}
-   case WOOD_STUMP:{
-    f=wl_ring(g);wl_box(x-r*.7f,y-r*.7f,x+r*.7f,y+r*.7f,0,h*.78f,0x695441,0xaa8c64);
-    wl_crown(&f,x,y,h*.78f,r*.48f,.92f,.45f,0,0x90734e);break;}
+   case WOOD_STUMP: wl_round_log(x,y,r,h,0,g);break;
    case WOOD_LOGPROP:
-    wl_box(x-r,y-r*.42f,x+r,y+r*.42f,0,h*.65f,0x63523e,0x826b4a);
-    wl_box(x+r-.6f,y-r*.37f,x+r+.1f,y+r*.37f,.6f,h*.60f,0xb99b6d,0xa4875c);break;
+    wl_round_log(x,y,r,h,1,g);break;
    case WOOD_POST:
     wl_box(x-.8f,y-.8f,x+.8f,y+.8f,0,19,0x786549,0xb19b73);
     wl_box(x-5.4f,y-.95f,x+5.4f,y+.95f,14,19,0xb29a65,0xc6b480);
@@ -177,5 +171,34 @@ static void wl_shore_grass(void){
   wl_brush(x,y,4.3f+((seed>>19)%4),seed,d);
   if(!outerLane[i+4*ROOM+4]&&outerLand[i+4*ROOM+4]==land)
    wl_brush(x+4,y+4,3.5f+((seed>>22)%3),seed>>2,d);
+ }
+}
+/* Pine seedlings and meadow clumps can be seen between the map's authored
+ * trunks. Draw a bounded near-only ecology, all on actual open land; the
+ * old tree/rock placement and all quest-clearance geometry stay intact. */
+static void wl_forest_clusters(void){
+ if(ch.x>1250||ch.y<1830)return;
+ int l=cl((int)(ch.x-180)/25,2,44),r=cl((int)(ch.x+180)/25,2,44);
+ int t=cl((int)(ch.y-180)/25,82,119),b=cl((int)(ch.y+180)/25,82,119);
+ for(int v=t;v<=b;v++)for(int u=l;u<=r;u++){
+  U s=outer_noise(u*35+271,v*19+712);if((s&7)>4)continue;
+  int x=u*25+3+(int)((s>>4)%18),y=v*25+3+(int)((s>>9)%18),at=y*ROOM+x;
+  if(outerLand[at]!=TILE_WOOD||outerLane[at]||roofMask[at])continue;
+  if(outerLand[at-7]!=TILE_WOOD||outerLand[at+7]!=TILE_WOOD||
+     outerLand[at-7*ROOM]!=TILE_WOOD||outerLand[at+7*ROOM]!=TILE_WOOD)continue;
+  float z0=wl_visible(x,y,3,14,165);
+  if(z0<-9900.f||z0>=165.f)continue;
+  int reserve=0;
+  for(int j=0;j<WOOD_N_SITES;j++)if(d2(x-woodline_sites[j].x,y-woodline_sites[j].y)<41*41){reserve=1;break;}
+  if(reserve)continue;
+  float fade=wl_sat((165-z0)/58.f),h=(3.7f+((s>>23)&7)*.65f)*fade;
+  if(h<.27f)continue;
+  U leaf=(s&64)?0x7b904e:0x68815b;
+  if(y>2450&&x>520)leaf=nw_blend(leaf,0xa4a663,52);
+  for(int n=-1;n<=1;n++){
+   float side=(.24f*n-.045f)*h,drift=sn(anim*1.51f+(s&15))*.14f*h;
+   ChVec A={x+side*.30f,y+.42f*(n&1),.10f},B={x+.5f+side*.30f,y+.35f*(n&1),.10f};
+   wl_tri(A,B,(ChVec){x+side*2.f+drift,y+side*(n?1.2f:-2),h*(n==0?1:.66f)},n&1?mix(leaf,0x365847,2):leaf);
+  }
  }
 }

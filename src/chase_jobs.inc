@@ -48,7 +48,7 @@ static void ch_skid_strips(void){
    float x=m->ax[i],y=m->ay[i],xx=m->bx[i],yy=m->by[i];
    float dx=xx-x,dy=yy-y,len=sq(d2(dx,dy));if(len<.1f)continue;
    float u=-dy*(.54f/len),v=dx*(.54f/len);
-   U floor=(unsigned)(int)x<ROOM&&(unsigned)(int)y<ROOM?city[(int)y*ROOM+(int)x]:0x344149;
+   U floor=(unsigned)(int)x<ROOM&&(unsigned)(int)y<ROOM?chaseFloor[(int)y*ROOM+(int)x]:0x344149;
    ch_quad((ChVec){x-u,y-v,.14f},(ChVec){xx-u,yy-v,.14f},
            (ChVec){xx+u,yy+v,.14f},(ChVec){x+u,y+v,.14f},mix(floor,0x0b131b,ink),1);
   }
@@ -64,26 +64,11 @@ static void ch_chalk_pixel_actor(void){
   static const int dx[]={22,-22,16,-22,0},dy[]={8,9,22,20,20};
   for(int i=0;i<LEN(dx);i++){
    int x=loc[at].x+dx[i],y=loc[at].y+dy[i];if(solid(x,y,7))continue;
-   ch_character(&(StreetPerson){x,y,look(p.x-x,p.y-y),0,MODEL_CIVILIAN,j%3,np_color[j%NP_NAPP]});
    ch_upright(x,y,1.4f,19.f,20.6f,0xff9adb);break;
   }
  }
 #endif
- int x,y;
- if(night_venue_vendor_pos(&x,&y)&&d2(p.x-x,p.y-y)<600.f*600.f){
-  Car cart={.x=x-21,.y=y+21,.a=1.65f,.type=4,.cond=100};ch_car(&cart,0);
-  ch_upright(x,y,2.2f,5.f,9.f,0xf6aada);
- }
- int door=night_club_listing(),count=night_club_queue();
- if(count&&ordinaryDoorX[door]&&d2(p.x-ordinaryDoorX[door],p.y-ordinaryDoorY[door])<500.f*500.f){
-  static const U cloth[]={0xb487ae,0x6ca9b2,0xd8af80,0x52627d};
-  for(int i=0;i<count;i++){int xx=ordinaryDoorX[door]-21-i%4*16,yy=ordinaryDoorY[door]+16+i/4*13;
-   if(!solid(xx,yy,5))ch_character(&(StreetPerson){xx,yy,i%3?1.f:-2.f,0,MODEL_CIVILIAN,i%5,cloth[i%4]});}
- }
- if(job.kind==JOB_RIVALS&&job.step==0&&rivalsDeployed){
-  x=job.xs[0];y=job.ys[0];ch_upright(x,y,6,.1f,5,0x594537);
-  ch_upright(x,y,6,3.8f,5.f,0xbc9e71);ch_upright(x,y,1,2,4.2f,GOLD);
- }
+
 }
 static void ch_job_labels(void){
  for(int i=0;i<chLabelN;i++){

@@ -9,7 +9,10 @@ import tempfile
 
 root = Path(__file__).resolve().parents[2]
 app, interposer, disk = (Path(a).resolve() for a in sys.argv[1:])
-tour = gzip.decompress((root/"scripts/qa/curb-access-tour.txt.gz").read_bytes())
+# Historical builds retain their exact keyboard tape. New world collision
+# may require a different path to the same courier and taxi outcomes.
+tour_path = Path(os.environ.get("DC_OPENING_TOUR", root/"scripts/qa/curb-access-tour.txt.gz"))
+tour = gzip.decompress(tour_path.read_bytes())
 frames, digest = tour.splitlines()[0].split()
 frames, digest = int(frames), int(digest, 16)
 expected_cash = 318
@@ -34,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix="deadchannel-linux-qa-") as path:
                DC_LINUX_REPLAY="")
     snapshot = tmp/"explicit-save.dat"
     subprocess.run([app], input=tour, env=dict(env, DC_LINUX_SNAPSHOT=str(snapshot)),
-                   check=True, timeout=90)  # 3,664 rendered frames: tolerate contention in parallel QA.
+                   check=True, timeout=90)  # Tolerate contention during the full native opening replay.
     exact, shut = snapshot.read_bytes(), career.read_bytes()
     assert valid(exact) and valid(shut)
     assert struct.unpack_from("<I", exact, 300)[0] == digest  # the Windows fixture

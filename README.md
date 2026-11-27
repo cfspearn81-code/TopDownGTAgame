@@ -1,15 +1,15 @@
-# Dead Channel | All-Area 3D
+# Dead Channel | Street Contact Update
 
-**Latest: All-Area 3D.** C toggles perspective on foot, in rooms, cars and boats. See [the controls and test notes](docs/ALL-AREA-3D.md).
+**Latest: Street Contact Update.** All 107 lamppost bases are solid, additional
+street and venue NPCs can be talked to or hit, and the Street Motion and 3D
+Detail changes are included. See the [controls and test notes](docs/STREET-CONTACT.md).
 
+- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Street-Contact-Update-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires SDL2 and glibc 2.34+.
+- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Street-Contact-Update-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
+- [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt) · [Previous builds](downloads/).
 
-The latest native build combines [Street Life Stability](docs/STABILITY-UPDATE.md)
-with [Greyreed Wood](docs/WOODLINE.txt) and the [Lantern Quay harbor](docs/LANTERN-QUAY.txt).
-See [integration and save compatibility](docs/WOODLINE-STABILITY.md).
-
-- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-All-Area-3D-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
-- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-All-Area-3D-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2.
-- [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt).
+Earlier updates: [3D Street Motion](docs/3D-STREET-MOTION.md),
+[3D Detail](docs/3D-DETAIL-UPDATE.md), and [All-Area 3D](docs/ALL-AREA-3D.md).
 
 Use **M**, then **F8**, for Greyreed Wood and Lantern Quay. Use Signal
 (**P** or **F7**) to open Night Wire commissions. **E** boards at a dock;

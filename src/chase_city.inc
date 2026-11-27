@@ -44,7 +44,11 @@ static void cf_window(unsigned char*t,int x,int y,int w,int h,int seed,int form)
  int glow=(seed%9<3),col=glow?CF_ROOM:CF_SKY;
  cf_fill(t,x+1,y+1,w-2,form==CF_GLASS?h/2:2,col);
  if(glow){cf_fill(t,x+2,y+3,w/2-1,h-4,CF_LAMP);cf_fill(t,x+w/2,y+3,1,h-4,CF_FRAME);}
- else if(form!=CF_YARD)cf_fill(t,x+w/2,y+2,1,h-3,CF_FRAME);
+ else if(form!=CF_YARD){
+  cf_fill(t,x+w/2,y+2,1,h-3,CF_FRAME);
+  for(int k=0;k<h-4;k++)if(k+2<w/2)cf_fill(t,x+2+k,y+2+k,2,1,CF_SHADE);
+  if(form==CF_GLASS)cf_fill(t,x+1,y+h-3,w-2,1,CF_ROOM);
+ }
  if(form==CF_CIVIC||form==CF_FLATS)cf_fill(t,x+1,y+h/2,w-2,1,CF_FRAME);
  cf_fill(t,x-1,y+h,w+2,1,CF_SILL);
 }
@@ -155,8 +159,10 @@ static CfSheet *cf_bake(int id,int side,const CfAddress *a){
   /* A real lettered sign in its own 3D plane, never mirrored by winding. */
   cf_fill(t,center-sw/2-1,27,sw+2,9,CF_SIGN);cf_fill(t,center-sw/2,28,sw,7,CF_BOARD);
   cf_text(t,center-(sl(a->name)*4-1)/2,29,a->name,CF_SIGN);
-  if(id==28||id==ncFrontId){
-   const char *billing=id==28?"MINA VALE":"STRIP CLUB";int len=sl(billing)*4+4,sx=64-len/2;
+  if(id==28||id==ncFrontId||zone_id[id]){
+   int site=zone_id[id]-1;
+   const char *billing=id==28?"MINA VALE":id==ncFrontId?"STRIP CLUB":zone_plan(site)->sign;
+   int len=sl(billing)*4+4,sx=64-len/2;
    cf_fill(t,sx-1,20,len+2,8,CF_GOLD);cf_fill(t,sx,21,len,6,CF_BOARD);
    cf_text(t,64-(sl(billing)*4-1)/2,21,billing,CF_PAPER);
   }
@@ -164,7 +170,14 @@ static CfSheet *cf_bake(int id,int side,const CfAddress *a){
  cf_pair_init();cf_mip(t,t+CF_LO,128,64);cf_mip(t+CF_LO,t+CF_LO+CF_LO/4,64,32);return sheet;
 }
 typedef struct{float x,y,z,u,v;} CfV;
-typedef struct{float x,y,z,u,v;} CfP;
+typedef CfV CfP;
+static float cf_facade_distance(ChVec a,ChVec b){
+ /* Stable when a vertex crosses the near plane. The previous clipped-corner
+  * average re-lit an entire building during a turn past it. */
+ float dx=b.x-a.x,dy=b.y-a.y,sq0=d2(dx,dy);
+ float t=((ch.x-a.x)*dx+(ch.y-a.y)*dy)/sq0;t=t<0?0:t>1?1:t;
+ return sq(d2(a.x+dx*t-ch.x,a.y+dy*t-ch.y))+.19f*sq(sq0);
+}
 static void cf_draw_side(int id,int side,const CfAddress *ad,ChVec left,ChVec right,float ht){
  /* Left/right are the screen-reading order from outside this wall. */
  ChVec a=ch_local(left),b=ch_local(right);left.z=right.z=ht;
@@ -177,15 +190,15 @@ static void cf_draw_side(int id,int side,const CfAddress *ad,ChVec left,ChVec ri
     prev.u+(w.u-prev.u)*f,prev.v+(w.v-prev.v)*f};
   }if(w.z>=9)v[n++]=w;prev=w;
  }
- if(n<3)return;float ymin=H,ymax=0,xmin=W,xmax=0,dist=0;CfP p0[6];
+ if(n<3)return;float ymin=H,ymax=0,xmin=W,xmax=0,dist=cf_facade_distance(left,right);CfP p0[6];
  for(int j=0;j<n;j++){
-  float inv=1.f/v[j].z,ss=CH_F*inv;dist+=v[j].z;
+  float inv=1.f/v[j].z,ss=CH_F*inv;
   float x=W*.5f+v[j].x*ss,y=CH_MY-v[j].y*ss;
   p0[j]=(CfP){x,y,CH_ZS*inv,v[j].u*inv*CH_ZS,v[j].v*inv*CH_ZS};
   if(y<ymin)ymin=y;if(y>ymax)ymax=y;if(x<xmin)xmin=x;if(x>xmax)xmax=x;
  }
  if(xmin>=W||xmax<0||ymin>=H||ymax<0)return;
- U pal[CF_N];cf_colors(*ad,side,pal);dist/=n;
+ U pal[CF_N];cf_colors(*ad,side,pal);
  for(int k=0;k<CF_N;k++){
   U c0=pal[k];if(k==CF_SKY)c0=nw_blend(c0,0x304650,(int)(160*chDark));
   if(k==CF_LAMP||k==CF_ROOM)c0=nw_blend(0x697978,c0,(int)(70+185*chDark));
@@ -209,7 +222,12 @@ static void cf_draw_side(int id,int side,const CfAddress *ad,ChVec left,ChVec ri
   float h=start+.5f-l.x,iz=l.z+stepZ*h,iu=l.u+stepU*h,iv=l.v+stepV*h;
   int pos=y*W+start;float stU=iu/iz,stV=iv/iz;
   for(int x=start;x<end;){
-   int len=min(8,end-x);float nextZ=iz+stepZ*len,ni=1.f/nextZ;
+   int len=min(8,end-x);
+   /* A long fixed span stretched texels sharply at grazing angles. Adapt
+    * only at the steepest depths; regular city draws remain eight-wide. */
+   float dz=absf(stepZ);
+   if(dz*8>iz*.090f)len=min(len,dz*4>iz*.09f?2:4);
+   float nextZ=iz+stepZ*len,ni=1.f/nextZ;
    float enU=(iu+stepU*len)*ni,enV=(iv+stepV*len)*ni;
    /* Oblique repeat detail uses a smaller atlas, not a maze of shimmering
     * one-pixel features. Latitude as well as depth matters on side walls. */
@@ -299,6 +317,7 @@ static void cf_city_fixtures(void){
  }
  #undef CF_PLANE
 }
+#include "chase_city_trim.inc"
 static void ch_buildings(void){
  for(int i=0;i<nb;i++){
   const Building*b=buildings+i;if(b->w<=0||b->h<=0)continue;
@@ -312,14 +331,8 @@ static void ch_buildings(void){
   if(ch.y>bt)cf_draw_side(i,2,&a,(ChVec){l,bt,0},(ChVec){r,bt,0},ht);
   if(ch.x<l)cf_draw_side(i,3,&a,(ChVec){l,t,0},(ChVec){l,bt,0},ht);
   cf_roof(i,&a,f,ht,dd);
-  if(dd<470.f*470.f&&ch.y>bt-25){
-   float ax=a.door,w=a.style==CF_MARKET?min(45,f.w/3):a.style==CF_DECO?21:12;
-   float z0=ht*(1.f-40.f/64),deep=a.style==CF_MARKET?5.f:3.6f;
-   /* Heading south under its shade, the lintel is still a solid object. */
-   float x0=ax-w<l?l:ax-w,x1=ax+w>r?r:ax+w;
-   cf_block(x0,bt-.5f,x1,bt+deep,z0,z0+1.4f,mix(a.accent,a.wall,3),mix(a.wall,a.accent,3));
-   if(ch.h<z0)ch_quad((ChVec){x0,bt,z0},(ChVec){x1,bt,z0},(ChVec){x1,bt+deep,z0},(ChVec){x0,bt+deep,z0},0x424651,1);
-  }
+  if(dd<310.f*310.f)cf_service_wall(i,&a,f,ht);
+  if(ch.y>bt-.3f)cf_front_architecture(i,&a,f,ht);
  }
  cf_city_fixtures();
 }

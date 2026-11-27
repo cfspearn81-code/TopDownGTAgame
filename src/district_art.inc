@@ -135,6 +135,7 @@ static void zone_entrance(const VenuePlan*r,Building*b,int kind){
  // Lit threshold and flush stairs end before the frontage sidewalk.
  zone_glow(r,x,y+9,26,a,3);
  for(int i=0;i<3;i++){int ww=w+6+i*4;rect(x-ww/2,y+1+2*i,ww,2,mix(m,0x35434f,3+i));}
+ if(bakeFloorOnly)return;
  rect(left,y-h,w,h+1,mix(m,ink,3));
  box(left+5,y-h+3,w-10,h-3,ink,mix(m,a,3));
  rect(left+7,y-h+6,w/2-8,h-8,0x48596a);rect(x+2,y-h+6,w/2-9,h-8,0x3a5264);
@@ -151,6 +152,7 @@ static void zone_art(int n){
  U a=r->light,roof=r->roof,c=r->brick,darkwall=mix(c,0x182a36,4);
  int on=max(ox+43,x-3),off=min(ox+210,x+w+s+9);
  zone_shadow(on,y,off,min(oy+216,edge+2),3,6,0x112230);
+ if(!bakeFloorOnly){
  // North roof, projected east wall and the actual street-facing wall.
  quad((Pt){x+w-1,top},(Pt){x+w+s,y-3},(Pt){x+w+s,edge-2},(Pt){x+w-1,front},darkwall);
  rect(x,front,w,d,c);
@@ -296,11 +298,12 @@ static void zone_art(int n){
  box(x+w/2-bw/2,yy,bw,24,mix(roof,0x172631,5),mix(c,a,4));
  zone_lettering(x+w/2,yy+3,r->name,a,2);
  zone_lettering(x+w/2,yy+16,r->sign,mix(PAPER,a,4),1);
+ }
  zone_entrance(r,b,kind);
  if(kind==3||kind==10){ // Painted service lanes on private forecourt only.
   for(int i=x+w-22;i<x+w-5;i+=7){rect(i,edge+4,3,9,0x8e8b69);}
  }
- if(kind==1||kind==7||kind==13){ // Planted pots safely behind the sidewalk.
+ if(!bakeFloorOnly&&(kind==1||kind==7||kind==13)){ // Planted pots safely behind the sidewalk.
   int xx=x+w-13;disc(xx+3,edge+5,5,0x24343b);disc(xx,edge+4,5,0x516861);disc(xx-1,edge+2,3,0x769271);
  }
 }

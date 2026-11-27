@@ -17,6 +17,9 @@ static const int nvs_targets[]={1,3,2},nvs_prices[]={0,24,36,48};
 static int nvs_back,nvs_room,nvs_tab,nvs_sel,nvs_mode,nvs_step,nvs_dials[3],nvs_saved,nvs_folio;
 static U nvs_frames;
 static int nvs_recov_ticks,nvs_leaf_grade,nvs_position,nvs_bonus,nvs_rail_dir,nvs_rail_walk;
+static float nvs_rail_fraction,nvs_aim_angle;
+static float nvs_rail_point(void){return nvs_position+(ch_pref()?nvs_rail_fraction:0);}
+
 static char nvs_log[150];
 static void nvs_msg(const char*s){append(nvs_log,s);}
 static int nvs_stage(void){return cl((int)(nv.world[NVS_STAGE]&255u),0,5);}
@@ -148,7 +151,7 @@ static void nvs_aqua_tick(U tap){
   }return;
  }
  if(stage>=5&&nvs_tab==3&&(tap&FIRE)){
-  nvs_mode=4;nvs_position=126;nvs_bonus=nvs_rail_walk=0;nvs_rail_dir=1;nvs_msg("The east wing is open. Walk the rail and inspect all four stops.");return;
+  nvs_mode=4;nvs_position=126;nvs_rail_fraction=nvs_aim_angle=0;nvs_bonus=nvs_rail_walk=0;nvs_rail_dir=1;p.noticeT=0;nvs_msg("The east wing is open. Walk the rail and inspect all four stops.");return;
  }
  if(tap&(LEFT|RIGHT)){nvs_tab=nvs_go(nvs_tab,(tap&LEFT)?-1:1,4);nvs_msg("");}
  if(!nvs_use_key(tap))return;
@@ -355,8 +358,22 @@ static void night_venues_tick(U keys,U tap){
   }
  }
  if(nvs_room==NVR_GLASS&&nvs_mode==4){
-  int dx=!!(keys&RIGHT)-!!(keys&LEFT),next=cl(nvs_position+dx*3,72,918);
-  nvs_rail_walk=next!=nvs_position;if(dx)nvs_rail_dir=dx;nvs_position=next;
+  int dx=!!(keys&RIGHT)-!!(keys&LEFT);
+  if(ch_pref()){
+   float a=nvs_rail_dir<0?3.14159265f:0,ox=nvs_rail_point();
+   float step=3.f*gait_pace(GAIT_RAIL,0,ox,332,a,dx!=0,0),x=ox+dx*step;
+   if(x<72.f)x=72.f;if(x>918.f)x=918.f;
+   nvs_position=(int)(x+.5f);nvs_rail_fraction=x-nvs_position;
+   nvs_rail_walk=x!=ox;if(dx)nvs_rail_dir=dx;
+   gait_finish(GAIT_RAIL,0,x,332,ox,332,nvs_rail_dir<0?3.14159265f:0);
+  }else{
+   int next=cl(nvs_position+dx*3,72,918);nvs_rail_fraction=0;
+   nvs_rail_walk=next!=nvs_position;if(dx)nvs_rail_dir=dx;nvs_position=next;
+  }
+  if(dx)nvs_aim_angle=dx<0?3.14159265f:0;
+  npc_private_step(keys,nvs_rail_point(),332,&nvs_aim_angle);
+  if(scene!=NIGHT_VENUES_SCENE)return;
+  if(npc_private_use(keys,tap,1))return;
  }
  nvs_frames++;if(nvs_frames>1200000U)nvs_frames=0;
  p.secs+=1.f/60.f;
@@ -694,12 +711,12 @@ static void nvs_aqua_paint(void){
   static const char*const stops[]={"Inez","Lightwell","Nursery","East bench"};
   for(int i=0;i<4;i++){int xx=119+i*222;rect(xx,285,2,32,0xa2b092);
    box(xx-48,291,101,23,0x18313a,nvs_bonus&(1<<i)?TEAL:GOLD);center(xx+2,291,stops[i],PAPER,0);}
-  person(151,329,0xbcb98a,0,3.14f,MODEL_STAFF,1);
-  person(nvs_position,335,0x51948b,nvs_rail_walk?(int)(nvs_frames%16)/4:0,nvs_rail_dir<0?3.14159f:0.f,MODEL_PLAYER,1);
+  npc_aqua_actors();
   }
-  nvs_tail("WALK THE EAST WING","Four marked stops: E to meet Inez or inspect the viewing station by your feet.",
+  nvs_tail("WALK THE EAST WING","Four marked stops: E to inspect. SHIFT+E to talk to Inez when nearby.",
    "The reopened promenade is visible here and remains available after restarting.",
    "LEFT / RIGHT: walk the rail     E / Inspect stop     ESC / Back to gallery");
+  if(p.noticeT>0){rect(30,460,900,49,0x101e26);nav_wrap(31,466,894,notice,notice_color(),2);}
   return;
  }
  if(nvs_mode==2){

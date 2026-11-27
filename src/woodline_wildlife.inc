@@ -187,7 +187,8 @@ static int ww_inc_begin(void){
  for(int k=0;k<WW_HIKERS;k++){
   int who=(first+k)%WW_HIKERS;
   WildHiker*h=ww_hikers+who;
-  if(h->away||d2(h->x-p.x,h->y-p.y)>270*270||!ww_edge_pos(h->fromX,h->fromY,h->x,h->y))continue;
+  if(h->away||npc_holds(N_ACT_OUT_HIKER+who)||npc_replaces(N_ACT_OUT_HIKER+who)||
+     street_extra_down(N_ACT_OUT_HIKER+who)||d2(h->x-p.x,h->y-p.y)>270*270||!ww_edge_pos(h->fromX,h->fromY,h->x,h->y))continue;
   ww_inc.victim=who;ww_inc.species=(int)(ww_random()%WW_SPECIES);ww_inc.state=WW_ENTERING;
   ww_inc.ticks=0;ww_inc.x=h->fromX;ww_inc.y=h->fromY;ww_inc.phase=0.f;return 1;
  }
@@ -207,7 +208,8 @@ static void ww_inc_tick(float dt){
    if(h->away==1&&d2(h->midX-p.x,h->midY-p.y)>425*425){h->away=0;h->x=h->midX;h->y=h->midY;}
    continue;
   }
-  if(ww_inc.victim==i&&ww_inc.state!=WW_QUIET)continue;
+  if((ww_inc.victim==i&&ww_inc.state!=WW_QUIET)||npc_holds(N_ACT_OUT_HIKER+i)||
+     npc_replaces(N_ACT_OUT_HIKER+i)||street_extra_down(N_ACT_OUT_HIKER+i))continue;
   float w=sn(p.secs*.56f+i*2.5f)*24.f;
   if(ww_edge_pos(h->midX,h->midY,h->midX+w,h->midY))h->x=h->midX+w;
  }
@@ -218,6 +220,8 @@ static void ww_inc_tick(float dt){
  }
  WildHiker*h=ww_hikers+ww_inc.victim;ww_inc.ticks++;
  if(ww_inc.state==WW_ENTERING){
+  int id=N_ACT_OUT_HIKER+ww_inc.victim;
+  if(npc_holds(id)||npc_replaces(id)||street_extra_down(id)){ww_inc.state=WW_WITHDRAW;ww_inc.ticks=0;return;}
   if(d2(h->x-ww_inc.x,h->y-ww_inc.y)<13*13){
    h->away=WW_HIKER_REST;ww_inc.state=WW_TAKEN;ww_inc.ticks=0;
    if(d2(h->x-p.x,h->y-p.y)<280*280)tell("A predator carried a Seawall hiker into the woods.");return;
@@ -339,16 +343,6 @@ static void ww_body_art(const WildActor*w,int i,int x,int y,float k,int display)
 static int ww_visible(float x,float y){return x>=cx-54&&x<=cx+W+54&&y>=cy-54&&y<=cy+H+72;}
 static void woodline_wild_paint(void){
  if(cy+H<1880||cx>1250)return;
- for(int i=0;i<WW_HIKERS;i++){
-  const WildHiker*h=ww_hikers+i;
-  if(!h->away&&ww_visible(h->x,h->y)){
-   float a=sn(p.secs*.56f+i*2.5f+.93f)>0.f?0.f:3.141593f;
-   int step=(int)(sn(p.secs*4.7f+i)*2.8f);
-   const int x=sx(h->x),y=sy(h->y);
-   person(x,y,i==0?0xc4a16f:0x7ca8a0,step,a,0,2+i);
-   box(x-5,y-17,9,8,0x726350,0x9d8865);
-  }
- }
  if(ww_inc.state!=WW_QUIET&&ww_visible(ww_inc.x,ww_inc.y)){
   int x=sx(ww_inc.x),y=sy(ww_inc.y);
   WildActor w={.x=ww_inc.x,.y=ww_inc.y,.a=ww_inc.a,.phase=ww_inc.phase,.glide=64};
