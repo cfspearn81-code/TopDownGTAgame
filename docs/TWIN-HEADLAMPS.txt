@@ -1,0 +1,19 @@
+Twin headlamps
+
+Each driven car and active traffic vehicle projects two separate front
+headlamp cones. The beams follow the nose even while reversing, allow one
+beam to be blocked independently, and have a cooler reflection on wet roads.
+Wrecks and empty parked cars do not project the beams. Use C to see the same
+lighting in the behind-car chase view; F2 Low FX skips beam processing and
+keeps the stable overhead fallback. These lights are visual only. They do not
+change vehicle handling, traffic, controls, or saved careers.
+
+Verification:
+  gcc -std=c11 -O2 src/headlamps_test.c -o build/headlamps_test
+  ./build/headlamps_test
+  bash scripts/build-linux.sh
+  gcc -std=c11 -O2 -fPIC -shared scripts/qa/linux_replay.c -ldl -o build/headlamps_replay.so
+  python3 scripts/qa/headlamps_host.py build/DeadChannel build/headlamps_replay.so build/headlamps_test build/headlamps-native
+
+The SDL test starts a temporary prior-format career and checks the actual
+rendered cones before and after C and F2. It never opens a real save.

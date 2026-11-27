@@ -1,0 +1,23 @@
+Street motion and crowd spacing
+
+All 40 named old-town pedestrians remain active. Residents no longer begin
+at identical door positions or walk through one another at a bottleneck.
+They wait for an open crossing and give the current crosser space to finish.
+If a parked car or jam closes their route, they can retreat safely and try
+a different sidewalk rather than idle in one pile. Police and authored job
+roles keep their existing routes and rules. Talking still holds only the
+selected actor and releases that same person where the talk began.
+
+The old decorative groups that rocked sideways at the Outer Loop stops are
+replaced by 24 continuously tracked walkers on separated, checked shoulder
+routes. They do not change positions when the viewport moves or the lights
+come on. Existing authored queues such as The Afterimage are not pedestrian
+traffic. These changes introduce no save-format or control changes.
+
+Run the deterministic movement and input test:
+  gcc -std=c11 -O2 src/street_motion_test.c -o build/street_motion_test
+  build/street_motion_test
+
+It exercises four minutes of the original city pedestrian simulation,
+outer movement across day and night and off-camera re-entry, actual held
+movement keys while talking, and a walker re-routing around a stopped car.

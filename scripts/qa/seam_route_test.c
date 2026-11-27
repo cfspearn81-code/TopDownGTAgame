@@ -8,9 +8,16 @@ static int backtrack(NavPoint a,NavPoint b,NavPoint c){
  int dx=b.x-a.x,dy=b.y-a.y,ex=c.x-b.x,ey=c.y-b.y;
  return dx*ey==dy*ex&&dx*ex+dy*ey<0;
 }
+static void route_coordinates(int k,int*x,int*y){
+ if(k>=LEN(loc)+TAXI_OUTER_STOPS){
+  /* The three new port stops are atlas destinations, not taxi ranks. */
+  OuterPoint q=outerNodes[outerStops[k-LEN(loc)].node];*x=q.x;*y=q.y;return;
+ }
+ int curb;assert(taxi_curb(k,x,y,&curb));
+}
 static int route(int from,int to,int hour,int trace){
- sv.dayClock=hour*60;int a,b,c,x,y;
- assert(taxi_curb(from,&a,&b,&c)&&taxi_curb(to,&x,&y,&c));
+ sv.dayClock=hour*60;int a,b,x,y;
+ route_coordinates(from,&a,&b);route_coordinates(to,&x,&y);
  nav_solve((NavPoint){a,b},(NavPoint){x,y});
  assert(navCount>=2&&navNodes[0].x==a&&navNodes[0].y==b&&navNodes[navCount-1].x==x&&navNodes[navCount-1].y==y);
  int actual=0,backs=0;for(int i=1;i<navCount;i++){

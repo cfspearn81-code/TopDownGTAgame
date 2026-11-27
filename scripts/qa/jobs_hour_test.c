@@ -67,8 +67,8 @@ static void regional_routes(void){init_city();starter_save();profiles_activate()
    if(taxi.dropoff>=LEN(loc)){stops|=1<<taxi_outer_index(taxi.dropoff);cross++;assert(taxi.meters==taxi_dispatch_distance(job.xs[0],job.ys[0],job.xs[1],job.ys[1]));}
    else inner++;end_job();}
  }
- assert(stops==(1<<LEN(outerStops))-1&&inner>350&&cross>40);
- printf("%d downtown draws across %d times/seeds: local %d, outbound %d, outer destinations mask %x/%x\n",144*4,144,inner,cross,stops,(1<<LEN(outerStops))-1);
+ assert(stops==(1<<TAXI_OUTER_STOPS)-1&&inner>350&&cross>40);
+ printf("%d downtown draws across %d times/seeds: local %d, outbound %d, outer destinations mask %x/%x\n",144*4,144,inner,cross,stops,(1<<TAXI_OUTER_STOPS)-1);
  /* First-time Dispatch callers never have to leave town to license. */
  sv.taxiFares=0;for(int i=0;i<48;i++){set_session_seed(i);TaxiOffer a;assert(taxi_draft(&a)&&a.taxi.pickup<LEN(loc)&&a.taxi.dropoff<LEN(loc));}
 }

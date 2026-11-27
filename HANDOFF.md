@@ -1,3 +1,26 @@
+# Dead Channel | Woodline & Lantern Quay Stability
+
+This local dual-architecture release starts from the published Crossroads
+tree `a545bd8fd6720bef690ee1410fb70ba97a2d15dd`.
+Use [WOODLINE](docs/WOODLINE.txt) for the trail, collectibles and controls.
+Use [LANTERN QUAY](docs/LANTERN-QUAY.txt) for the docks, helm and commissions.
+This merge keeps the latest Street Life Stability fixes and the full
+delivered Woodline and Lantern Quay gameplay in one native build.
+The starting GitHub tree was `5ba89d979c7e49e91f94acd8aca4de5d67b65f51`;
+the two sides share `a545bd8fd6720bef690ee1410fb70ba97a2d15dd`.
+See [Woodline Stability](docs/WOODLINE-STABILITY.md) for the merge,
+migration and verification notes. This resolves the mutually assigned
+garage words without changing the 304/1,044-byte layout; the former
+seizure receipt moves on validated load and keeps an exact predecessor
+backup before overwrite. Avoid downgrading an active updated slot.
+Stability preserves six original cab ranks. The three additional harbor
+stops, all 24 walkers, boats, forest, and club features remain intact.
+Linux uses its real SDL2 process; Win32 is a simulated host of the exact PE.
+Older release history follows.
+
+---
+
+
 # Dead Channel | Street Life Stability Update
 
 This build is based on the verified released Street Life source (the

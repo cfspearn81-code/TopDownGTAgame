@@ -242,10 +242,15 @@ static const char *const np_style[]={"Mute the handset and car station.","Glass 
 static const char *const np_modules[]={"Lighting upgrade","Hydroponics upgrade","Ventilation upgrade"};
 static const char *const np_moddesc[]={"Unlocks Prism Fern and Select grade. Adds one power slot.","Unlocks Echo Bloom and Select grade. Adds one power slot.","Unlocks Top Shelf for all unlocked strains. Adds one slot."};
 typedef struct{char label[100],suffix[95],detail[155];} NPLine;
-
+enum{NP_WIRE_WOODLINE=13,NP_WIRE_HARBOR=14,NP_WIRE_ROWS=18};
+static int np_rows(void);
 static void np_label(NPLine*r,const char*name,const char*small,const char*detail){append(r->label,name);append(r->suffix,small);append(r->detail,detail);}
 #include "signal_receipts.inc"
-static int np_rows(void){static const int counts[]={4,4,13,10,9,6,4};return np_app==NP_RECEIPTS?RRC_ROWS:counts[cl(np_app,0,NP_NAPP-1)];}
+/* Receipts remains on its own M shortcut and does not change the seven-app ring. */
+static int np_rows(void){
+ static const int counts[]={4,4,NP_WIRE_ROWS,10,9,6,4};
+ return np_app==NP_RECEIPTS?RRC_ROWS:counts[cl(np_app,0,NP_NAPP-1)];
+}
 static const char *const np_meet_name[]={"Switchyard Social","Bluff Lights","Wharf After Dark"};
 static const char *const np_booth[]={"Velvet","Mirage","Aurora"};
 static int np_card_booth(void){return (np_hour()/4)%LEN(np_booth);}
@@ -299,6 +304,8 @@ static void np_line(NPLine *l,int r){
    else append(l->detail,"Stage booths accept exact Top Shelf strains after you purchase The Afterimage. Pin the club.");}
   if(r==10)np_label(l,"@porchlight / Take a break","VOLUNTARY","Apartment Four has a Bunk and fountain reset for the game's temporary effects and familiarity meter. Pin your front door.");
   if(r==11)np_label(l,"@groundwire / Garden note","ARCADE","Cabinet power is a game stat. Low Draw takes longer and uses less power; Showpiece needs spare slots and produces more attention.");
+  if(r>=NP_WIRE_HARBOR&&r<NP_WIRE_ROWS)harbor_jobs_card(r-NP_WIRE_HARBOR,l->label,l->suffix,l->detail);
+  if(r==NP_WIRE_WOODLINE){np_label(l,"@woodline / Ranger bulletin","","Walk south from Seawall Road to the Ranger for trail surveys, specimen quests and chests. Press Enter to pin the desk.");append(number(l->suffix,woodline_post_status())," / 3 FILED");}
   if(r==12)np_label(l,"@belllane / Trap House",night_trap_owned()?"OWNED":"$480 CLEAN","Bell Lane Annex, southwest of Apartment Four. Separate property with a graded stockroom, construction and repair dispatch. Select to pin.");
  }break;
  case NP_LOFT:
@@ -355,6 +362,8 @@ static void np_apply(void){int r=np_row,j=np_job();
   else if(r==8)np_pin(-1,NP_PARKWAY_X-66,NP_PARKWAY_Y);
   else if(r==10)np_venue(12);
   else if(r==11){np_app=NP_LOFT;np_row=9;np_msg("Glasshouse profile opened.");return;}
+  else if(r>=NP_WIRE_HARBOR&&r<NP_WIRE_ROWS){harbor_jobs_phone(r-NP_WIRE_HARBOR);return;}
+  else if(r==NP_WIRE_WOODLINE){woodline_pin_ranger();np_msg("Ranger desk pinned. Follow the trail south of Seawall Road on foot.");return;}
   else if(r==12){np_pin(NAV_TRAP,NT_DOOR_X,NT_DOOR_Y);np_msg("Trap House pinned. Enter at the marked Bell Lane side door on foot.");return;}
   np_msg("Night Wire location pinned on the atlas.");return;
  }

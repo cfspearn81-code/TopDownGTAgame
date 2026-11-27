@@ -8,7 +8,7 @@
 #include <string.h>
 static void live_traffic(void){
  starter_save();sv.intro=4;
- for(int shift=0;shift<2;shift++)for(int site=0;site<6;site++){
+ for(int shift=0;shift<2;shift++)for(int site=0;site<LEN(outerStops);site++){
   clear_input();npc_reset();vd_reset();end_job();spawnCars();dispatch_reset();outer_life_reset();
   scene=1;sv.dayClock=shift?17*60.f:11*60.f;menu=-1;mapOn=0;
   OuterPoint pt=outerNodes[outerStops[site].node];p=(Player){.x=pt.x,.y=pt.y,.car=-1,.hp=100,.heat=150.f};
@@ -38,7 +38,8 @@ static void extras(void){
   for(int k=1;k<n;k++)assert(dispatch_region_clear(route[k-1],route[k]));
   passes++;closed+=!!np_closed();
  }
- assert(closed==30&&passes==60);
+ const int routes=LEN(outerStops)*(LEN(outerStops)-1);
+ assert(closed==routes&&passes==routes*2);
  /* Keep one real assigned unit, then end the call and see it return home. */
  dispatch_reset();sv.dayClock=660;scene=1;streetWalks[DISPATCH_FIRST].pause=0;
  p=(Player){.x=2819.34f,.y=1025.64f,.heat=90,.hp=100,.car=-1};

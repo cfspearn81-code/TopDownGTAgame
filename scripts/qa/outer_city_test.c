@@ -22,7 +22,7 @@ static void survey(void){
    assert(!street_hits_wall(&car));assert(!solid(car.x,car.y,10));samples++;
   }
  }
- assert(samples>1600);assert(solid(3000,1700,10)&&solid(2600,2780,10));
+ assert(samples>1600);assert(solid(2998,2200,10)&&solid(2600,2780,10));
  printf("Outer Loop: %d actual drivable hull and foot samples across surveyed road segments.\n",samples);
 }
 static void map_route(void){

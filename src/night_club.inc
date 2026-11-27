@@ -26,6 +26,8 @@ static const char*const ncIncidents[4]={"Queue is calm","Overbooked seats","Cros
 static const char*const ncRemedies[3]={"Check the seating list","Ask guard to reset rope","Clear the back hallway"};
 static int ncRoom,ncPanel,ncChoice,ncFreeTrack,ncBooth,ncVisitServed,ncDanceTicks,ncCache=-1;
 static float ncX,ncY,ncAngle;
+static U ncMotionTicks;
+static float nc_motion(void){return ncMotionTicks*(1.f/60.f);}
 static U ncBackdrop[W*H];
 /* All external save words are bounded when read. A zeroed block is an unsold deed. */
 static int nc_get(int field){
@@ -126,7 +128,7 @@ static void nc_enter_room(int room,int from){
 static int night_club_open(int building){
  if((building!=NC_ID&&building!=ncFrontId)||(U)building>=(U)nb||!ordinaryDoorY[building])return 0;
  walkin_active=building;ncFreeTrack=0;ncVisitServed=0;
- ncBooth=0;ncDanceTicks=0;ncCache=-1;
+ ncBooth=0;ncDanceTicks=0;ncMotionTicks=0;ncCache=-1;
  scene=NIGHT_CLUB_SCENE;menu=-1;mapOn=0;p.noticeT=0;nc_enter_room(NC_FLOOR,-1);
  return 1;
 }
@@ -171,8 +173,9 @@ static const char*nc_hint(int target){
  static const char*const h[]={"Walk to a lit station","Exit to the city","Enter the box office","Enter the velvet lounge","Return to the main floor","Choose a record","Visit the bar","Cue an encore","Talk to door staff","Open the management ledger","Attend Velvet booth","Open VIP stock cabinet","Refresh the lounge","Attend Mirage booth","Attend Aurora booth"};
  return h[cl(target,0,LEN(h)-1)];
 }
-static void nc_showpanel(int panel){ncPanel=panel;ncChoice=0;}
+static void nc_showpanel(int panel){ncPanel=panel;ncChoice=0;walking=0;}
 static void nc_label(int,int,const char*,U);
+static void nc_regular_sprite(int,int,int,int);
 #include "night_club_gig.inc"
 static int nc_items(void){
  switch(ncPanel){case NC_DESK:return nc_owned()?9:2;case NC_DECK:return 4;case NC_TABLE:return nc_owned()?6:5;case NC_DANCE_CONFIRM:return 2;case NC_OLD_LEDGER:return 3;case NC_REGULAR:return ncr_contact==NCR_PROMOTER?2:1;
@@ -237,7 +240,7 @@ static void nc_ledger(int row){
   nv.club[NC_CLEAN]=100;nv.club[NC_SERVICE]=100;nc_save_note("House crew reset the room. Service and cleanliness restored.");break;
  }
 }
-static float nc_beat(void){return sn(anim*(nc_music()==0?4.8f:nc_music()==1?5.6f:4.1f));}
+static float nc_beat(void){return sn(nc_motion()*(nc_music()==0?4.8f:nc_music()==1?5.6f:4.1f));}
 static void nc_activate(int row){
  int count=nc_items();if(row<0||row>=count)return;
  if(ncPanel==NC_DANCE_CONFIRM){
@@ -411,7 +414,7 @@ static void nc_static_floor(int room,int level){
   rect(299,219,362,3,0xd99b8c);rect(306,222,348,4,0x533c4b);
   for(int i=0;i<13;i++){int x=314+i*28;rect(x,220,4,2,ncGold);}
   nc_speaker(268,158);nc_speaker(668,158);
-  nc_console(86,208);nc_label(158,171,"01  /  SELECTOR",ncIce);
+  nc_console(86,208);nc_label(158,117,"01  /  SELECTOR",ncIce);
   for(int i=0;i<2;i++)box(735,160+i*20,134,4,0x795364,0x967576);
   for(int i=0;i<9;i++)nc_bottle(744+i*14,155-(i%2)*4,i%3==0?0x769a90:i%3==1?0xad737f:0xb99c77);
   for(int i=0;i<6;i++)nc_bottle(750+i*20,177-(i%2)*3,i%2?0x9a7c9e:0xa77d71);
@@ -498,28 +501,23 @@ static void nc_beam(int ax,int ay,int bx,int by,int w,U color){
  }
  nc_oval(bx,by,w,3,mix(0x312837,color,3));
 }
-static void nc_dancer(int x,int y,int i,int act){
- U coats[]={0xb75c89,0x589a9e,0xa584bf,0xc28858,0x7589b8};
- U shadow=0x261c2a,c=coats[i%5],light=mix(c,PAPER,3),skin= i&1?0xae7e69:0xe0a38b;
- float t=anim*(3.2f+nc_music()*.4f)+i*1.8f;
- int sway=(int)(sn(t)*3),lift=(int)(cs(t)*4),lean=(int)(sn(t*.51f)*3);
- int hip=x+sway,foot=y,should=hip+lean,head=should+lean/2;
- nc_oval(x,y+2,13,3,0x382534);
- /* Fully clothed stage costume: long trousers, tailored jacket, gold lapels and cuffs. */
- for(int q=-1;q<=1;q++){
-  line(hip-2+q,y-11,x-5-lift+q,y,0x352c41);line(hip+2+q,y-11,x+6+lift+q,y-1,0x45384b);
-  line(should-4+q,y-23,should-10+q,y-17-lift,light);line(should-10+q,y-17-lift,should-13+q,y-25-lift,c);
-  line(should+4+q,y-23,should+10+q,y-24+lift,light);line(should+10+q,y-24+lift,should+14+q,y-29+lift,c);
- }
- rect(x-8-lift,foot,7,2,ncGold);rect(x+5+lift,foot-1,7,2,ncGold);
- tri(should-6,y-24,should+6,y-24,hip-4,y-8,c);tri(should+6,y-24,hip+5,y-9,hip-4,y-8,c);
- line(should-3,y-24,hip+1,y-16,ncGold);line(should+3,y-24,hip+1,y-16,ncGold);
- rect(hip-4,y-12,9,2,shadow);dot(hip,y-12,ncGold);
- disc(should-13,y-25-lift,2,skin);disc(should+14,y-29+lift,2,skin);
- rect(head-1,y-26,3,4,skin);disc(head,y-29,4,skin);rect(head-4,y-33,8,3,shadow);
- if(i%2){rect(head-6,y-32,12,2,light);rect(head-3,y-35,7,4,c);}
- else{disc(head-3,y-33,3,shadow);dot(head-5,y-35,ncGold);}
- if(act==2)line(should-4,y-21,hip-8,y-10,light);
+#include "club_cast.inc"
+/* The named contacts keep their authored meeting positions and job roles.
+   Their room costumes and idle clock follow the rest of the house cast. */
+static void nc_regular_sprite(int i,int x,int y,int close){
+ static const NcCast wardrobe[]={
+  {0x9c82c5,0xe7baec,0x454068,0x98664f,0x3a2942,CA_RIBBON,CA_WAVES,4,2},
+  {0xc78266,0xffcb99,0x58556b,0xbd8b74,0x30334b,CA_DENIM,CA_QUIFF,5,1},
+  {0x75a8ad,0xb8e0d3,0x435768,0xcc9a82,0x59444f,CA_LEDGER,CA_CROP,5,2}
+ };
+ _Static_assert(LEN(wardrobe)==LEN(ncr_cast),"one costume per Afterimage contact");
+ int face=close?(ncX<x?-1:1):(i==NCR_PHOTOGRAPHER?-1:1);
+ nc_cast_actor(x,y,110,wardrobe+i,CA_WAITING,close?0.f:nc_motion()*(1.35f+i*.17f)+i,face);
+}
+/* The street queue shares the patrons' wardrobe, not their hall positions or
+   idle timer. The normal city simulation continues to own street animation. */
+static void night_club_queue_paint(int x,int y,int slot){
+ nc_guest_actor(x,y,slot+8,CA_WAITING,anim*(1.5f+slot*.06f)+slot,slot%3?-1:1,72);
 }
 static void nc_player(void){
  int x=(int)ncX,y=(int)ncY;
@@ -527,22 +525,34 @@ static void nc_player(void){
  /* Small open bracket below feet: identify the player even on a busy floor. */
  line(x-7,y+5,x-3,y+7,ncIce);line(x-3,y+7,x+3,y+7,ncIce);line(x+3,y+7,x+7,y+5,ncIce);
 }
+/* Bar, mixer and ledger are cached background props. Restore their narrow
+   foreground lips after drawing workers so they are behind, not on, desks. */
+static void nc_restore_front(int left,int top,int right,int bottom){
+ for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)pixels[y*W+x]=ncBackdrop[y*W+x];
+}
 static void nc_dynamics(void){
  int track=nc_music(),act=nc_get(NC_ACT),level=nc_get(NC_DECOR);
+ float time=nc_motion();
  if(ncRoom==NC_FLOOR){
   U left=track==0?0xe79dad:track==1?0xefd388:0xbcacec,
     right=track==0?0x75c3c6:track==1?0x84d2a6:0x8ac6e7;
-  nc_beam(312,126,391+(int)(sn(anim*.71f)*41),226,40,left);
-  nc_beam(645,126,563+(int)(sn(anim*.83f+1.4f)*43),225,37,right);
-  if(level==2)nc_beam(481,117,481+(int)(sn(anim*.48f)*83),245,48,0xcfacdf);
+  nc_beam(312,126,391+(int)(sn(time*.71f)*41),226,40,left);
+  nc_beam(645,126,563+(int)(sn(time*.83f+1.4f)*43),225,37,right);
+  if(level==2)nc_beam(481,117,481+(int)(sn(time*.48f)*83),245,48,0xcfacdf);
   for(int j=0;j<2;j++){int xx=j?645:312;rect(xx-8,119,16,7,0x302a3c);rect(xx-5,126,10,2,j?right:left);}
   /* Downstage after reflected light to keep silhouettes + upper bodies readable. */
-  int n=3+act;for(int i=0;i<n;i++){int xx=480+(i*2-n+1)*28;nc_dancer(xx,201-(i&1)*5,i,act);}
-  for(int i=0;i<6;i++){int xx=141+i*6,h=2+(int)((sn(anim*(3+i*.2f)+i)+1)*4);rect(xx,207-h,3,h,i<4?ncIce:ncGold);}
+  int n=3+act;for(int i=0;i<n;i++){
+   int xx=480+(i*2-n+1)*30;nc_stage_actor(xx,209-(i&1)*5,i,time);
+  }
+  /* Behind their working counters, out of the player's walkable lane. */
+  nc_cast_actor(159,216,117,ncHouseCast,CA_WORKING,time*3.5f,1);
+  nc_cast_actor(800,216,118,ncHouseCast+1,CA_WORKING,time*2.9f,-1);
+  nc_restore_front(138,209,183,223);nc_restore_front(778,208,821,222);
+  for(int i=0;i<6;i++){int xx=141+i*6,h=2+(int)((sn(time*(3+i*.2f)+i)+1)*4);rect(xx,207-h,3,h,i<4?ncIce:ncGold);}
   int guests=nc_owned()?cl(8+nc_get(NC_DOOR)/4,8,16):12;
   float beat=nc_beat();
   if(!fastGfx)for(int i=0;i<12;i++){int xx=313+i%6*61,yy=281+(i/6)*52;
-   U color=mix(0x342e43,(i&1)?right:left,(int)((sn(anim*2.1f+i*1.18f)+1)*1.49f)+1);
+   U color=mix(0x342e43,(i&1)?right:left,(int)((sn(time*2.1f+i*1.18f)+1)*1.49f)+1);
    nc_rhomb(xx,yy,16,7,color);}
   /* Ordered by depth; density index grows the audience in little dance circles
      rather than filling rigid rows from front to back. */
@@ -552,39 +562,43 @@ static void nc_dynamics(void){
   int plotted=0,regular=0;
   for(int i=0;i<16;i++){
    int idx=crowd[i][2];if(idx>=guests)continue;
-   int yy=crowd[i][1]+(int)(sn(anim*1.9f+idx)*2),xx=crowd[i][0]+(int)(sn(anim*.83f+idx*4.2f)*7);
+   int yy=crowd[i][1]+(int)(sn(time*1.9f+idx)*2),xx=crowd[i][0]+(int)(sn(time*.83f+idx*4.2f)*7);
    while(regular<LEN(ncr_cast)&&ncr_cast[regular].y<=yy){
     if(!plotted&&ncY<=ncr_cast[regular].y){nc_player();plotted=1;}
     ncr_actor(regular++);
    }
    if(!plotted&&ncY<=yy){nc_player();plotted=1;}
-   person(xx,yy,idx%3==0?0xb77f9d:idx%3==1?0x6a999e:0x938ba9,
-          (int)(sn(anim*3+idx*1.7f)*4),1.5f+sn(anim*.5f+idx)*1.7f,0,idx);
+   nc_guest_actor(xx,yy,idx,idx%3==0?CA_APPLAUSE:idx%3==1?CA_SWAY:CA_WAITING,
+         time*(2.6f+idx*.07f)+idx*1.7f,idx%4>=2?-1:1,93+idx%3*4);
   }
   while(regular<LEN(ncr_cast)){
    if(!plotted&&ncY<=ncr_cast[regular].y){nc_player();plotted=1;}
    ncr_actor(regular++);
   }
-  if(!plotted)nc_player();
-  person(159,201,0x82718a,0,1.4f,3,1);person(795,203,0x61958e,0,1.25f,0,2);
-  for(int i=0;i<1+nc_get(NC_STAFF);i++){int xx=584+i*19;person(xx,378+i%2*5,0x4a5468,0,2.4f-i*.4f,1,3+i);}
-  if(nc_get(NC_DISPUTE)){
-   nc_label(599,339,"QUEUE  /  !",ncRose);
-   for(int i=0;i<nc_get(NC_DISPUTE)+1;i++){
-    int yy=393+i%2*9,xx=615+i*15+(int)(sn(anim*3.7f+i)*4);
-    person(xx,yy,0x986e82,(int)(sn(anim*4.2f+i)*2),2.2f,0,i);
-   }
+  /* Draw foreground guests/crew in order, with player occlusion matching
+     their feet. The old path always drew all of them over the player. */
+  for(int i=0;i<1+nc_get(NC_STAFF);i++){
+   int xx=568+i*25,yy=377+i*3;
+   if(!plotted&&ncY<=yy){nc_player();plotted=1;}
+   nc_cast_actor(xx,yy,108,ncHouseCast+(i?i+3:2),CA_WAITING,time*1.7f+i,i==2?-1:1);
   }
-  else nc_label(603,382,"DOOR STAFF",0xd4bf9a);
+  if(nc_get(NC_DISPUTE))for(int i=0;i<nc_get(NC_DISPUTE)+1;i++){
+   int yy=396+i*3,xx=610+i*18+(int)(sn(time*3.7f+i)*3);
+   if(!plotted&&ncY<=yy){nc_player();plotted=1;}
+   nc_guest_actor(xx,yy,12+i,CA_APPLAUSE,time*2.6f+i,-1,92);
+  }
+  if(!plotted)nc_player();
+  if(nc_get(NC_DISPUTE))nc_label(599,413,"QUEUE  /  !",ncRose);
+  else nc_label(603,389,"DOOR STAFF",0xd4bf9a);
   for(int i=0;i<6;i++){int xx=323+i*62;rect(xx,221,7,2,beat>0?left:ncGold);}
   if(nc_owned()&&nc_get(NC_CLEAN)<48)for(int i=0;i<5;i++)rect(290+i*76,373-(i%2)*11,4,2,0xa09895);
  }else if(ncRoom==NC_SUITE){
   for(int i=0;i<3;i++){
    int cx=210+i*266;U ink=ncBoothInk[i];
    for(int j=0;j<2;j++){
-    int xx=cx+(j?49:-49)+(int)(sn(anim*.7f+i+j)*2);
-    person(xx,210+(int)(cs(anim*1.6f+j)*1.7f),j?mix(ink,0x4d3e55,4):mix(ink,0x37545e,5),
-       (int)(sn(anim*1.7f+i+j)*2),(j?2.3f:.7f)+sn(anim*.8f+j+i)*.25f,0,j+i);
+    int xx=cx+(j?49:-49)+(int)(sn(time*.7f+i+j)*2);
+    int guest=2+i*3+j;
+    nc_guest_actor(xx,213,guest,CA_SEATED,time*(1.4f+j*.24f)+i+j,j?-1:1,104);
    }
    for(int j=0;j<2;j++){
     int xx=cx+24+(j?-48:0),y=223;
@@ -593,7 +607,7 @@ static void nc_dynamics(void){
    }
    if(nc_get(NC_SHOWCASE)&(1<<i)){nc_rhomb(cx,210,6,6,ink);nc_oval(cx,212,5,3,mix(ink,ncGold,4));}
    if(!fastGfx){
-    int k=1+(int)((sn(anim*1.4f+i)+1)*1.4f);
+    int k=1+(int)((sn(time*1.4f+i)+1)*1.4f);
     line(cx-68,182,cx+68,182,mix(0x5c4659,ink,k));disc(cx-68,182,2,ink);disc(cx+68,182,2,ink);
    }
   }
@@ -602,7 +616,8 @@ static void nc_dynamics(void){
 
   nc_player();
  }else{
-  person(540,181,0x708889,0,1.9f,0,4);nc_player();
+  nc_cast_actor(540,192,108,ncHouseCast+3,CA_WORKING,time*1.43f,1);
+  nc_restore_front(521,184,565,199);nc_player();
   int val=nc_get(NC_TILL),fill=min(4,val/32);for(int i=0;i<fill;i++)box(405+i*5,181-i*2,15,4,0x6e947f,ncGold);
  }
 }
@@ -705,9 +720,10 @@ static void nc_panel_draw(void){
   nc_sun(rx+76,212,42,ncGold);nav_wrap(rx,234,280,"Acquire the performance hall, velvet lounge and box office with clean cash.",PAPER,4);
   nav_wrap(rx,314,280,"Every 45 seconds of active city time, a set closes and the door takings reach your till.",ncDim,4);
  }else if(ncPanel==NC_DECK){
-  for(int i=0;i<15;i++){int h=6+(int)((sn(anim*(3.1f+i*.05f)+i)+1)*22);rect(rx+i*15,216-h,9,h,i<9?ncIce:ncGold);}
+  for(int i=0;i<15;i++){int h=6+(int)((sn(nc_motion()*(3.1f+i*.05f)+i)+1)*22);rect(rx+i*15,216-h,9,h,i<9?ncIce:ncGold);}
   nav_wrap(rx,237,280,"Choose a house record. Different tempos change the light rig, dancers and synth music.",PAPER,4);
   append(append(row,"Audience request: "),ncTracks[nc_get(NC_SHOWS)%3]);nav_wrap(rx,326,280,row,ncGold,4);
+  textat(rx,389,"JUNO  /  SELECTOR",ncIce,0);
  }else if(ncPanel==NC_TABLE){
   int want=nc_guest_order(ncBooth);U cup=want==0?ncRose:want==1?ncIce:ncGold;
   nc_oval(rx+46,222,26,4,0x665363);rect(rx+44,192,4,28,cup);tri(rx+18,171,rx+76,171,rx+46,201,cup);line(rx+23,173,rx+67,173,PAPER);
@@ -732,6 +748,7 @@ static void nc_panel_draw(void){
  }else if(ncPanel==NC_BAR){
   nc_st_line(row,"House drinks  /  ",nc_get(NC_DRINK)," of 12");textat(rx,159,row,PAPER,0);
   nav_wrap(rx,222,280,"A house soda restores up to six health. Owners can order up to four booth servings for $3 apiece.",PAPER,4);
+  textat(rx,349,"ISABEL  /  BAR",ncIce,0);
  }else if(ncPanel==NC_DANCE_CONFIRM){
   nc_sun(rx+88,209,45,ncBoothInk[ncBooth]);
   nav_wrap(rx,240,280,"Book a short, private costumed cabaret performance at this booth for $25.",PAPER,4);
@@ -741,6 +758,8 @@ static void nc_panel_draw(void){
   box(rx,190,206,18,0x2a2635,0x776272);rect(rx+1,191,w,16,beat>.28f?ncGold:0x806a85);
   rect(rx+131,184,2,31,PAPER);textat(rx,224,beat>.28f?"CUE NOW":"WAIT FOR GOLD",beat>.28f?ncGold:ncDim,0);
   nav_wrap(rx,264,280,"Cue on the downbeat. One good encore per set boosts the crowd and box-office take.",PAPER,4);
+  char*q=append(row,"Tonight: ");for(int i=0;i<3+nc_get(NC_ACT);i++){if(i)q=append(q,", ");q=append(q,ncStageNames[i]);}
+  nav_wrap(rx,366,280,row,ncGold,3);
  }else{
   const char*const trouble[]={"Brief the crew once per set to prevent a new incident. Hire a full team at the ledger.",
   "Two groups have tickets for the same booth. Verify the ledger and seat the overflow group.",
@@ -750,31 +769,13 @@ static void nc_panel_draw(void){
   textat(rx,159,ncIncidents[incident],incident?ncRose:ncIce,0);
   nav_wrap(rx,212,280,trouble[incident],PAPER,4);
   if(incident)nav_wrap(rx,323,280,"Ignoring this cuts turnout, earnings and reputation at set close.",ncDim,4);
+  textat(rx,392,"IDRIS  /  DOOR",ncIce,0);
  }
  rect(x+24,432,699,1,0x574651);textat(x+26,440,"ARROWS  SELECT       E / ENTER  CHOOSE       ESC  BACK",ncDim,0);
  if(p.noticeT>0){rect(0,496,W,44,0x151520);textat(36,507,notice,notice_color(),0);}
 }
 /* An optional costumed cabaret vignette. The player's avatar remains seated
    behind the illuminated dance lane; the performer has a separate silhouette. */
-static void nc_dance_performer(int x,int y,float t,U color){
- U edge=0x221a2b,shade=mix(color,edge,4),rim=mix(color,PAPER,3),skin=0xcf9b85;
- int rhythm=(int)(sn(t)*10),lift=(int)(cs(t)*5),head=(int)(sn(t*.58f)*7);
- Pt lhip={x-6,y-32},rhip={x+7,y-32},la={x-12-rhythm,y-3+lift},ra={x+11+rhythm,y-2-lift};
- Pt ls={x-13+head,y-61},rs={x+13+head,y-62},le={ls.x-20,y-53+lift},re={rs.x+20,y-60-lift};
- Pt lh={le.x-11,y-68+rhythm/2},rh={re.x+10,y-79-rhythm/2};
- nc_oval(x,y+1,33,5,0x271e32);
- rod(lhip,la,4,edge);rod(rhip,ra,4,edge);rod(lhip,la,2,shade);rod(rhip,ra,2,shade);
- line(la.x-7,la.y+3,la.x+4,la.y+3,ncGold);line(ra.x-4,ra.y+3,ra.x+8,ra.y+3,ncGold);
- rod(ls,le,4,shade);rod(le,lh,3,color);rod(rs,re,4,color);rod(re,rh,3,shade);
- disc(lh.x,lh.y,3,skin);disc(rh.x,rh.y,3,skin);
- quad(ls,rs,(Pt){x+9,y-28},(Pt){x-9,y-28},color);
- line(ls.x+3,ls.y+1,x+1,y-43,rim);line(rs.x-3,rs.y+1,x+1,y-43,ncGold);
- rect(x-9,y-34,19,3,edge);dot(x,y-33,ncGold);line(x-6,y-29,x+8,y-29,rim);
- disc(x+head,y-70,7,skin);rect(x+head-8,y-77,16,4,edge);
- rect(x+head-11,y-75,22,2,shade);rect(x+head-6,y-83,12,7,color);
- rect(x+head-6,y-79,12,2,ncGold);
- dot(x+head-2,y-71,edge);dot(x+head+3,y-71,edge);
-}
 static void nc_dance_paint(void){
  U ink=ncBoothInk[ncBooth],cloth=ncBoothUph[ncBooth],frame=0x1e1828;
  float elapsed=ncDanceTicks/60.f,t=elapsed*(nc_music()==0?4.8f:nc_music()==1?5.6f:4.1f);
@@ -805,7 +806,9 @@ static void nc_dance_paint(void){
  rod((Pt){hx-11,hy+1},(Pt){hx-16,hy+14},2,jacket);rod((Pt){hx+10,hy+1},(Pt){hx+12,hy+14},2,jacket);
  disc(hx-2,hy-7,8,hair);disc(hx-3,hy-5,6,skin);rect(hx-9,hy-12,13,3,hair);dot(hx-7,hy-5,frame);
  int x=429+(int)(sn(t*.59f)*46),y=337+(int)(sn(t*.37f)*7);
- nc_dance_performer(x,y,t,mix(cloth,ink,5));
+ int actor=(ncBooth+nc_get(NC_SHOWS))%(3+nc_get(NC_ACT));
+ nc_cast_actor(x,y,248,ncStageCast+actor,CA_PRIVATE,t,1);
+ textat(674,360,ncStageNames[actor],ink,0);
  rect(94,84,768,53,0x292334);
  textat(108,88,"THE AFTERIMAGE    /    PRIVATE PERFORMANCE",ink,0);
  char title[72];char*q=append(title,ncBooths[ncBooth]);append(q," booth  /  Lap dance");textat(108,111,title,PAPER,0);
@@ -839,6 +842,7 @@ static void night_club_tick(U keys,U tap){
   active(PAUSE_MENU);makeMenu();return;
  }
  if(menu>=0){makeMenu();if(!nopt){menu=-1;return;}if(tap&UP)sel=(sel+nopt-1)%nopt;if(tap&DOWN)sel=(sel+1)%nopt;if(tap&(USE|ENTER))doOpt(opt[sel].action);return;}
+ ncMotionTicks=(ncMotionTicks+1u)%216000u;
  p.secs+=1.f/60;job_clock_tick(1.f/60);
  if(ncPanel){
   int n=nc_items();if(!n){ncPanel=0;return;}

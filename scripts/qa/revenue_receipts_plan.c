@@ -52,7 +52,7 @@ int main(int argc,char**argv){
  loss=rr_read(0);assert(loss.kind==REVENUE_SWEEP&&loss.clean==WALLET_LIMIT&&loss.dirty==WALLET_LIMIT);
  sv.sweepTicks=1;revenue_tick();assert(rr_read(0).kind==REVENUE_SWEEP);
  nv.garage[RR_PURCHASE_DIRTY]=~0u;assert(!rr_read(1).kind);
- nv.garage[RR_SEIZURE_META]|=1u<<13;assert(!rr_read(0).kind);
+ nv.phone[DC_SEIZURE_META]|=1u<<13;assert(!rr_read(0).kind);
  revenue_close_case();rrc_open();np_line(&l,2);assert(!strcmp(l.suffix,"CLEAR"));
  np_line(&l,3);assert(!strcmp(l.suffix,"NONE"));
  pointer_input(RR_SIGNAL_X+3,RR_SIGNAL_Y+4,1);assert(np_app==NP_RECEIPTS);

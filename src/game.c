@@ -107,7 +107,7 @@ static const Place originalLoc[]={
 {1280,512,"VANTA POLICE HQ","Desk Officer","Headquarters and patrol dispatch.",0x8aabff,15}
 };
 static Place loc[LEN(originalLoc)];
-static const char* district(int x,int y){if(x>=BASE_ROOM-36||y>=BASE_ROOM-36){return y<820?"GLASS BLUFF":y<1130?"FREIGHT PARKWAY":y<1570?"BELT WORKSHOPS":x>=2180?"HARBOR PIER":"SALT REACH";}if(y<545)return "GLASS MILE";if(y>1160)return x<900?"LANTERN WARD":"BREAKWATER";return x<850?"TIDE MARKET":x<1400?"NIGHTGLASS":"EAST FREIGHT";}
+static const char* district(int x,int y){if(x>=BASE_ROOM-36||y>=BASE_ROOM-36){if(y>BASE_ROOM-36&&x<1106+(int)(55*sn(y*.010f)))return "GREYREED WOOD";return y<820?"GLASS BLUFF":y<1130?"FREIGHT PARKWAY":y<1570?"BELT WORKSHOPS":x>=2180?"HARBOR PIER":"SALT REACH";}if(y<545)return "GLASS MILE";if(y>1160)return x<900?"LANTERN WARD":"BREAKWATER";return x<850?"TIDE MARKET":x<1400?"NIGHTGLASS":"EAST FREIGHT";}
 static const char*venue_address(int b){return b==ncFrontId?"BASE VILLAGE":district(ordinaryDoorX[b],ordinaryDoorY[b]);}
 /* Forward caps use each model's former 10/100-condition speed at full
  * health. Keep throttle response and low-speed control unchanged. */
@@ -174,7 +174,7 @@ static int street_next_car(int i){
 typedef struct { U club[32],garage[64],phone[64],world[24]; } NightSave;
 typedef struct { Save base; NightSave night; U hash; } Save11;
 enum { NIGHT_SAVE_REV=11, NIGHT_CLUB_SCENE=7, NIGHT_GARAGE_SCENE=8, NIGHT_PHONE_SCENE=9,
-       NIGHT_VENUES_SCENE=10,NIGHT_TRAP_SCENE=11 };
+       NIGHT_VENUES_SCENE=10,NIGHT_TRAP_SCENE=11,NIGHT_FOREST_SCENE=12 };
 enum {NT_DOOR_X=174,NT_DOOR_Y=944};
 enum { NIGHT_CLEAR, NIGHT_FOG, NIGHT_RAIN };
 _Static_assert(sizeof(NightSave)==736 && sizeof(Save11)==1044 && __builtin_offsetof(Save11,night.world[6])==968,"Unexpected Night District save layout");
@@ -207,7 +207,17 @@ static void night_phone_heat_add(int,int,int);
 static int np_closed(void),night_phone_lane_stop(float,float,float,float,int),night_phone_take_link(void),night_phone_signature(int,int);
 static void night_phone_link_result(int),night_phone_road_paint(void),night_phone_contact_paint(void),night_phone_rest(int);
 static int night_club_queue(void),night_club_signature_demand(int),night_club_listing(void);
+static void night_club_queue_paint(int,int,int);
 static int night_trap_owned(void),night_trap_entry(U);
+static int npc_gate_street_use(void);
+static int harbor_boats_tick(U,U,float),harbor_boat_active(void),harbor_boat_save_point(float*,float*),harbor_boat_nav_clear(float,float);
+static void harbor_boats_world(float),harbor_boats_paint(void),harbor_boats_hint(void),harbor_boats_reset(void);
+static int harbor_jobs_use(U),harbor_jobs_route(int*,int*),harbor_jobs_panel_active(void);
+static void harbor_jobs_card(int,char*,char*,char*),harbor_jobs_phone(int);
+static void harbor_jobs_tick(float),harbor_jobs_world_paint(void),harbor_jobs_hint(void),harbor_jobs_panel_tick(U,U),harbor_jobs_reset(void);
+static int woodline_entry(U),woodline_bench_solid(float,float),woodline_post_status(void);
+static void woodline_wild_reset(void),woodline_wild_tick(float),woodline_wild_paint(void),woodline_wild_hint(void);
+static void woodline_tick(U,U),woodline_paint(void),woodline_world_tick(float),woodline_street_paint(void),woodline_hint(void),woodline_interior_paint(int,int),woodline_pin_ranger(void);
 static void night_trap_tick(U,U),night_trap_paint(void),night_trap_world_tick(float),night_trap_street_paint(void),night_trap_hint(void);
 static int night_venue_apply_pulse(int*,int*,float*,U*),night_venue_vendor_stop(void);
 static void nvk_stats(int*,int*,float*,U*);
@@ -238,6 +248,7 @@ typedef struct{int kind,clean,dirty,pending;} RevenueReceipt;
 static int revenueCrossed;
 static RevenueReceipt revenueReceipt;
 #include "revenue_receipts.inc"
+_Static_assert(__builtin_offsetof(Save11,night.garage[DC_SEIZURE_LEGACY_META])==DC_SAVE11_OLD_SEIZURE_AT,"Unexpected Rev11 receipt slot");
 static RevenueReceipt revenue_seizure_notice(void){
  RevenueReceipt receipt=revenueReceipt;revenueReceipt=(RevenueReceipt){0};return receipt;
 }
@@ -383,8 +394,10 @@ static StreetBounds building_bounds(const Building*b){
 #include "outer_city.inc"
 static int solid(float x,float y,float r){
  if(x<35||x>ROOM-36||y<35||y>ROOM-36)return 1;
- if(outer_is_new(x,y))return !outer_area(x,y,r);
- const BlockScenery*block=&scenery[((int)y/256)*8+(int)x/256];
+ if(outer_is_new(x+r,y+r)&&!outer_walkable(x,y,r))return 1;
+ /* A body whose radius straddles the old edge still sees old masonry. */
+ if(outer_is_new(x-r,y-r))return 0;
+ const BlockScenery*block=&scenery[cl((int)y/256,0,7)*8+cl((int)x/256,0,7)];
  for(int i=0;i<block->count;i++){
   const StreetBounds*b=block->walls+i;
   if(x+r>b->x&&x-r<b->x+b->w&&y+r>b->y&&y-r<b->y+b->h)return 1;
@@ -509,18 +522,19 @@ static int valid_sweep_save(void){
  return sv.charges?sv.sweepTicks>0&&sv.sweepTicks<=REVENUE_SWEEP_TICKS:sv.sweepTicks==0;
 }
 enum{NW_SAVE_X=6,NW_SAVE_Y=7,NW_SAVE_SCALE=64,HYBRID_SAVE_MARK=63};
-static void save_outer_position(void){
+static void save_outer_position_at(float x,float y){
  nv.world[NW_SAVE_X]=nv.world[NW_SAVE_Y]=0;
- if(outer_is_new(p.x,p.y)&&outer_area(p.x,p.y,3)){
-  nv.world[NW_SAVE_X]=(U)(p.x*NW_SAVE_SCALE+.5f);
-  nv.world[NW_SAVE_Y]=(U)(p.y*NW_SAVE_SCALE+.5f);
+ if(outer_is_new(x,y)&&outer_walkable(x,y,3)){
+  nv.world[NW_SAVE_X]=(U)(x*NW_SAVE_SCALE+.5f);
+  nv.world[NW_SAVE_Y]=(U)(y*NW_SAVE_SCALE+.5f);
  }
 }
+static void save_outer_position(void){save_outer_position_at(p.x,p.y);}
 static void restore_outer_position(void){
  nv.world[NW_SAVE_X]&=0x7fffffffu;
  if(!nv.world[NW_SAVE_X]&&!nv.world[NW_SAVE_Y])return;
  float x=(float)nv.world[NW_SAVE_X]/NW_SAVE_SCALE,y=(float)nv.world[NW_SAVE_Y]/NW_SAVE_SCALE;
- if(outer_is_new(x,y)&&outer_area(x,y,3)){sv.x=x;sv.y=y;}
+ if(outer_is_new(x,y)&&outer_walkable(x,y,3)){sv.x=x;sv.y=y;}
  else nv.world[NW_SAVE_X]=nv.world[NW_SAVE_Y]=0;
 }
 /* Old Afterhours builds can still read the compatible 304-byte prefix
@@ -529,7 +543,7 @@ static void outer_safe_anchor(Save*s){
  static const int gates[][2]={{1792,512},{1792,1024},{1792,1792},{1024,1792}};
  float best=1.e20f;int pick=0;
  for(int i=0;i<LEN(gates);i++){
-  float d=d2(p.x-gates[i][0],p.y-gates[i][1]);
+  float d=d2(s->x-gates[i][0],s->y-gates[i][1]);
   if(d<best){best=d;pick=i;}
  }
  s->x=(float)gates[pick][0];s->y=(float)gates[pick][1];
@@ -542,7 +556,7 @@ void load_save(void){
     withNight.base.magic==0x44433131&&withNight.base.hash==night_hash(&withNight.base,sizeof(Save)-4)&&withNight.hash==night_hash(&withNight,sizeof withNight-4)){
   cp(&sv,&withNight.base,sizeof sv);
   if(valid_save_core()&&valid_profile_save(1)&&valid_banking_save()&&valid_sweep_save()&&valid_ledger_save(DAY_SECONDS)){
-   cp(&nv,&withNight.night,sizeof nv);restore_outer_position();accept_loaded_save();return;
+   cp(&nv,&withNight.night,sizeof nv);rr_import_legacy();restore_outer_position();accept_loaded_save();return;
   }
   z(&sv,sizeof sv);
  }
@@ -562,7 +576,13 @@ void load_save(void){
 #endif
  starter_save();
 }
-void request_save(void){if(scene==0||scene==5||p.dead)return;sv.x=p.x;sv.y=p.y;sv.hp=p.hp;stamp_save();save_outer_position();
+void request_save(void){
+ if(scene==0||scene==5||p.dead)return;
+ float x=p.x,y=p.y;
+ /* The hull is a session vehicle. Save to solid dock land without
+    changing the active boat's position or overwriting older save fields. */
+ harbor_boat_save_point(&x,&y);
+ sv.x=x;sv.y=y;sv.hp=p.hp;stamp_save();save_outer_position_at(x,y);
 #ifndef DC_TEST
  int changed=0;const unsigned char *p=(const unsigned char*)&nv;
  for(unsigned i=0;i<sizeof nv;i++)if(p[i]){changed=1;break;}
@@ -590,6 +610,7 @@ static void profiles_paint(void);
 static int stoppingToExit;
 static void district_notice_reset(void),district_notice_tick(float);
 static void spawnPlayer(void){
+ woodline_wild_reset();harbor_boats_reset();harbor_jobs_reset();
  npc_reset();pulse_guard_reset();ncr_reset();
  wheelFists=wheelOpen=wheelFeedback=0;wheelSuppressed=0;
  stoppingToExit=0;
@@ -694,8 +715,12 @@ static int ownedJob(void){if(ncr_active()){tell("Finish or cancel the Afterimage
 /* Expansion fares use signed, driveable shoulders at named landmarks, not
  * arbitrary coordinates in the hills or water. First-time downtown shifts
  * and the original seeded inner-city tariff stay on the legacy grid. */
+/* New maritime atlas landmarks are not cab ranks. Preserve published
+ * dispatch's six destinations and its seeded quote stream. */
+enum {TAXI_OUTER_STOPS=N_OUTER_SITES};
+_Static_assert(TAXI_OUTER_STOPS<=LEN(outerStops),"Taxi rank list exceeds the region");
 static int taxi_outer_index(int where){
- int k=where-LEN(loc);return (unsigned)k<LEN(outerStops)?k:-1;
+ int k=where-LEN(loc);return (unsigned)k<TAXI_OUTER_STOPS?k:-1;
 }
 static const char *taxi_stop_label(int where){
  int k=taxi_outer_index(where);return k>=0?outerStops[k].label:loc[where].label;
@@ -764,8 +789,8 @@ static int taxi_draft(TaxiOffer *offer){
   * licensed, roughly one in four downtown radio calls has an outbound
   * destination; pickups stay in the dispatcher's current region. */
  int outbound=!outer&&sv.taxiFares&&(taxi_random(&toss)>>30)==0;
- int pickupEnd=LEN(loc)+(outer?LEN(outerStops):0);
- int dropStart=outbound?LEN(loc):0,dropEnd=LEN(loc)+((outer||outbound)?LEN(outerStops):0);
+ int pickupEnd=LEN(loc)+(outer?TAXI_OUTER_STOPS:0);
+ int dropStart=outbound?LEN(loc):0,dropEnd=LEN(loc)+((outer||outbound)?TAXI_OUTER_STOPS:0);
  for(int i=outer?LEN(loc):0;i<pickupEnd;i++){
   if(i==lastTaxiPickup||i==lastTaxiDrop)continue;
   int x,y,curb;if(!taxi_curb(i,&x,&y,&curb))continue;
@@ -1348,16 +1373,16 @@ void tick(U keys){
  const float dt=1.f/60; wheelSuppressed&=keys;keys&=~wheelSuppressed;
  U tap=keys&~prev;prev=keys;
  keys=npc_filter_keys(keys,&tap);
- if(taxiRadio&&taxi_radio_input(tap)){stoppingToExit=0;return;}
- if(wheel_tick(keys,tap)){stoppingToExit=0;return;}
+ if(scene==1&&harbor_jobs_panel_active()){harbor_jobs_panel_tick(keys,tap);return;}
+ if(!harbor_boat_active()&&taxiRadio&&taxi_radio_input(tap)){stoppingToExit=0;return;}
+ if(!harbor_boat_active()&&wheel_tick(keys,tap)){stoppingToExit=0;return;}
  if(!(keys&USE)||scene!=1||menu>=0||mapOn||p.dead||p.car<0)stoppingToExit=0;
  // Keep fractional frame precision during long sessions.
  anim+=dt;if(anim>=3600.f)anim-=3600.f;
  if(scene==0||scene==5){profiles_tick(tap);return;}
  if(scene==NIGHT_PHONE_SCENE){if(tap&SAVE)request_save();night_phone_tick(keys,tap);return;}
- if(vd_input(tap))return;
- if(taxi_radio_input(tap))return;
- if(!p.dead&&menu<0&&!mapOn&&(scene==1||scene==3||scene==4||scene==NIGHT_CLUB_SCENE||scene==NIGHT_GARAGE_SCENE||scene==NIGHT_VENUES_SCENE||scene==NIGHT_TRAP_SCENE)
+ if(!harbor_boat_active()&&(vd_input(tap)||taxi_radio_input(tap)))return;
+ if(!p.dead&&menu<0&&!mapOn&&(scene==1||scene==3||scene==4||scene==NIGHT_CLUB_SCENE||scene==NIGHT_GARAGE_SCENE||scene==NIGHT_VENUES_SCENE||scene==NIGHT_TRAP_SCENE||scene==NIGHT_FOREST_SCENE)
     &&night_phone_toggle(tap)){night_phone_open();return;}
  if(!p.dead&&(tap&(SLOT|NEW_SLOT))){profiles_open(!!(tap&NEW_SLOT));return;}
  if(saveFlash>0)saveFlash--;if(saveFlash<0)saveFlash++;
@@ -1365,7 +1390,7 @@ void tick(U keys){
    if(sv.playedTicks!=~0u)sv.playedTicks++;
    production_tick(dt);
    revenue_tick();
-   night_world_tick(dt);night_phone_world_tick(dt);night_trap_world_tick(dt);night_club_business_tick();night_venues_world_tick();ng_schedule_tick();outer_life_tick(dt);
+   night_world_tick(dt);night_phone_world_tick(dt);night_trap_world_tick(dt);woodline_world_tick(dt);night_club_business_tick();night_venues_world_tick();ng_schedule_tick();outer_life_tick(dt);
  }
  if(tap&SAVE)request_save();
  if(scene==3&&menu!=PAUSE_MENU&&shelterT>0&&(shelterT-=dt)<=0)finish_shelter_rest();
@@ -1374,7 +1399,8 @@ void tick(U keys){
  if(scene==NIGHT_GARAGE_SCENE){night_garage_tick(keys,tap);return;}
  if(scene==NIGHT_VENUES_SCENE){night_venues_tick(keys,tap);return;}
  if(scene==NIGHT_TRAP_SCENE){night_trap_tick(keys,tap);return;}
- if(night_trap_entry(tap))return;
+ if(scene==NIGHT_FOREST_SCENE){woodline_tick(keys,tap);return;}
+ if(night_trap_entry(tap)||woodline_entry(tap))return;
  if(night_club_entry(tap))return;
  if((scene==3||scene==4)&&night_venues_entry(tap))return;
  if(scene==3){if(menu<0)night_venue_reload(tap);interior_tick(keys,tap);return;}
@@ -1403,7 +1429,7 @@ void tick(U keys){
   request_save();
  }
  if(tap&GFX){fastGfx=!fastGfx;tell(fastGfx?"Low FX on: rain and dynamic glows off.":"Full FX on.");}
- if(menu<0){
+ if(menu<0&&!harbor_boat_active()){
   if(taxi_occupied()&&taxi.phase==TAXI_RIDING&&(taxi.copper==CAB_OFFER||taxi.copper==CAB_VIA))
    cab_choose_route(tap);
   else if(tap&TAXI_NEXT)next_fare();
@@ -1418,6 +1444,21 @@ void tick(U keys){
  float checkpointX=p.x,checkpointY=p.y;
  roadFX_tick();
  street_tick_traffic(dt);
+ harbor_boats_world(dt);
+ /* Afloat uses its own hull and never a fake index in the car array.
+    It shares the active clock, menus, phone, atlas, save, and street
+    actors, but never invokes walking, weapons, taxi or land use. */
+ const int wasAfloat=harbor_boat_active();
+ int canLaunch=wasAfloat||(job.kind<0&&vdActive<0&&!ncr_active()&&!vdPanel&&atmOpen<0&&!npc_gate_street_use());
+ if(canLaunch&&harbor_boats_tick(keys,tap,dt)){
+  walking=0;
+  pulse_guard_reset();
+  if(wasAfloat&&harbor_boat_active())harbor_jobs_use(tap);
+  harbor_jobs_tick(dt);
+  update_camera_lead();
+  npcTick(dt);
+  return;
+ }
  if(p.car>=0){pulse_guard_reset();Car*c=cars+p.car;const CarSpec*s=specs+c->type;
   float speedBefore=absf(c->s),angleBefore=c->a;int taxiImpact=0;
   if(stoppingToExit){y=0;keys|=BRAKE;}
@@ -1498,7 +1539,7 @@ void tick(U keys){
  if((tap&USE)&&(keys&BRAKE)&&p.car<0&&npc_open_near())tap&=~USE;
  if(vd_frame(keys,tap))tap&=~(USE|ENTER);
  night_garage_street(tap);if(scene!=1)return;
- if((tap&USE)&&!job_use_street()&&!night_phone_action(tap)&&!night_venue_vendor_entry(tap)){
+ if((tap&USE)&&!job_use_street()&&!harbor_jobs_use(tap)&&!night_phone_action(tap)&&!night_venue_vendor_entry(tap)){
   if(p.car>=0)vehicle_use(-1);
   else {
    StreetUse target=street_use_target(by,near);
@@ -1513,9 +1554,11 @@ void tick(U keys){
  }
  npc_encounter_tick(dt);
  if(scene!=1)return;
+ harbor_jobs_tick(dt);
  if(job.kind==1&&taxi.phase>=TAXI_RIDING&&p.car!=taxi.ride)taxi_tick(0);
  p.quiet-=dt;if(p.quiet<=0&&p.heat>0){float rate=p.car>=0?26:19;p.heat-=dt*rate;if(p.heat<0)p.heat=0;}
  update_camera_lead();
+ woodline_wild_tick(dt);if(p.dead)return;
  district_notice_tick(dt);
  npcTick(dt);
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0){fx[i].t-=dt;fx[i].x+=fx[i].vx*dt;fx[i].y+=fx[i].vy*dt;}
@@ -1533,33 +1576,11 @@ void pointer_input(int sx,int sy,U clicks){
  if(scene==1&&mapOn&&!p.dead)navigation_pointer(sx,sy,clicks);
 }
 
+static int outer_walk_count(void);
+static int outer_walk_pose(int,float*,float*,float*,int*,U*);
+static U headlamps_ground(U,int,int);
 static int sx(float x){return(int)x-cx;}static int sy(float y){return(int)y-cy;}
-static int beam_block(int x,int y){return (U)x>=ROOM||(U)y>=ROOM||roofMask[y*ROOM+x]||(outer_is_new(x,y)&&!outer_onroad(x,y));}
-/* Both camera modes consume the same wall-clipped lamp footprint. */
-static void road_beam_rays(const Car*c,float co,float si,int range,int rays[17]){
- for(int ray=0;ray<17;ray++){float side=(ray-8)*.047f;int d;
-  for(d=12;d<range;d+=3){
-   if(beam_block((int)(c->x+co*d-si*side*d),(int)(c->y+si*d+co*side*d)))break;
-  }rays[ray]=d;
- }
-}
-static void projectLights(Car*c){
- if(fastGfx||c->cond<=0)return;
- int x=sx(c->x),y=sy(c->y);if(x<-95||y<-95||x>W+95||y>H+95)return;
- float co=cs(c->a),si=sn(c->a);int range=61+(c->cond*19)/100;
- int rays[17];road_beam_rays(c,co,si,range,rays);
- int x1=x+(int)(co*range),y1=y+(int)(si*range),edge=range*3/8+3;
- for(int py=max(0,min(y,y1)-edge);py<=min(H-1,max(y,y1)+edge);py++)for(int px=max(0,min(x,x1)-edge);px<=min(W-1,max(x,x1)+edge);px++){
-  float dx=px-x,dy=py-y,forward=dx*co+dy*si;if(forward<12||forward>=range)continue;
-  float side=(dy*co-dx*si)/forward;
-  float width=absf(side);if(width>.37f)continue;
-  int ray=cl((int)(side/.047f+8.5f),0,16);
-  if(forward>rays[ray]||beam_block(px+cx,py+cy))continue;
-  int intensity=(int)((range-forward)*9/range*(1-width/.39f));if(intensity<1)continue;
-  U b=pixels[py*W+px];int r=min(255,((b>>16)&255)+intensity*15),g=min(255,((b>>8)&255)+intensity*11),bl=min(255,(b&255)+intensity*5);
-  pixels[py*W+px]=RGB(r,g,bl);
- }
-}
+static void headlamps_overhead(void);
 #include "model_vehicle.inc"
 #include "night_vehicles.inc"
 static void carbody(Car*c,int x,int y){
@@ -1571,7 +1592,7 @@ static void carbody(Car*c,int x,int y){
  if(c->owner==1&&p.car<0){line(x-4,y-18,x,y-14,LIME);line(x,y-14,x+4,y-18,LIME);}
 }
 typedef struct{int x,y;}Pt;
-static int previewRig;
+static int previewRig,streetPersonNoShadow;
 /* Keep the gameplay feet on the same world point. Scale the articulated
  * positions, not the completed bitmap: 1 px details retain sharp ink.
  * The full-size portrait and world-facing arrow use the unchanged rig. */
@@ -1614,7 +1635,7 @@ static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,
  }
  U seam=mix(jacket,ink,4),rim=mix(jacket,PAPER,3);
  if(previewRig)rect(x-6,y+2,13,2,0x151d27);
- else for(int dy=-3;dy<=3;dy++){
+ else if(!streetPersonNoShadow)for(int dy=-3;dy<=3;dy++){
   int half=person_offset(7-(dy<0?-dy:dy)),row=y+person_offset(3+dy);
   line(x+2-half,row,x+2+half,row,0x19232b);
  }
@@ -1836,6 +1857,9 @@ static void bake_scenery(void){
  for(int i=0;i<LEN(outerNodes);i++){
   StreetLamp fixture;if(street_lamp_outer(i,&fixture))street_lamp_bake(&fixture);
  }
+ for(int i=0;i<HARBOR_LAMPS;i++){
+  StreetLamp fixture;if(street_lamp_harbor(i,&fixture))street_lamp_bake(&fixture);
+ }
  surface=pixels;rw=W;rh=H;clipLeft=clipTop=0;clipRight=W;clipBottom=H;
 }
 static void diamond(int x,int y,int r,U c){line(x-r,y,x,y-r,c);line(x,y-r,x+r,y,c);line(x+r,y,x,y+r,c);line(x,y+r,x-r,y,c);}
@@ -1914,7 +1938,7 @@ static void hud(void){
  box(650,16,294,79,DARK,0x415766);
  draw_wallet(650,16,294);
  rect(845,70,82,6,0x34434b);rect(845,70,p.hp*82/100,6,0x6ea7ee);
- if(p.car>=0){vehicle_condition_text(append(v,"CAR "),cars+p.car);textat(670,64,v,vehicle_hp(cars+p.car)<120?GOLD:MUTED,0);}else textat(670,64,pistol_equipped()?"PULSE":"FISTS",MUTED,0);
+ if(p.car>=0){vehicle_condition_text(append(v,"CAR "),cars+p.car);textat(670,64,v,vehicle_hp(cars+p.car)<120?GOLD:MUTED,0);}else if(harbor_boat_active())textat(670,64,"AT THE HELM",TEAL,0);else textat(670,64,pistol_equipped()?"PULSE":"FISTS",MUTED,0);
  int h=(p.heat>15)+(p.heat>80)+(p.heat>150);
  if(h>0){textat(761,64,"HEAT",PINK,0);for(int i=0;i<h;i++)diamond(813+i*9,76,3,PINK);}
  else if(p.heat>0)textat(761,64,"CLEARING",PINK,0);
@@ -1928,6 +1952,11 @@ static void hud(void){
   textat(688,124,v,PAPER,0);
  }
  if(atmOpen>=0)return; /* A terminal has its own action and receipt rows. */
+ if(harbor_boat_active()){
+  if(p.noticeT>0)street_toast();
+  if(saveFlash)textat(18,508,saveFlash>0?"SAVED ON SHORE":"SAVE ERROR",saveFlash>0?TEAL:PINK,0);
+  return;
+ }
  const char*use=job_street_prompt();
  if(!use&&p.car>=0)use=stoppingToExit?"BRAKING  /  HOLD E":absf(cars[p.car].s)>STREET_EXIT_SPEED?"HOLD E  BRAKE AND EXIT":"E  EXIT CAR";
  else if(!use){
@@ -1955,7 +1984,7 @@ static const GuideBinding guideStreet[]={
  {"WASD/ARROWS","Move or steer"},{"SHIFT","Sprint / handbrake"},
  {"E","Use / talk / board"},{"ENTER","Confirm / ride tram"},
  {"HOLD E","Brake to exit at speed"},{"X / SPACE","Punch / attack"},
- {"T / Q / R","Taxi: accept / quote / receipt"},{"TAB / V","Wheel / med patch"},
+ {"T / Q / R","Call / quote / receipt"},{"TAB / V","Wheel / med patch"},
  {"SHIFT + E","Talk at shared prompt"},{"C","Switch driving view"}
 },guideCareer[]={
  {"M","Open / close atlas"},{"F8","City / region in atlas"},
@@ -1991,7 +2020,11 @@ static void field_guide(void){
 #include "streetside_interiors.inc"
 #include "profiles.inc"
 typedef struct{int x,y,kind,id;} StreetSprite;
-enum{SPRITE_CAR,SPRITE_PED,SPRITE_RIDER,SPRITE_HERO,SPRITE_TREE,SPRITE_ATM,SPRITE_NIGHT_RIDER};
+enum{SPRITE_CAR,SPRITE_PED,SPRITE_RIDER,SPRITE_HERO,SPRITE_TREE,SPRITE_ATM,SPRITE_WOOD,SPRITE_OUT_PERSON,SPRITE_NIGHT_RIDER};
+static float nw_dark(void);
+static U nw_blend(U,U,int);
+#include "street_people.inc"
+#include "woodline_art.inc"
 static void add_sprite(StreetSprite*list,int*count,int x,int y,int kind,int id){
  if(x<cx-44||x>cx+W+44||y<cy-44||y>cy+H+44)return;
  int i=(*count)++;
@@ -2025,8 +2058,7 @@ static void night_city_actors(void){
   if((unsigned)x<W&&(unsigned)y<H){
    for(int i=0;i<count;i++){
     int px=wx-21-(i%4)*16,py=wy+16+(i/4)*13;
-    if(!solid(px,py,5))person(sx(px),sy(py),i%3?0x887392:0x76a7ac,
-                               (int)(sn(anim*(3+i*.4f))*2),-1.5708f,0,i);
+    if(!solid(px,py,5))night_club_queue_paint(sx(px),sy(py),i);
    }
    if(count>=4){rect(x-73,y+34,50,2,0xc39870);disc(x-73,y+34,2,GOLD);disc(x-23,y+34,2,GOLD);}
   }
@@ -2043,14 +2075,19 @@ static void night_city_actors(void){
 static void draw_street_actors(void){
  vd_cross_paint();
  /* A viewport including sprite margins covers at most 6 x 4 city blocks. */
- static StreetSprite list[LEN(cars)+LEN(peds)+3+6*4*8+LEN(bankAtms)];int count=0;
+ static StreetSprite list[LEN(cars)+LEN(peds)+2+6*4*8+LEN(bankAtms)+LEN(woodProps)+SP_OUT_MAX+1];int count=0;
+ StreetPerson actor;
  for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))add_sprite(list,&count,cars[i].x,cars[i].y,SPRITE_CAR,i);
- for(int i=0;i<LEN(peds);i++)if(peds[i].hp>0||peds[i].life>0)
-  add_sprite(list,&count,peds[i].x,peds[i].y,SPRITE_PED,i);
- if((job.kind==JOB_TAXI&&taxi.phase!=TAXI_RIDING)||(taxi.phase==TAXI_WALKING&&taxi.linger>0))
-  add_sprite(list,&count,taxi.x,taxi.y,SPRITE_RIDER,0);
- float nx,ny;if(ncr_ped(&nx,&ny))add_sprite(list,&count,nx,ny,SPRITE_NIGHT_RIDER,0);
- if(p.car<0&&!p.dead)add_sprite(list,&count,p.x,p.y,SPRITE_HERO,0);
+ for(int i=0;i<LEN(peds);i++){
+  if(street_ped_pose(i,&actor))add_sprite(list,&count,actor.x,actor.y,SPRITE_PED,i);
+  else if(peds[i].hp<=0&&peds[i].life>0&&!npc_replaces(N_ACT_STREET+i))add_sprite(list,&count,peds[i].x,peds[i].y,SPRITE_PED,i);
+ }
+ if(street_rider_pose(&actor))add_sprite(list,&count,actor.x,actor.y,SPRITE_RIDER,0);
+ for(int i=0;i<min(SP_OUT_MAX,outer_walk_count());i++)
+  if(street_outer_pose(i,&actor))add_sprite(list,&count,actor.x,actor.y,SPRITE_OUT_PERSON,i);
+ int nightMarker;
+ if(street_night_rider_pose(&actor,&nightMarker))add_sprite(list,&count,actor.x,actor.y,SPRITE_NIGHT_RIDER,nightMarker);
+ if(p.car<0&&!p.dead&&!harbor_boat_active())add_sprite(list,&count,p.x,p.y,SPRITE_HERO,0);
  for(int gy=cl((cy-44)/256,0,7);gy<=cl((cy+H+44)/256,0,7);gy++)
   for(int gx=cl((cx-44)/256,0,7);gx<=cl((cx+W+44)/256,0,7);gx++){
    const BlockScenery*block=scenery+gy*8+gx;
@@ -2059,9 +2096,15 @@ static void draw_street_actors(void){
    }
   }
  for(int i=0;i<LEN(bankAtms);i++)add_sprite(list,&count,bankAtms[i].x,bankAtms[i].y,SPRITE_ATM,i);
+ for(int i=0;i<woodPropN;i++)add_sprite(list,&count,woodProps[i].x,woodProps[i].y,SPRITE_WOOD,i);
+ /* Ground-only layer first. A closer shadow never paints across a
+    previously drawn standing figure, even when two paths cross. */
+ for(int j=0;j<count;j++)if(list[j].kind==SPRITE_PED||list[j].kind==SPRITE_RIDER||list[j].kind==SPRITE_OUT_PERSON||list[j].kind==SPRITE_NIGHT_RIDER)
+  street_person_shadow(list[j].x,list[j].y);
  for(int j=0;j<count;j++){
   StreetSprite v=list[j];int x=v.x-cx,y=v.y-cy;
   switch(v.kind){
+  case SPRITE_WOOD:woodline_draw_prop(woodProps+v.id,x,y);break;
   case SPRITE_TREE:tree_crown(x,y-7,v.id);break;
   case SPRITE_ATM:atm_kiosk(x,y);break;
   case SPRITE_CAR:carbody(cars+v.id,x,y);break;
@@ -2073,27 +2116,29 @@ static void draw_street_actors(void){
    }else person(x,y,jacket,player_gait(),p.a,MODEL_PLAYER,3);
    break;}
   case SPRITE_RIDER:{
-   if(npc_replaces(N_ACT_RIDER+taxi.rider))break;
-   float px=taxi.x,py=taxi.y,a=taxi.a;
-   int step=taxi.phase==TAXI_WAIT?0:(int)(sn(anim*(15.f*FOOT_PACE))*5);
-   npc_present_pose(N_ACT_RIDER+taxi.rider,&px,&py,&a,&step);
-   person((int)px-cx,(int)py-cy,riders[taxi.rider].outfit,step,a,0,riders[taxi.rider].face);
-   if(job.kind==JOB_TAXI){center(x,y-36,riders[taxi.rider].name,0xe2b3ff,0);diamond(x,y+5,8,0xb988f2);}break;}
-  case SPRITE_NIGHT_RIDER:ncr_street_person(x,y);break;
-  case SPRITE_PED:{
-   int i=v.id;Ped*q=peds+i;if(npc_replaces(N_ACT_STREET+i))break;
-   if(q->hp<=0){line(x-6,y-3,x+6,y+3,0x815763);disc(x-7,y-4,3,0x85757b);break;}
-   U c=pedHit[i]>0?0xffdfbc:q->role==1?(dispatch_posted(i)?0x668df0:(((int)(anim*9)&1)?0x668df0:PINK)):q->role==2?PINK:(i%2)?0x92b7b4:0xca8c71;
-   float px=q->x,py=q->y,a=q->a;
-   int step=q->s<=2?0:(int)(sn(anim*FOOT_PACE*(q->role?16.f:11.f)+i)*4);
-   if(npc_present_pose(N_ACT_STREET+i,&px,&py,&a,&step)&&q->role==1)c=0x668df0;
-   person((int)px-cx,(int)py-cy,c,step,a,q->role,i);break;}
+   if(!street_rider_pose(&actor))break;
+   street_person_draw(&actor);
+   if(job.kind==JOB_TAXI){center(x,y-36,riders[taxi.rider].name,0xe2b3ff,0);diamond(x,y+5,8,0xb988f2);}
+   continue;}
+  case SPRITE_NIGHT_RIDER:{
+   int marker;
+   if(street_night_rider_pose(&actor,&marker)){street_person_draw(&actor);if(marker)diamond(x,y+5,8,0xf18acb);}
+   continue;}
+  case SPRITE_OUT_PERSON:
+   if(street_outer_pose(v.id,&actor))street_person_draw(&actor);
+   continue;
+  case SPRITE_PED:
+   if(street_ped_pose(v.id,&actor)){street_person_draw(&actor);continue;}
+   /* Downed combat actors are deliberately on the ground. */
+   if(peds[v.id].hp<=0)street_person_downed(x,y,v.id);
+   break;
   }
-  if(v.kind!=SPRITE_TREE&&v.kind!=SPRITE_ATM)cover_behind_buildings(v.x,v.y);
+  if(v.kind!=SPRITE_TREE&&v.kind!=SPRITE_ATM&&v.kind!=SPRITE_WOOD)cover_behind_buildings(v.x,v.y);
  }
 }
 /* The field guide is an overlay. Pass its previous view to the renderer
  * without changing the authoritative scene or resuming simulation. */
+#include "harbor_raster.inc"
 static void paint_world(int view){
  if(view==3){interior_paint();if(scene!=2)night_venues_hint();return;}
  if(view==4){
@@ -2108,6 +2153,7 @@ static void paint_world(int view){
  if(view==NIGHT_GARAGE_SCENE){night_garage_paint();return;}
  if(view==NIGHT_VENUES_SCENE){night_venues_paint();return;}
  if(view==NIGHT_TRAP_SCENE){night_trap_paint();return;}
+ if(view==NIGHT_FOREST_SCENE){woodline_paint();return;}
  if(mapOn){minimap();return;}
  cx=camera_left();cy=camera_top();
  int introVenue=job.kind<0&&vdActive<0&&!ncr_active()?nav_intro_venue():-1;
@@ -2115,12 +2161,13 @@ static void paint_world(int view){
  typedef U V4 __attribute__((vector_size(16),aligned(1),may_alias));
  for(int y=0;y<H;y++){const V4 *q=(const V4*)(city+(cy+y)*ROOM+cx);V4 *r=(V4*)(pixels+y*W);for(int x=0;x<W/4;x++)r[x]=q[x];}
  roadFX_paint(cx,cy);
- night_world_street_fx();
- night_phone_road_paint();night_trap_street_paint();
+ night_world_street_fx();harbor_paint_world();
+ night_phone_road_paint();night_trap_street_paint();woodline_street_paint();
  cab_marquee_paint();
- for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(i==p.car||absf(cars[i].s)>9)projectLights(cars+i);
+ headlamps_overhead();
  draw_street_actors();outer_life_paint();night_city_actors();
- night_phone_contact_paint();npc_body_paint(cx,cy);vd_world();
+ night_phone_contact_paint();npc_body_paint(cx,cy);woodline_wild_paint();harbor_boats_paint();vd_world();
+ harbor_jobs_world_paint();
  atm_kiosk_hint();
  int x=sx(p.x),y=sy(p.y);
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0)disc(sx(fx[i].x),sy(fx[i].y),2,fx[i].c);
@@ -2197,12 +2244,16 @@ static void paint_world(int view){
   if(px>=34&&px<=W-34&&py>=97&&py<=H-70&&!(px>=750&&py>=333)){
    box(px-21,py-9,43,18,0x29202d,0xf18acb);diamond(px,py,8,0xf18acb);
   }else {int ax=cl(px,31,W-32),ay=cl(py,148,H-72);if(ax>=750&&ay>=333)ax=730;mark(ax,ay,8,0xf18acb);}
- }else if(job.kind<0&&vdActive<0&&night_phone_route(&phoneX,&phoneY)){
+ }else if(job.kind<0&&vdActive<0&&harbor_jobs_route(&phoneX,&phoneY)){
+  int px=sx(phoneX),py=sy(phoneY);ng_cam_point(&px,&py);
+  if(px>=34&&px<=W-34&&py>=97&&py<=H-70&&!(px>=750&&py>=333))diamond(px,py,10,0x83dff2);
+  else{int ax=cl(px,31,W-32),ay=cl(py,148,H-72);if(ax>=750&&ay>=333)ax=730;mark(ax,ay,8,0x83dff2);}
+ } else if(job.kind<0&&vdActive<0&&night_phone_route(&phoneX,&phoneY)){
   int px=sx(phoneX),py=sy(phoneY);ng_cam_point(&px,&py);
   if(px>=34&&px<=W-34&&py>=97&&py<=H-70&&!(px>=750&&py>=333))diamond(px,py,10,0xff9adb);
   else {int ax=cl(px,31,W-32),ay=cl(py,148,H-72);if(ax>=750&&ay>=333)ax=730;mark(ax,ay,8,0xff9adb);}
  }
- hud();night_world_hud();minimap();ng_gate_overlay();ch_badge();night_trap_hint();district_notice_paint();
+ hud();night_world_hud();minimap();ng_gate_overlay();ch_badge();night_trap_hint();district_notice_paint();woodline_hint();woodline_wild_hint();harbor_boats_hint();harbor_jobs_hint();
  if(scene==1&&menu<0&&p.car<0&&!p.dead&&job.kind<0&&vdActive<0&&!vdPanel&&atmOpen<0){
   int x,y;if(night_venue_vendor_pos(&x,&y)&&d2(p.x-x,p.y-y)<42*42){
    box(317,486,326,29,DARK,0xf6aada);center(W/2,489,"E   NIGHT SIGNAL VAN",0xf6aada,0);
@@ -2227,6 +2278,7 @@ void paint(void){
 
 #include "verdict_activities.inc"
 #include "npc_encounter.inc"
+static int npc_gate_street_use(void){return npcTalkOn||npcEnc.phase!=NPC_IDLE;}
 #include "night_world.inc"
 #if __has_include("night_club.inc")
 #include "night_club.inc"
@@ -2244,6 +2296,7 @@ static void night_club_tick(U k,U t){(void)k;(void)t;}
 static void night_club_paint(void){}
 static int night_club_track(void){return 0;}
 static int night_club_queue(void){return 0;}
+static void night_club_queue_paint(int x,int y,int i){(void)x;(void)y;(void)i;}
 static int night_club_signature_demand(int n){(void)n;return -1;}
 static void night_club_business_tick(void){}
 static void night_club_pointer(int x,int y,U c){(void)x;(void)y;(void)c;}
@@ -2292,6 +2345,8 @@ static int np_closed(void){return 0;}
 static int night_phone_lane_stop(float x,float y,float a,float b,int radius){(void)x;(void)y;(void)a;(void)b;(void)radius;return 0;}
 #endif
 #include "night_trap.inc"
+#include "night_forest.inc"
+#include "woodline_wildlife.inc"
 #if __has_include("night_venues.inc")
 #include "night_venues.inc"
 #else
@@ -2338,7 +2393,11 @@ int exit_save_ok(void){
 
 
 #include "outer_life.inc"
+#include "headlamps.inc"
 #include "chase_view.inc"
+#include "harbor_boats.inc"
+#include "harbor_jobs.inc"
+
 /* Optional platform timing signpost. The regular paint path never calls
  * this, and the host draws it only while the player has opted in. */
 void frame_probe_banner(const char*label,U ink){

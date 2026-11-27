@@ -142,8 +142,7 @@ static int ncr_near(void){
 static void ncr_actor(int i){
  if(i==NCR_VOCALIST&&ncr_active())return;
  const NcRegular*r=ncr_cast+i;int close=(ncPanel==NC_REGULAR&&ncr_contact==i)||ncr_near()==i;
- float a=close?look(ncX-r->x,ncY-r->y):1.57f+.32f*sn(anim+i);
- person(r->x,r->y,r->coat,0,a,r->model,r->hue);
+ nc_regular_sprite(i,r->x,r->y,close);
  if(close)nc_label(r->x,r->y-43,r->name,i==NCR_PROMOTER?ncGold:ncIce);
  else disc(r->x,r->y-34,2,i==NCR_PROMOTER?ncGold:ncIce);
 }

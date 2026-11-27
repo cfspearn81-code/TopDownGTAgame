@@ -1,16 +1,18 @@
-# Dead Channel | Crossroads Street Life
+# Dead Channel | Woodline & Lantern Quay Stability
 
-**Latest: Street Life Stability Update.** See [the merged QA report](docs/STABILITY-UPDATE.md) for the six one-hour playtests, verified fixes and remaining ideas.
+The latest native build combines [Street Life Stability](docs/STABILITY-UPDATE.md)
+with [Greyreed Wood](docs/WOODLINE.txt) and the [Lantern Quay harbor](docs/LANTERN-QUAY.txt).
+See [integration and save compatibility](docs/WOODLINE-STABILITY.md).
 
-**Street Life update:** The nine follow-ups from the [Crossroads QA verdict](docs/CROSSROADS-QA.md) are in this build. See [what changed and how to use it](docs/STREET-LIFE.md).
+- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Woodline-Lantern-Quay-Stability-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
+- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Woodline-Lantern-Quay-Stability-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2.
+- [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt).
 
-An original top-down PC action and driving game. Crossroads combines the
-published Conversation Hold Hotfix with the expanded Outer Loop and
-Base Village. The Street Life launchers read **Dead Channel | Crossroads Street Life**.
+Use **M**, then **F8**, for Greyreed Wood and Lantern Quay. Use Signal
+(**P** or **F7**) to open Night Wire commissions. **E** boards at a dock;
+**Shift** slows the launch. Existing Street Life, Crossroads and other
+[releases remain in downloads](downloads/).
 
-- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Street-Life-Stability-Update-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
-- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Street-Life-Stability-Update-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2 runtime.
-- [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt) · [Compatibility and testing](docs/CROSSROADS.txt).
 
 **Base Village:** Leave Apartment 4 and walk straight left to the pink
 Afterimage marquee. Press **E** to enter directly. Vault 39 is still its
@@ -100,6 +102,6 @@ the target saves before copying between platforms. No automatic sync.
 Linux automated testing runs the exact ELF using SDL's software renderer and
 dummy video driver. Windows automated testing runs the exact PE with simulated
 Win32 on Linux. Interactive desktop/physical Windows testing remains open.
-Package the verified builds with `python3 scripts/package-street-life-stability.py`. The archived copies of these documents reflect the original direct handoff.
+Package verified builds with `python3 scripts/package-woodline-stability.py`.
 Before publishing another build, update [HANDOFF.md](HANDOFF.md) for the next
 maintainer and verify the matching archives/checksums.

@@ -28,7 +28,7 @@ static const StreetLoop streetLoops[]={
 typedef struct {int live,loop,next;float pace;} StreetDriver;
 enum{STREET_LEAVE,STREET_EN_ROUTE,STREET_ARRIVE};
 typedef struct {float x,y,cx,cy;} StreetAddress;
-typedef struct {int goal,visits,cross,leg;float tx,ty,mx,my,ax,ay,pause,crossX,crossY,blocked;} StreetWalk;
+typedef struct {int goal,visits,cross,leg;float tx,ty,mx,my,ax,ay,pause,crossX,crossY,blocked,fromX,fromY,stalled,crossWait;int detour,axis;} StreetWalk;
 static StreetDriver streetDrivers[LEN(cars)];
 static StreetWalk streetWalks[DISPATCH_FIRST+DISPATCH_UNITS];
 static int streetJunctionOwner[64];
@@ -54,9 +54,9 @@ static int street_clip_axis(float pos,float delta,float low,float high,float*t0,
 static int street_line_open(float x,float y,float tx,float ty,float radius){
  if(x<35||y<35||tx<35||ty<35||x>ROOM-36||y>ROOM-36||tx>ROOM-36||ty>ROOM-36)return 0;
  float dx=tx-x,dy=ty-y;
- if(outer_is_new(x,y)||outer_is_new(tx,ty)){
+ if(outer_is_new(x+radius,y+radius)||outer_is_new(tx+radius,ty+radius)){
   int steps=1+(int)((absf(dx)+absf(dy))/4.f);
-  for(int i=0;i<=steps;i++)if(!outer_area(x+dx*i/steps,y+dy*i/steps,radius))return 0;
+  for(int i=0;i<=steps;i++)if(!outer_walkable(x+dx*i/steps,y+dy*i/steps,radius))return 0;
  }
  for(int yy=cl((int)((dy<0?ty:y)-radius)/256,0,7);yy<=cl((int)((dy>0?ty:y)+radius)/256,0,7);yy++)
   for(int xx=cl((int)((dx<0?tx:x)-radius)/256,0,7);xx<=cl((int)((dx>0?tx:x)+radius)/256,0,7);xx++){
@@ -437,21 +437,55 @@ static void street_civ_goal(int i){
  StreetAddress a=street_venue_address(w->goal,i+w->visits);
  w->ax=a.x;w->ay=a.y;w->tx=a.cx;w->ty=a.cy;
 }
+static int street_civ_spawn_room(int i,int slots,float x,float y){
+ if(!street_foot_clear(x,y,-1))return 0;
+ for(int j=0;j<slots;j++)if(i!=j&&peds[j].hp>0&&d2(peds[j].x-x,peds[j].y-y)<17.f*17.f)return 0;
+ return 1;
+}
+static int street_civ_find_spawn(int i,int slots,int site,int offscreen,StreetAddress*out){
+ StreetAddress a=street_venue_address(site,i);
+ if((!offscreen||!street_on_camera(a.x,a.y))&&street_civ_spawn_room(i,slots,a.x,a.y)){*out=a;return 1;}
+ /* Keep the named storefront catchments but place later walkers down
+  * the same sidewalk instead of stacking on identical shop coordinates. */
+ for(int n=1;n<=7;n++)for(int try=0;try<4;try++){
+  int axis=(try/2+!!(i&2))%2,sign=(try+i)%2?1:-1;
+  float x=a.x+(axis?0:17.f*n*sign),y=a.y+(axis?17.f*n*sign:0);
+  float cross=axis?x:y;
+  if(absf(cross-street_nearest_line(cross))<STREET_WALK-1.f)continue;
+  /* Never spawn in the middle of a crosswalk or route through a facade. */
+  float dist=axis?y:x;if(absf(dist-street_nearest_line(dist))<STREET_WALK-2.f)continue;
+  if((offscreen&&street_on_camera(x,y))||!street_civ_spawn_room(i,slots,x,y))continue;
+  float cx=axis?x:a.cx,cy=axis?a.cy:y;
+  if(!street_line_open(x,y,cx,cy,4)||absf(x-cx)+absf(y-cy)>166.f)continue;
+  *out=(StreetAddress){x,y,cx,cy};return 1;
+ }
+ return 0;
+}
 static void street_spawn_civilian_at(int i,int address,StreetAddress a){
  peds[i]=(Ped){a.x,a.y,0,0,2,0,0,0,0};
  StreetWalk*w=streetWalks+i;
- *w=(StreetWalk){.goal=(address+1+i%5)%LEN(loc),.leg=STREET_LEAVE,.mx=a.cx,.my=a.cy,.pause=(i%6)*.38f};
+ *w=(StreetWalk){.goal=(address+1+i%5)%LEN(loc),.leg=STREET_LEAVE,.mx=a.cx,.my=a.cy,.fromX=a.x,.fromY=a.y,
+  .pause=(i%6)*.38f,.axis=(i/LEN(loc))&1};
  street_civ_goal(i);
 }
 static void street_spawn_civilian(int i){
  int address=i%LEN(loc);
- street_spawn_civilian_at(i,address,street_venue_address(address,i));
+ StreetAddress a;
+ for(int k=0;k<LEN(loc);k++){
+  int s=(address+k)%LEN(loc);
+  if(street_civ_find_spawn(i,i,s,0,&a)){street_spawn_civilian_at(i,s,a);return;}
+ }
+ /* No camera-dependent drops: a bounded curb-grid scan finds a legal
+  * alternative even if every authored venue was temporarily saturated. */
+ for(int y=1;y<8;y++)for(int x=1;x<8;x++)for(int k=0;k<4;k++){
+  float cx=x*256.f+(k&1?38:-38),cy=y*256.f+(k&2?38:-38);
+  if(street_civ_spawn_room(i,i,cx,cy)){street_spawn_civilian_at(i,address,(StreetAddress){cx,cy,cx,cy});return;}
+ }
 }
 static int street_respawn_civilian(int i){
  for(int n=0;n<LEN(loc);n++){
-  int address=(i+n)%LEN(loc);
-  StreetAddress a=street_venue_address(address,i+n);
-  if(!street_on_camera(a.x,a.y)&&street_foot_clear(a.x,a.y,-1)){
+  int address=(i+n)%LEN(loc);StreetAddress a;
+  if(street_civ_find_spawn(i,STREET_CIVILIANS,address,1,&a)){
    street_spawn_civilian_at(i,address,a);return 1;
   }
  }
@@ -516,29 +550,129 @@ static void street_walk_step(Ped*q,StreetWalk*w,float dt,float speed){
   w->mx=w->crossX;w->my=w->crossY;w->cross=2;w->blocked=0;w->pause=.15f;
  }
 }
+static int street_civ_gap(const Ped*q,float x,float y){
+ for(int j=0;j<LEN(peds);j++){
+  const Ped*r=peds+j;if(r==q||r->hp<=0)continue;
+  if(absf(r->x-x)>13.f||absf(r->y-y)>13.f||npc_replaces(N_ACT_STREET+j))continue;
+  float after=d2(r->x-x,r->y-y),before=d2(r->x-q->x,r->y-q->y);
+  if(after<12.f*12.f&&after<before-.0005f)return 0;
+ }
+ return 1;
+}
+static int street_civ_cede_zebra(Ped*q,StreetWalk*w,float dt){
+ if(w->cross)return 0;
+ for(int j=0;j<LEN(streetWalks);j++){
+  const Ped*r=peds+j;const StreetWalk*z=streetWalks+j;
+  if(r==q||r->hp<=0||!z->cross||!street_is_walker(j))continue;
+  if(d2(z->mx-q->x,z->my-q->y)>12.4f*12.4f||d2(r->x-q->x,r->y-q->y)>31.f*31.f)continue;
+  /* Give an existing crossing pedestrian space to exit. Normal traffic
+   * queue ordering resumes at the exact curb point after they pass. */
+  float dx=z->mx-z->crossX,dy=z->my-z->crossY;
+  if(z->cross==2){dx=z->mx-r->x;dy=z->my-r->y;}
+  float sideX=absf(dy)>absf(dx)?1.f:0,sideY=1.f-sideX,step=dt*27.f;
+  for(int n=1;n>=-1;n-=2){
+   float x=q->x+n*sideX*step,y=q->y+n*sideY*step;
+   float curb=sideX?x:y;
+   if(absf(curb-street_nearest_line(curb))<31.f||solid(x,y,4)||
+     !street_foot_car_clear(x,y,-1,3.f)||!street_civ_gap(q,x,y)||
+     d2(z->mx-x,z->my-y)<=d2(z->mx-q->x,z->my-q->y))continue;
+   q->x=x;q->y=y;q->a=look(n*sideX,n*sideY);q->s=27.f;return 1;
+  }
+ }
+ return 0;
+}
+static float street_civ_corner(float value,float target,int*cross){
+ float center=street_nearest_line(value),dir=target>value?1.f:-1.f;
+ float a=center-dir*STREET_WALK,b=center+dir*STREET_WALK;
+ /* A sidestep may finish a few meters shy of the exact authored curb.
+  * Walk there first rather than stepping a diagonal straight into traffic. */
+ if((target-b)*dir>=0&&(a-value)*dir>.45f)return a;
+ return street_corner_step(value,target,cross);
+}
+static int street_civ_cross_queue(const Ped*q,const StreetWalk*w){
+ float dx=w->mx-q->x,dy=w->my-q->y;
+ for(int j=0;j<LEN(streetWalks);j++){
+  const Ped*r=peds+j;if(r==q||r->hp<=0||!streetWalks[j].cross||!street_is_walker(j))continue;
+  float x=r->x-q->x,y=r->y-q->y;
+  if(absf(dx)>absf(dy)){
+   if(absf(y)<11.f&&x*dx>0&&absf(x)<absf(dx)+4.f)return 1;
+  }else if(absf(x)<11.f&&y*dy>0&&absf(y)<absf(dy)+4.f)return 1;
+ }
+ return 0;
+}
+static int street_civ_yield(Ped*q,StreetWalk*w,float dt,float speed){
+ float dx=w->mx-q->x,dy=w->my-q->y,n=sq(d2(dx,dy));if(n<.001f)return 0;
+ float stride=speed*FOOT_PACE*dt;if(stride>n)stride=n;
+ float u=dx/n,v=dy/n,nx=q->x+u*stride,ny=q->y+v*stride;
+ if(street_civ_gap(q,nx,ny))return 0;
+ if(!w->cross&&w->leg==STREET_EN_ROUTE){
+  /* A crowded sidewalk can be wider on the storefront or on the curb
+   * side. Try a polite step to the right, then the left, never the lane. */
+  for(int side=1;side>=-1;side-=2){
+   float x=q->x+(u*.12f-v*side)*stride,y=q->y+(v*.12f+u*side)*stride;
+   float cross=absf(dx)>absf(dy)?y:x;
+   if(absf(cross-street_nearest_line(cross))<31.f||solid(x,y,4)||!street_civ_gap(q,x,y)||
+    !street_foot_car_clear(x,y,-1,3.f)||vd_cross_foot(q->x,q->y,x,y,3.f))continue;
+   q->x=x;q->y=y;q->a=look(u,v);q->s=speed*FOOT_PACE*.82f;return 1;
+  }
+ }
+ return 1; /* Let the lead walker occupy their space; don't overlap. */
+}
+static void street_civ_replan(int i){
+ Ped*q=peds+i;StreetWalk*w=streetWalks+i;
+ w->detour=1;w->mx=w->fromX;w->my=w->fromY;w->stalled=0;
+ w->pause=.25f+(i%5)*.08f;
+ /* If a blocker pinned the pedestrian at their previous marker, the
+  * ordinary target selector can choose a new route immediately. */
+ if(d2(q->x-w->mx,q->y-w->my)<.18f)w->pause=.47f;
+}
 static void street_tick_civilian(int i,float dt){
  Ped*q=peds+i;StreetWalk*w=streetWalks+i;q->s=0;
+ if(street_civ_cede_zebra(q,w,dt))return;
  if(w->pause>0){w->pause-=dt;return;}
  if(d2(w->mx-q->x,w->my-q->y)<.18f){
-  q->x=w->mx;q->y=w->my;w->cross=0;w->blocked=0;
+  if(!street_civ_gap(q,w->mx,w->my)){
+   if(!w->cross&&(w->stalled+=dt)>2.1f+(i%6)*.22f)street_civ_replan(i);
+   return;
+  }
+  q->x=w->mx;q->y=w->my;w->cross=0;w->blocked=0;w->stalled=0;
+  if(w->detour){
+   w->detour=0;w->axis^=1;w->goal=(w->goal+3+i%4)%LEN(loc);w->visits++;
+   w->leg=STREET_EN_ROUTE;street_civ_goal(i);
+  }
   if(w->leg==STREET_LEAVE)w->leg=STREET_EN_ROUTE;
   if(w->leg==STREET_ARRIVE){
    w->mx=w->tx;w->my=w->ty;w->leg=STREET_LEAVE;
    w->goal=(w->goal+1+(i+w->visits++)%5)%LEN(loc);
+   w->axis=(i+w->visits+w->goal)&1;
    w->pause=1.6f+(i%5)*.55f;
    street_civ_goal(i);return;
   }
-  if(d2(w->tx-q->x,w->ty-q->y)<.18f){
+  w->fromX=q->x;w->fromY=q->y;
+  int dx=absf(q->x-w->tx)>.4f,dy=absf(q->y-w->ty)>.4f;
+  if(!dx&&!dy){
    /* Exact-corner destinations are already reached; keep them in the
     * arrival phase so their next tick begins the same pause as mid-block. */
    w->leg=STREET_ARRIVE;w->mx=w->ax;w->my=w->ay;
-  }else if(absf(q->x-w->tx)>.4f)w->mx=street_corner_step(q->x,w->tx,&w->cross);
-  else w->my=street_corner_step(q->y,w->ty,&w->cross);
-  if(!street_can_start_leg(q,w))return;
+  }else if(dx&&(!dy||!w->axis))w->mx=street_civ_corner(q->x,w->tx,&w->cross);
+  else w->my=street_civ_corner(q->y,w->ty,&w->cross);
+  if(w->cross){
+   if(street_civ_cross_queue(q,w)||!street_can_start_leg(q,w)){
+    w->mx=q->x;w->my=q->y;w->cross=0;w->pause=.22f+(i%5)*.05f;
+    if((w->crossWait+=.24f)>3.8f+(i%6)*.22f){w->crossWait=0;street_civ_replan(i);}
+    return;
+   }
+   w->crossWait=0;
+  }else w->crossWait=0;
  }
  float speed=w->cross?62.f:27.f+(i%6)*2.f;
  if(p.heat>35.f&&d2(p.x-q->x,p.y-q->y)<110.f*110.f)speed+=17.f;
- street_walk_step(q,w,dt,speed);
+ if(!street_civ_yield(q,w,dt,speed))street_walk_step(q,w,dt,speed);
+ else if(w->cross==1&&(w->blocked+=dt)>.62f){
+  w->mx=w->crossX;w->my=w->crossY;w->cross=2;w->blocked=0;w->pause=.20f;
+ }
+ if(q->s>0)w->stalled=0;
+ else if(!w->cross&&(w->stalled+=dt)>2.1f+(i%6)*.22f)street_civ_replan(i);
 }
 static void street_spawn(void){
  roadFX_reset();

@@ -1,9 +1,21 @@
 /* Add a small weighted road graph to the legacy grid router. Long routes
  * enter/exit at actual road joins; no straight line across cliffs/water. */
 enum{OUT_ATTACH_CAP=4};
+static int nav_force_road;
 typedef struct{int node,count,dist;NavPoint via[8];} OuterAttach;
 static const unsigned char outGates[]={0,14,29,52};
 static NavPoint nav_outer_point(int i){return (NavPoint){outerNodes[i].x,outerNodes[i].y};}
+static int nav_ribbon(NavPoint a,NavPoint b,int radius){
+ /* Graph joins, mileage and taxi paths follow asphalt even when
+    requested on foot. Off-road pedestrian routes have a separate solver. */
+ if(!nav_traversable(a,b,radius))return 0;
+ int steps=max(1,nav_dist(a,b)/6);
+ for(int i=0;i<=steps;i++){
+  float x=a.x+(b.x-a.x)*i/(float)steps,y=a.y+(b.y-a.y)*i/(float)steps;
+  if(outer_is_new(x,y)&&!outer_area(x,y,radius))return 0;
+ }
+ return 1;
+}
 static int nav_outer_attach(NavPoint p,OuterAttach att[OUT_ATTACH_CAP]){
  int n=0;
  if(!outer_is_new(p.x,p.y)){
@@ -17,12 +29,12 @@ static int nav_outer_attach(NavPoint p,OuterAttach att[OUT_ATTACH_CAP]){
  }else{
   int px=p.x,py=p.y,i=outer_nearest(p.x,p.y,&px,&py,100);
   if(i<0)return 0;
-  NavPoint mid={px,py};if(!nav_traversable(p,mid,5))return 0;
+  NavPoint mid={px,py};if(!nav_ribbon(p,mid,5))return 0;
   const OuterRoad*r=outerRoads+i;
   int nodes[]={r->a,r->b};
   for(int k=0;k<2;k++){
    int e=nodes[k];NavPoint q=nav_outer_point(e);
-   if(night_phone_lane_stop(mid.x,mid.y,q.x,q.y,4))continue;
+   if(!nav_ribbon(mid,q,5)||night_phone_lane_stop(mid.x,mid.y,q.x,q.y,4))continue;
    OuterAttach*a=att+n++;a->node=e;a->count=0;a->dist=nav_length(p,mid)+nav_length(mid,q);
    a->count=nav_append(a->via,a->count,p);a->count=nav_append(a->via,a->count,mid);
    a->count=nav_append(a->via,a->count,q);
@@ -60,15 +72,21 @@ static void nav_trim_retraces(void){
  }
  navCount=n;
 }
+#include "woodline_navigation.inc"
 static void nav_solve(NavPoint from,NavPoint to){
  if(!outer_is_new(from.x,from.y)&&!outer_is_new(to.x,to.y)){nav_solve_base(from,to);return;}
  OuterAttach start[OUT_ATTACH_CAP],end[OUT_ATTACH_CAP];
  int ns=nav_outer_attach(from,start),ne=nav_outer_attach(to,end);
  navCount=navDist=0;
- if(nav_traversable(from,to,10)&&!night_phone_lane_stop(from.x,from.y,to.x,to.y,4)){
+ if(p.car<0&&!nav_force_road&&((outer_is_new(from.x,from.y)&&!outer_area(from.x,from.y,10))||
+               (outer_is_new(to.x,to.y)&&!outer_area(to.x,to.y,10)))){
+  if(nav_walk_solve(from,to))return;
+  navCount=navDist=0;
+ }
+ if(nav_ribbon(from,to,10)&&!night_phone_lane_stop(from.x,from.y,to.x,to.y,4)){
   navNodes[0]=from;navNodes[1]=to;navCount=2;navDist=nav_length(from,to);return;
  }
- if(!ns||!ne)return;
+ if(!ns||!ne){if(p.car<0&&!nav_force_road)nav_walk_solve(from,to);return;}
  enum{N=LEN(outerNodes),INF=100000};
  int d[N],prev[N],which[N];unsigned char done[N];
  for(int i=0;i<N;i++){d[i]=INF;prev[i]=which[i]=-1;done[i]=0;}

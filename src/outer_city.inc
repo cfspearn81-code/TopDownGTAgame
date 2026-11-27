@@ -4,6 +4,8 @@ typedef struct {int x,y;} OuterPoint;
 typedef struct {unsigned char a,b,half,kind;} OuterRoad;
 enum{OUT_HILL,OUT_HWY,OUT_DOCK,OUT_WORKS,OUT_COUNTRY};
 enum{OUT_BL_BEGIN=0,OUT_HW_BEGIN=14,OUT_SH_BEGIN=29,OUT_S_BEGIN=49,OUT_W_BEGIN=52};
+enum {OUT_HQ_GATE=57,OUT_HQ_QUAY,OUT_HQ_LOT,OUT_HQ_YARD,OUT_HQ_FREIGHT,OUT_HQ_LOAD,
+      OUT_HQ_TURN,OUT_HQ_BANK,OUT_HQ_TIDE};
 static const OuterPoint outerNodes[]={
  {1792,512},{2048,512},{2144,482},{2197,411},{2263,382},{2332,421},{2388,471},
  {2460,481},{2530,437},{2598,380},{2690,384},{2770,452},{2800,568},{2752,707},
@@ -12,7 +14,9 @@ static const OuterPoint outerNodes[]={
  {1792,1792},{2048,1792},{2152,1766},{2272,1680},{2416,1663},{2512,1696},{2592,1756},
  {2704,1824},{2808,1858},{2864,1920},{2790,2016},{2682,2083},{2544,2176},{2384,2216},
  {2240,2280},{2200,2400},{2064,2496},{1920,2496},{1792,2432},{1792,2152},{1792,1792},
- {1712,2504},{1592,2464},{1024,1792},{1024,2144},{1136,2265},{1360,2321},{1520,2368}
+ {1712,2504},{1592,2464},{1024,1792},{1024,2144},{1136,2265},{1360,2321},{1520,2368},
+ {2856,2054},{2916,2070},{2950,2086},{2848,2114},{2824,2150},{2824,2192},
+ {2426,2285},{2463,2370},{2478,2451}
 };
 #define OR(a,b,w,k) {(a),(b),(w),(k)}
 static const OuterRoad outerRoads[]={
@@ -31,7 +35,11 @@ static const OuterRoad outerRoads[]={
  OR(41,42,42,OUT_DOCK),OR(42,43,41,OUT_DOCK),OR(43,44,39,OUT_DOCK),OR(44,45,43,OUT_DOCK),
  OR(45,46,43,OUT_DOCK),OR(46,47,39,OUT_DOCK),OR(47,48,42,OUT_DOCK),OR(48,29,33,OUT_DOCK),
  OR(47,50,39,OUT_COUNTRY),OR(50,51,38,OUT_COUNTRY),OR(51,56,36,OUT_COUNTRY),
- OR(52,53,33,OUT_COUNTRY),OR(53,54,35,OUT_COUNTRY),OR(54,55,37,OUT_COUNTRY),OR(55,56,37,OUT_COUNTRY)
+ OR(52,53,33,OUT_COUNTRY),OR(53,54,35,OUT_COUNTRY),OR(54,55,37,OUT_COUNTRY),OR(55,56,37,OUT_COUNTRY),
+ OR(39,OUT_HQ_GATE,25,OUT_DOCK),OR(OUT_HQ_GATE,OUT_HQ_QUAY,25,OUT_DOCK),
+ OR(OUT_HQ_QUAY,OUT_HQ_LOT,24,OUT_DOCK),OR(OUT_HQ_GATE,OUT_HQ_YARD,23,OUT_DOCK),
+ OR(OUT_HQ_YARD,OUT_HQ_FREIGHT,22,OUT_DOCK),OR(OUT_HQ_FREIGHT,OUT_HQ_LOAD,19,OUT_DOCK),
+ OR(42,OUT_HQ_TURN,24,OUT_DOCK),OR(OUT_HQ_TURN,OUT_HQ_BANK,24,OUT_DOCK),OR(OUT_HQ_BANK,OUT_HQ_TIDE,22,OUT_DOCK)
 };
 #undef OR
 typedef struct{int node;const char *label,*detail;U tint;} OuterLandmark;
@@ -41,7 +49,10 @@ static const OuterLandmark outerStops[]={
  {25,"BELT WORKSHOPS","Tight turns under the industrial gantries.",0xfa9b87},
  {36,"HARBOR PIER","Tidewater bends, striped bollards and an open pier.",0x7fddd6},
  {45,"SALT REACH","South shore bridges and broad, clear runoffs.",0x91d8bc},
- {54,"WINDMILL CURVE","Rural turnoff from the older Seawall Road.",0xc3d590}
+ {54,"WINDMILL CURVE","Rural turnoff from the older Seawall Road.",0xc3d590},
+ {OUT_HQ_LOT,"LANTERN QUAY","Park on the marked spur. Walk south to the public boat slip and ocean terminal.",0x9edfc9},
+ {OUT_HQ_LOAD,"FREIGHT BERTH","Cargo lane and work handoff. The last stretch to the water is a foot gangway.",0xe0ad84},
+ {OUT_HQ_TIDE,"TIDE SIGNAL PIER","Old coastal signal station. Follow the plank pier south to the mooring.",0xa6bbd9}
 };
 /* Four pixels in a packed lane index carry timed fixtures and forward map
    routing while scenery, shoulder and hull geometry use the same ribbon. */
@@ -91,38 +102,24 @@ static void outer_stamp(int lane,int *extent){
   U n=outer_noise(x,y)&1;city[i]=n?mix(c,0x728189,1):c;
  }
 }
+static int outer_nearest(float,float,int*,int*,int);
+#include "woodline_terrain.inc"
+#include "harbor_layout.inc"
 static void outer_bake(void){
- static U districtTint[]={0x292b3d,0x263749,0x263e48,0x39363a};
  z(outerLane,sizeof outerLane);z(outerInk,sizeof outerInk);
- for(int y=0;y<ROOM;y++){
-  int start=y<BASE_ROOM?BASE_ROOM:0;
-  for(int x=start;x<ROOM;x++){
-   const U g=outer_noise(x/6,y/6),gr=outer_noise(x/128,y/118);
-   U c;
-   if(x>2030&&y<820){
-    int cliff=(y+(int)(g%18)+((x/3)%81))%92;
-    c=mix(districtTint[0],0x60576a,(cliff<4)?3:gr%3);
-   }else if(x>2030&&y<1600){
-    const int yard=x%142<114&&y%121<88;
-    c=mix(districtTint[1],0x59626d,yard?gr%4:g%2);
-    if(yard&&(x%142>100||y%121>76))c=mix(c,0x172432,4);
-    if(yard&&y%121==77&&x%15<7)c=0x9e8577;
-   }else if((x>2030&&y>=1600)||(y>2070&&x>950&&x<2300)){
-    int surface=(y+(int)(g%18))%57;c=mix(districtTint[2],0x3e6970,surface<3?3:1);
-    if(x>2030&&y>1610&&(x/42+y/100)%7==0)c=mix(c,0x755e51,2);
-   }else c=mix(0x182e3a,0x354959,((x/17+y+(g%32))%53==0)?2:0);
-   city[y*ROOM+x]=c;
-  }
- }
+ woodline_bake();harbor_bake_ground();
  /* Draw the branches before the main boulevard so the latter keeps its
     lane markings at major crossings. Road cells remain a geometric union. */
  int extent=0;
  for(int i=0;i<LEN(outerRoads);i++)outer_stamp(i,&extent);
+ woodline_scatter();woodline_shadows();harbor_bake_structures();
  for(int i=0;i<LEN(outerStops);i++){
   const OuterLandmark*s=outerStops+i;OuterPoint p=outerNodes[s->node];
-  int w=textw(s->label,0)+30;
-  box(p.x-w/2,p.y-43,w,22,0x192838,s->tint);
-  center(p.x,p.y-44,s->label,s->tint,0);
+  if(i<6){
+   int w=textw(s->label,0)+30;
+   box(p.x-w/2,p.y-43,w,22,0x192838,s->tint);
+   center(p.x,p.y-44,s->label,s->tint,0);
+  } /* Quay plaque lettering is overhead-only, not a floor billboard in chase. */
   for(int d=-1;d<=1;d+=2){
     rect(p.x+d*19-2,p.y+14,5,17,0x233440);disc(p.x+d*19,p.y+14,3,s->tint);
   }

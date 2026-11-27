@@ -1,0 +1,29 @@
+GREYREED WOOD / Port Vanta walking routes
+
+The outer roads no longer fence off the visible land. Step out of the car
+and walk over legal hillside, industrial aprons and land inside Harbor's
+bends. Vehicles and traffic follow the established pavement. Open water,
+the forest tarn, tree trunks, rocks and structures remain physical
+obstacles; decorative low brush does not block you.
+
+To enter Greyreed Wood from the city, go south to Seawall Road and look
+for the two dirt tracks on its southern edge, one just east of the
+520/2000 crossing and one by the western street at 256/2000. The Windmill
+Curve also has an eastern trail entrance. All entrances join the same map.
+
+Map (M) > full atlas (F8) shows the land boundary, woods paths and eight
+named trail locations. Select Greyreed Station and click or press Enter
+to pin the ranger's trailhead. The atlas can pin off-road land. On foot,
+directions avoid actual obstacles; while driving an off-road destination
+gives a parking leg before the walk. The shareable written names are:
+
+  Greyreed Station / Survey Clearing / Fern Hollow / Old Log Glade
+  Granite Fork / Moth Meadow / Stone Ring / East Rise
+
+Mirror Tarn is the small body of water in the center of the southern loop.
+The trail goes around it. Keep to the dry shore.
+
+You can save and resume outside town using the existing Rev11 file. A
+compatible city fallback remains in the original prefix for older
+releases. The optional C chase view shows the same exterior terrain when
+driving; there is no separate forest loading screen.

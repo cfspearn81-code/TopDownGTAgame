@@ -1,0 +1,21 @@
+Lantern Quay / harbor launches
+
+Walk to the Public Landing, Cargo Quay or Tide Station and press E to take
+the free harbor launch. Use WASD or the arrow keys to throttle, reverse and
+steer. A turn carries a little momentum; Shift brakes. Return to any marked
+berth, slow down, then press E to moor. You cannot step off in open water.
+If the hull is wrecked, a harbor tow returns you to a safe quay. Ordinary
+water traffic and a scheduled patrol use the same physical water mask.
+
+F1, Signal (P/F7), the atlas and F5 still work aboard. The game always saves
+the last safe shore position, not a session-only boat floating out at sea.
+Leaving the game at sea therefore brings you back to the quay on reload.
+F2 Low FX suppresses foam trails. Boat condition is independent of car
+condition; dock launches do not replace the current car or add save fields.
+
+Verification on integrated source:
+  bash scripts/build-linux.sh
+  gcc -std=c11 -O2 src/harbor_boats_test.c -o build/harbor_boats_test
+  build/harbor_boats_test
+  gcc -std=c11 -O2 -fPIC -shared scripts/qa/linux_replay.c -ldl -o build/harbor_replay.so
+  python3 scripts/qa/harbor_boats_host.py build/DeadChannel build/harbor_replay.so build/harbor_boats_test build/native-harbor

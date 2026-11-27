@@ -86,7 +86,8 @@ def save(path, dirty, hp, expected_digest):
     if rev==11:
         prefix=2166136261
         for v in b[:300]: prefix=((prefix^v)*16777619)&0xffffffff
-        assert field(300)==prefix and (field(968)&0x7fffffff)//64>2750
+        x, y = (field(968) & 0x7fffffff) / 64, field(972) / 64
+        assert field(300) == prefix and 2650 < x < 2830 and 950 < y < 1090
     assert (field(8), field(12), field(20), field(136)) == (70, hp, 0, dirty)
     assert digest == expected_digest
     return b
@@ -100,7 +101,7 @@ cases = {
     "guide": (0, 100, 1),
     "hold": (0, 100, 1),
     "outer": (0, 100, 1),
-    "outer-strike": (0, 92, 1),
+    "outer-strike": (0, 100, 1),
     "outer-response": (0, 100, 1),
 }
 requested = os.getenv("DC_NPC_CASE", "all")

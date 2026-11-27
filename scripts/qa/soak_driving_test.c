@@ -22,7 +22,8 @@ static void chase_curb(void){
  empty();nv.garage[60]=1;p.car=0;p.x=2750;p.y=1034;outCrowdCount=4;
  NpcRef q;assert(outer_person_ref(N_ACT_OUTER+4,&q,0));
  cars[0]=(Car){p.x,p.y,look(q.x-p.x,q.y-p.y),0,0,1,100};
- ch_draw();changed();outCrowdCount=0;
+ ch_draw();changed();
+ for(int i=0;i<LEN(outBody);i++)outBody[i].damage=3;
  ch_draw();int crowd=changed();assert(crowd>30);
  /* A rider outside her ride is solid world art in either camera; one in
     the car must not appear on the pavement. Compare framebuffer pixels. */
@@ -33,20 +34,23 @@ static void chase_curb(void){
 static void lights(void){
  empty();sv.dayClock=1230;nv.garage[60]=1;p.car=0;p.x=1024;p.y=1024;cars[0]=(Car){p.x,p.y,0,0,0,1,100};
  ngCamRide=-1;assert(ch_draw()&&chDark>.6f);
- static U ground[W*H];ch_ground();cp(ground,pixels,sizeof ground);
- ChPlot near=ch_screen(ch_local((ChVec){1054,1024,0})),far=ch_screen(ch_local((ChVec){1080,1024,0}));
- int nearI=near.y*W+near.x,farI=far.y*W+far.x;
- ch_headlights(cars);assert(pixels[nearI]>ground[nearI]&&pixels[farI]>ground[farI]);
+ static U ground[W*H];hlCount=0;ch_ground();cp(ground,pixels,sizeof ground);
+ ChPlot l=ch_screen(ch_local((ChVec){1054,1017,0})),far=ch_screen(ch_local((ChVec){1080,1014,0})),
+        r=ch_screen(ch_local((ChVec){1054,1031,0})),gap=ch_screen(ch_local((ChVec){1054,1024,0}));
+ int li=l.y*W+l.x,fi=far.y*W+far.x,ri=r.y*W+r.x,gi=gap.y*W+gap.x;
+ headlamps_build(1,940,940,1170,1120);ch_ground();
+ assert(pixels[li]>ground[li]&&pixels[ri]>ground[ri]&&pixels[fi]>ground[fi]&&pixels[gi]==ground[gi]);
  int count=0;for(int i=0;i<W*H;i++)if(ground[i]!=pixels[i])count++;
  assert(count>75&&count<W*H/8);
- /* Place a controlled barrier into the exact roof mask both renderers query.
-    Before opaque scene props draw, no illuminated road remains behind it. */
+ /* A barrier clips the independent beams using the real world footprint. */
  unsigned char old[40];for(int i=0;i<40;i++){int id=(1004+i)*ROOM+1062;old[i]=roofMask[id];roofMask[id]=1;}
- ch_ground();ch_headlights(cars);assert(pixels[nearI]>ground[nearI]&&pixels[farI]==ground[farI]);
+ headlamps_build(1,940,940,1170,1120);ch_ground();assert(pixels[li]>ground[li]&&pixels[fi]==ground[fi]);
  for(int i=0;i<40;i++)roofMask[(1004+i)*ROOM+1062]=(unsigned char)old[i];
- ch_ground();chDark=0;ch_headlights(cars);assert(!memcmp(ground,pixels,sizeof ground));
- chDark=1;cars[0].cond=0;ch_headlights(cars);assert(!memcmp(ground,pixels,sizeof ground));
- printf("Chase lights: %d lit pavement pixels at night, no spill behind the barrier or light from a wreck/daytime.\n",count);
+ const int nightGain=hlGain;sv.dayClock=720;
+ headlamps_build(1,940,940,1170,1120);assert(hlGain<nightGain);
+ cars[0].cond=0;headlamps_build(1,940,940,1170,1120);ch_ground();
+ assert(!hlCount&&!memcmp(ground,pixels,sizeof ground));
+ printf("Chase lights: %d lit pavement pixels at night, visible split, weaker daylight, no spill behind barrier or wreck light.\n",count);
 }
 static void gate(void){
  for(int side=-1;side<=1;side+=2){

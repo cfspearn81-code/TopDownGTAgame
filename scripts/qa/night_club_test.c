@@ -28,9 +28,9 @@ static void move(float x,float y){
  assert(absf(ncX-x)<4.f&&absf(ncY-y)<4.f);
 }
 static void reach_club(void){
- p.car=-1;p.x=ordinaryDoorX[NC_ID];p.y=ordinaryDoorY[NC_ID];scene=1;menu=-1;mapOn=0;clear_input();
- hit(USE);assert(scene==4&&walkin_active==NC_ID);hit(ENTER);
- assert(scene==NIGHT_CLUB_SCENE&&ncRoom==NC_FLOOR);
+ int b=night_club_listing();assert(b!=NC_ID);
+ p.car=-1;p.x=ordinaryDoorX[b];p.y=ordinaryDoorY[b];scene=1;menu=-1;mapOn=0;clear_input();
+ hit(USE);assert(scene==NIGHT_CLUB_SCENE&&ncRoom==NC_FLOOR&&walkin_active==b);
 }
 static void reach_office(void){move(168,361);hit(USE);assert(ncRoom==NC_OFFICE);move(480,264);hit(USE);assert(ncPanel==NC_DESK);}
 static void leave_subroom(void){move(480,416);hit(USE);assert(ncRoom==NC_FLOOR);}
@@ -56,6 +56,25 @@ int main(int argc,char**argv){
  nv.phone[NP_BAG+2]=1;nv.phone[NP_BAG+5]=1;nv.phone[NP_BAG+8]=1;
  assert(night_club_queue()==4);reach_club();assert(night_club_track()==1);
  U floor0=image_hash();tick(0);for(int i=0;i<10;i++)tick(0);assert(image_hash()!=floor0);snap(out,"public-floor");
+ hit(ESC);assert(menu==PAUSE_MENU);U hold=ncMotionTicks,paused=image_hash();
+ for(int f=0;f<40;f++)tick(0);
+ assert(ncMotionTicks==hold&&image_hash()==paused);
+ hit(ESC);assert(menu<0);hit(PHONE);assert(scene==NIGHT_PHONE_SCENE);
+ hold=ncMotionTicks;for(int f=0;f<40;f++)tick(0);
+ assert(ncMotionTicks==hold);hit(ESC);assert(scene==NIGHT_CLUB_SCENE);
+ hit(HELP);assert(scene==2&&helpBack==NIGHT_CLUB_SCENE);hold=ncMotionTicks;paused=image_hash();
+ for(int f=0;f<40;f++)tick(0);
+ assert(ncMotionTicks==hold&&image_hash()==paused);
+ hit(ESC);assert(scene==NIGHT_CLUB_SCENE);
+ /* The same authored assets still expose their local conversations. No
+    advance past a promoter quote, no show ride, and no bookable business cost. */
+ move(285,306);hit(USE);assert(ncPanel==NC_REGULAR&&ncr_contact==NCR_VOCALIST);
+ assert(strstr(ncr_small_talk(),"Jules:"));hit(ESC);
+ move(695,315);hit(USE);assert(ncPanel==NC_REGULAR&&ncr_contact==NCR_PHOTOGRAPHER);
+ assert(strstr(ncr_small_talk(),"Remi:"));hit(ESC);
+ move(285,371);hit(USE);assert(ncPanel==NC_REGULAR&&ncr_contact==NCR_PROMOTER&&ncChoice==1);
+ hit(ENTER);assert(ncPanel==NC_NONE&&!ncr_active()&&sv.cash==2400);
+ move(480,423);
  reach_office();paint();snap(out,"public-office");
  click(0);assert(nc_owned()&&sv.cash==1920);
  click(1);assert(nc_get(NC_COVER)==2&&ncCoverPrice[nc_get(NC_COVER)]==6);
@@ -126,5 +145,5 @@ int main(int argc,char**argv){
  data[NC_CLOCK]=NC_SHOW-1;data[NC_EXCHANGE]=30;cp(nv.club,data,sizeof nv.club);sv.charges=1;night_club_business_tick();
  assert(nc_get(NC_EXCHANGE)==30);sv.charges=0;nv.club[NC_CLOCK]=NC_SHOW-1;night_club_business_tick();assert(nc_get(NC_EXCHANGE)==0);
  for(int i=0;i<32;i++)nv.club[i]=~0u;assert(!nc_owned()&&night_club_signature_demand(0)==-1);paint();
- printf("PASS: normal club controls / three VIP booths / real satchel grade / exact native save reload / VIP receipts / %d independent economy factors / queue remedy & hire / legacy stock preserved / private cabaret confirmed, skipped, timed, saved\n",ok);
+ printf("PASS: normal club controls / three VIP booths / real satchel grade / exact native save reload / VIP receipts / %d independent economy factors / queue remedy & hire / legacy stock preserved / private cabaret confirmed, skipped, timed, saved / regulars, direct E, F1/Pause/Signal freeze\n",ok);
 }

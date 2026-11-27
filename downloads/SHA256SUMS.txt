@@ -12,3 +12,5 @@ b362744cb9650a1b792019ca54f46a836ca0739f8e443df2049a68bdc113fac1  Dead-Channel-P
 f19cdf3dc4294c997e0045e1fa2365ff37f9ddb0433e193c53b96e85e45b9570  Dead-Channel-Port-Vanta-Crossroads-Linux-x64.tar.gz
 b5d1e9188b19c49fd3d1d566a0855ad8a3ed313bee7da228a8119436712a55b1  Dead-Channel-Street-Life-Stability-Update-Linux-x64.tar.gz
 4759647b133a9921efd344b382d50b1afd1f416c1d3f65298c99bcee5fb7ff62  Dead-Channel-Street-Life-Stability-Update-Windows-11-x64.zip
+fb8bdda1f50a7b03e6af3c6449df137f7b86a87deb639008466f8b7d9587b284  Dead-Channel-Woodline-Lantern-Quay-Stability-Windows-11-x64.zip
+764af00ed9c34a83174235aee86a7b2cd2476373f6e0db5b41ccf9d84abc1593  Dead-Channel-Woodline-Lantern-Quay-Stability-Linux-x64.tar.gz

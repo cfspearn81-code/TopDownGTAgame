@@ -1,5 +1,6 @@
 /* Native Win32 window, DIB rendering, keyboard, and local save. No runtime DLL bundle. */
 #include "game.h"
+#include "save_receipt_layout.h"
 #include "radio_motif.h"
 #include "frame_probe.h"
 typedef unsigned long long U64; typedef unsigned short U16;
@@ -141,7 +142,8 @@ static int preserve_predecessor(int hasStock){
  if(!__imp_CloseHandle(h)||!ok||n<176||n>1044||readword(old)!=0x44433131u)return 0;
  U rev=readword(old+4);
  if(rev<2||rev>11||(rev==11?(n!=304&&n!=1044):n>304))return 0;
- if(n==1044&&(readword(old+968)&0x80000000u)&&(!hasStock||old[267]||(readword(old+684)&0x80000000u)))return 1;
+ if(n==1044&&(readword(old+DC_SAVE11_FAMILY_AT)&0x80000000u)&&!dc_legacy_receipt_marker(readword(old+DC_SAVE11_OLD_SEIZURE_AT))&&
+    (!hasStock||old[267]||(readword(old+684)&0x80000000u)))return 1;
  U digest=readword(old+n-4);if(disk_hash(old,n-4)!=digest||(n==1044&&disk_hash(old,300)!=readword(old+300)))return 0;
  U16 dest[1024];for(U i=0;i<directoryEnd;i++)dest[i]=savePath[i];
  U at=add(dest,directoryEnd,L"\\pre-");at=add(dest,at,savePath+directoryEnd+1);
@@ -262,7 +264,7 @@ void entry(void){
  static const U16 cls[]=L"DeadChannelNative11";
  Class k={sizeof(Class),0x23,wnd,0,0,instance,0,__imp_LoadCursorW(0,(void*)32512),0,0,cls,0};
  if(!__imp_RegisterClassExW(&k)){__imp_ExitProcess(1);return;}
- Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Crossroads Street Life",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
+ Handle win=__imp_CreateWindowExW(0,cls,L"Dead Channel | Woodline & Lantern Quay Stability",0x00cf0000,(-2147483647-1),0,1152,690,0,0,instance,0);
  if(!win){__imp_ExitProcess(2);return;}
  directories();set_session_seed((U)__imp_GetTickCount64());init_city();__imp_ShowWindow(win,1);
  U64 t=__imp_GetTickCount64(); unsigned acc=0;int wasFocused=1,lastW=0,lastH=0;U focusBlocked=0;

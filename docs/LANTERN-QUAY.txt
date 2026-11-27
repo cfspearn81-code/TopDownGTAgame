@@ -1,0 +1,47 @@
+LANTERN QUAY | PORT VANTA
+
+Follow Harbor Curve toward the southeast coast. On the atlas (M, then
+F8 for the full map), look for Lantern Quay and its marked landings.
+The main road serves Harbor Office, Freight Berth (Cargo Quay) and
+Lantern Quay Public Landing. A separate road serves Tide Signal Pier. Park on the paved apron and walk
+the marked deck down to the water. Cars stay on roads. The quay decks
+are dry on foot, the open sea is for boats, and the forest's Mirror Tarn
+is not connected to the harbor.
+
+BOATS
+A harbor launch is free at a marked berth. Step up to the berth and
+press E. Up/W and Down/S apply forward or reverse thrust; Left/A and
+Right/D steer. The launch slides at speed; Shift brings it under control.
+Slow down near a marked berth and press E to moor. E away from a berth
+doesn't put you in the water. Harbor traffic and an occasional patrol
+share the channel. Watch the hull integrity gauge; a broken launch is
+towed to shore, and the berth offers a fresh one.
+
+M still opens the atlas afloat. You can pin navigable water there. The
+chart draws a route only when it can find a hull-clear passage. If it
+can't find a clear line, use the marked berths or a different waypoint.
+Signal and Pause still work. F5 or a normal exit saves to the last
+safe dock; on reload you start ashore, with your current mission step.
+Hull motion, damage and wakes do not persist.
+
+HARBOR OFFICE
+Open Signal (P, or F7 if rebound), select Night Wire and scroll to the
+Harbor cards. Or walk to Harbor Office and press E. The cards explain
+each step; Enter twice accepts. Other timed work must be finished or
+canceled first. If you need to leave an assignment, confirm its Cancel
+card. A clean payout can be collected only once per commission.
+
+- Relay Recovery: Bring a working registered car. E disables the
+  nonhuman security automaton in the marked service lane. E again
+  picks up its inert shell. A brief interference burst may interrupt E.
+  Follow the marker to the registered trunk,
+  then the cargo handoff and its offshore survey receiver.
+- Blue Parcel: Read the blue gantry, then meet the blue cabin launch
+  offshore. Exchange for the fictional Starcoil parcel, moor and
+  return to Harbor Office.
+- Breakwater Bump: Tag an uncrewed orange trainer in a boat to release
+  a scoring chip. Collect it for the optional bonus, then report back
+  to Harbor Office.
+
+These commissions are fictional arcade objectives, not real procedures.
+They do not repurpose any named people or story encounters.

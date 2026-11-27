@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "linux_save.h"
+#include "save_receipt_layout.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
@@ -169,10 +170,11 @@ int linux_disk_backup_upgrade(int stock_patches){
  struct stat st;
  if(fstat(fd,&st)||!S_ISREG(st.st_mode)){close(fd);return 0;}
  if(st.st_size>304&&st.st_size!=1044){close(fd);return 0;}
- uint32_t family=0;
+ uint32_t family=0,receipt=0;
  if(st.st_size==1044){
-  if(pread(fd,&family,sizeof family,968)!=sizeof family){close(fd);return 0;}
-  if(family&0x80000000u){
+  if(pread(fd,&family,sizeof family,DC_SAVE11_FAMILY_AT)!=sizeof family||
+     pread(fd,&receipt,sizeof receipt,DC_SAVE11_OLD_SEIZURE_AT)!=sizeof receipt){close(fd);return 0;}
+  if((family&0x80000000u)&&!dc_legacy_receipt_marker(receipt)){
    unsigned char patches;uint32_t hybrid;
    if(pread(fd,&patches,sizeof patches,267)!=sizeof patches||
       pread(fd,&hybrid,sizeof hybrid,684)!=sizeof hybrid){close(fd);return 0;}
@@ -195,7 +197,7 @@ int linux_disk_backup_upgrade(int stock_patches){
     migration_hash(old,len-4)!=digest)return 0;
  if(len==1044){memcpy(&base_digest,old+300,4);if(migration_hash(old,300)!=base_digest)return 0;}
  char dest[60];
- const char* label=header[1]!=11?"afterhours":len==1044&&!(family&0x80000000u)?"outerloop":"crossroads";
+ const char* label=header[1]!=11?"afterhours":dc_legacy_receipt_marker(receipt)?"stability":len==1044&&!(family&0x80000000u)?"outerloop":"crossroads";
  snprintf(dest,sizeof dest,".pre-%s-%s-r%u-%08x.bak",label,save_name,header[1],digest);
  /* A previous backup may legitimately be a distinct inode. Retry only
     accepts byte-identical, regular files; a conflicting file is untouched. */

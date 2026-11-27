@@ -1,0 +1,55 @@
+WOODLINE / RANGER TRAILS AND SHOP PLANTERS
+=========================================
+Enter the forest on foot from the opening south of Seawall Road in
+the southwest of the old city. Press P (or rebound F7), choose
+Night Wire and open @woodline / Ranger bulletin to pin the Ranger.
+The larger F8 atlas includes the Woodline. Press E at the Ranger's
+canopy desk near the start of the trails. If a timed city job is
+already active, finish or cancel it first.
+
+RANGER'S FIELD JOURNAL
+* Mark the walking loop. Accept the survey, then press E at the
+  three pennant stations in Fern Hollow, Granite Fork and East
+  Rise. Return for $90 and access to the first chest.
+* Four lights for the catalog. Find a Velvet Lantern, Clockcap,
+  Frostbell and Moonspindle. They are all invented game species.
+  Look in fern beds, beside fallen logs, and around the meadow
+  and ruin clearings. The four different silhouettes mark the
+  different types. E collects; the ranger takes just one of each
+  for the $120 catalog reward. Picking a patch records it forever.
+* The missing trail beacon. Finish the first two assignments,
+  then accept this request. Search the supply chest, then the
+  ruin chest. Hand the beacon in for $165. Completing all three
+  assignments unlocks a further chest at the East Rise lookout.
+  Each chest is awarded once per career. The supply chest holds
+  $28, the ruins chest $45 and the lookout chest $85 plus a badge
+  and a specimen. No storage is removed when your wallet is full.
+
+In the journal, up/down selects a task; E accepts or hands it in.
+Press M to pin the next objective for that task. Escape closes the
+journal without abandoning the assignment.
+
+SHOP PLANTERS
+Two independently timed beds are available in the public Lantern
+Grow Loft and two more in Kiosk 09. Enter the shop as usual with E;
+walk to the sign 'PLANTERS' near the front-right side of the center
+aisle and press Enter there. Existing staff counters, jobs, the
+private grow room, and Signal Glasshouse are unchanged.
+
+Left/right selects the bed, up/down selects the crop. E or Enter
+queues a fictional seed token or harvests the completed bed. You
+can grow each of the four collectible game mushrooms once you
+have discovered its outdoor patch. Owners of Lantern can also
+choose unlocked House-grade in-game strains, using the existing
+Glasshouse strain unlocks. Each bed yields one unit and pauses
+while reading the planter panel/phone or when the game is paused.
+The same shop owns the bed until harvest. A full destination slot
+leaves the mature crop intact. This is an arcade menu and timer,
+not a real growth simulation or advice.
+
+The game saves discovered patches, exact inventory, ranger and
+chest state, and the contents/timers of each bed. This update uses
+previously unused garage-extension words 49 through 52 in expanded
+Rev11. Existing compact and expanded save layout/validation is
+unchanged. Opening the map or unused shop menus creates no new
+persistent feature state.

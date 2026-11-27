@@ -100,6 +100,15 @@ static void snapshot_frame(SDL_Renderer*r,const char*name){
  for(int i=0;i<w*h;i++){fputc(buf[i]>>16,out);fputc(buf[i]>>8,out);fputc(buf[i],out);}
  assert(!fclose(out));free(buf);
 }
+static void requested_snapshot(SDL_Renderer*r){
+ const char *s=getenv("DC_LINUX_CAPTURE_FRAMES");
+ while(s&&*s){
+  char *end;unsigned long n=strtoul(s,&end,10);
+  if(end==s)return;
+  if(n==frame){char label[40];snprintf(label,sizeof label,"frame-%lu",n);snapshot_frame(r,label);return;}
+  s=*end==','?end+1:NULL;
+ }
+}
 static unsigned guide(SDL_Renderer*r){
  static uint32_t apt;
  if(frame==0||frame==3)return ENTER;
@@ -148,6 +157,29 @@ static unsigned create(SDL_Renderer*r){
  if(frame==73)return SAVE;
  return 0;
 }
+static unsigned club_cast(SDL_Renderer*r){
+ /* Fresh profile, ordinary SDL keys and the main Base Village entrance.
+    Screen probes assert the club uses its own UI, not the legacy foyer. */
+ if(frame==0||frame==3)return ENTER;
+ if(frame>=8&&frame<=63)return DOWN;
+ if(frame==64||frame==163||frame==391)return USE;
+ if(frame==66)snapshot_frame(r,"afterimage-queue");
+ if(frame>=67&&frame<=161)return LEFT;
+ if(frame==165||frame==172){
+  assert(margin(r,8,28)==0x141420);
+  snapshot_frame(r,frame==165?"afterimage-stage-a":"afterimage-stage-b");
+ }
+ if(frame==174)return HELP;
+ if(frame==175||frame==190)snapshot_frame(r,frame==175?"afterimage-freeze-a":"afterimage-freeze-b");
+ if(frame==192)return ESC;
+ if(frame>=194&&frame<358)return RIGHT;
+ if(frame>=359&&frame<390)return UP;
+ if(frame==394){
+  assert(margin(r,8,28)==0x141420&&margin(r,91,125)==0xbb818f);
+  snapshot_frame(r,"afterimage-lounge");
+ }
+ return 0;
+}
 void SDL_RenderPresent(SDL_Renderer *renderer){
  void(*real)(SDL_Renderer*)=dlsym(RTLD_NEXT,"SDL_RenderPresent");assert(real);
  if(!frames){
@@ -158,13 +190,14 @@ void SDL_RenderPresent(SDL_Renderer *renderer){
   else if(kind&&!strcmp(kind,"resave")){mode=3;frames=24;}
   else if(kind&&!strcmp(kind,"delete")){mode=4;frames=24;}
   else if(kind&&!strcmp(kind,"guide")){mode=5;frames=18;}
+  else if(kind&&!strcmp(kind,"club-cast")){mode=6;frames=398;}
   else{
    unsigned expected;
    assert(fscanf(plan,"%u %x",&frames,&expected)==2&&frames>0);
   }
   focus(1);verify_frame(renderer);
  }
- real(renderer);
+ real(renderer);requested_snapshot(renderer);
  if(frame==frames){
   assert(mode||!remaining);
   const char *snapshot=getenv("DC_LINUX_SNAPSHOT");
@@ -182,6 +215,7 @@ void SDL_RenderPresent(SDL_Renderer *renderer){
  else if(mode==2)set_keys(create(renderer));
  else if(mode==3)set_keys(frame==2?ENTER:frame==17?SAVE:0);
  else if(mode==5)set_keys(guide(renderer));
+ else if(mode==6)set_keys(club_cast(renderer));
  else if(mode==4)set_keys(frame==2?DELETE_SLOT:frame==5?RIGHT:frame==8?ENTER:0);
  else{
   if(!remaining)assert(fscanf(plan,"%u %u",&remaining,&mask)==2&&remaining);

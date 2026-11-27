@@ -1,11 +1,11 @@
 DEAD CHANNEL / PORT VANTA
-Crossroads Street Life for Windows 11 x64 and Linux x86-64
+Woodline & Lantern Quay Stability for Windows 11 x64 and Linux x86-64
 
 1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
    Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
    from the extracted Dead-Channel directory. If your extractor did not
    preserve execute permission, run chmod +x DeadChannel first.
-   Look for "Dead Channel | Crossroads Street Life" in the window title.
+   Look for "Dead Channel | Woodline & Lantern Quay Stability" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -23,6 +23,16 @@ Close the older game, extract this build to a new folder and run the new
 executable. The saved careers are stored separately; no transfer, reset
 or new career is required. The weapon wheel still intentionally dims the
 background while Tab is held.
+
+WOODLINE
+See WOODLINE.txt for the southwest trail, wildlife, planters and quests.
+F1 lists the P/F7 handset and M/F8 atlas controls in-game.
+
+LANTERN QUAY
+Take Harbor Curve southeast to Public Landing or Cargo Quay. E boards
+a launch at marked berths; Shift slows the boat, and E moors when stopped.
+Open the Harbor cards in Signal Night Wire, or visit the Harbor Office.
+See LANTERN-QUAY.txt.
 
 BASE VILLAGE AND OUTER LOOP
 At Apartment 4, leave through the teal E door and walk straight left to

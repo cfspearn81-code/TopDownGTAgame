@@ -1,0 +1,59 @@
+DEAD CHANNEL / WOODLINE & LANTERN QUAY
+
+WINDOWS: Extract the ZIP and open DeadChannel.exe.
+LINUX: Extract the tar.gz and run ./DeadChannel from the Dead-Channel
+folder. Linux needs x86-64, glibc 2.34+ and SDL2. You do not need Wine,
+an installer or a network account.
+
+F1 opens the field guide. M opens the atlas and F8 expands it; P opens
+Signal, or F7 if you changed the setting. Tab/V, C and L keep their
+previous functions.
+
+Your career is still kept outside the game folder. Windows uses
+%LOCALAPPDATA%/DeadChannel. Linux normally uses ~/.local/share/DeadChannel
+or $XDG_DATA_HOME/DeadChannel if XDG_DATA_HOME is an absolute path.
+Older Rev2–10 and both Rev11 layouts remain compatible. Keep a backup
+before intentionally opening a recent career in an older game.
+
+GREYREED WOOD
+Walk out through the southwest opening below Seawall Road. In Signal,
+choose Night Wire and select @woodline / Ranger bulletin to pin the
+trailhead. Or use M, then F8, and pick Greyreed Station on the expanded
+map. Press E at the Ranger canopy. The journal’s M key pins the next
+objective for the highlighted quest. E also collects specimens, stamps
+the trail posts and opens earned chests. Bears, wolves and bobcats
+react when you forage away from the trail. Watch for the amber warning,
+then use Shift to sprint back to the trail, Ranger approach or marked
+quest clearing. Occasionally a predator reaches the Seawall edge and
+carries an ambient hiker away offscreen. Named and quest NPCs are safe.
+See WOODLINE-WILDLIFE.txt for the in-game cues.
+
+Walk off the old paved ribbons in the outer districts: the grass below
+Glass Bluff, the yards and the coastal shore are traversable ground.
+Cars stay on the road. The tide, Mirror Tarn, solid trees and rock
+outcrops still block walking. Pin a land point in the atlas to get a
+walking route; if you are driving, stop at the suggested parking point
+and continue on foot.
+
+SHOPS
+Enter the public Lantern Grow Loft or Kiosk 09 as usual with E.
+Walk toward the sign marked PLANTERS and press Enter. Left and Right
+choose a bed; Up and Down choose a fictional seed token. Use E or Enter
+to queue or harvest it. Each location owns its two beds until harvest.
+See WOODLINE-GAMEPLAY.txt for unlock conditions, quest order and loot.
+
+THE AFTERIMAGE AND DRIVING
+The Afterimage keeps its entrance just west of Apartment 4. Its stage
+performers, patrons, DJ, bartender and queue now have individually
+drawn nightclub outfits and distinct poses. Existing ownership,
+bookings, VIP and guest service are unchanged. Driven cars and active
+night traffic cast two independent headlight beams. C shows them in
+chase view as well; F2 Low FX disables the beam effect.
+
+Pedestrians outdoors now have their own sidewalk and crossing routes.
+They wait, give others room and take another path if a car blocks them.
+The pedestrians are upright in both camera views. Shift+E still targets
+conversation on crowded corners without stopping everyone else.
+
+Follow Harbor Curve southeast to board a harbor launch or pick up a
+commission at Harbor Office. See LANTERN-QUAY.txt.

@@ -17,8 +17,11 @@ def inspect(p):
     assert len(b)==1044 and word(4)==11 and word(300)==fnv(b[:300]) and word(1040)==fnv(b[:1040])
     minute=word(432+31*4)&2047
     assert 540<=minute<545
-    assert [word(432+4*i) for i in (31,35,46,49,50,51,52)] == [
-        0x52560000|(3<<11)|minute,49,501,0x52560000|(1<<11)|minute,0,400,79]
+    garage=lambda i: word(432+4*i)
+    phone=lambda i: word(688+4*i)
+    assert [garage(i) for i in (31,35,46)] == [0x52560000|(3<<11)|minute,49,501]
+    assert (phone(2),phone(3),garage(62),phone(63)) == (0x52560000|(1<<11)|minute,0,400,79)
+    assert [garage(i) for i in (49,50,51,52)] == [0,0,0,0], "checkout wrote Forest fields"
     assert (word(8),word(136),word(148),word(288),word(292)) == (0,0,1,207,501)
     return b
 def call(*args,**kw):

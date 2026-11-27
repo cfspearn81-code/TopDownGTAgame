@@ -196,6 +196,65 @@ static void guide_hotfix(void){
  shot("separate-legend",92,395,775,29);
  tap(ESC);assert(scene==1&&menu<0);
 }
+#ifdef DC_OUTER_WALK_POSES
+static void held_body(const char*label,int id){
+ Ped *q=peds+id;
+ paint();int x=sx(q->x),y=sy(q->y);
+ /* The foreground panel may cover the actor; capture the identity there.
+  * After Esc capture the actual upright sprite at its current foot point. */
+ if(npcTalkOn&&x>=186&&x<=773&&y>130&&y<430){
+  shot(label,221,160,480,53);
+  return;
+ }
+ int l=max(0,x-14),t=max(0,y-27),r=min(W,x+15),b=min(H,y+7);
+ assert(l<r&&t<b);
+ StreetPerson pose;
+ assert(street_ped_pose(id,&pose));
+ U ink=mix(pose.coat,0x111a27,1);
+ int tint=cl((int)(nw_dark()*53.f),0,58);
+ U lamp=headlamps_ground(0x131b27,(int)q->x,(int)q->y);
+ int glow=cl((int)(lamp&255)-0x27,0,88);
+ if(tint)ink=nw_blend(ink,0x252d47,tint);
+ if(glow)ink=nw_blend(ink,lamp,glow);
+ shot_test(label,l,t,r-l,b-t,ink,1);
+}
+static void conversation_hold(void){
+ /* East Freight: let an actual resident start walking within Shift+E
+  * range. New spacing means nearby walkers do not share a spawn point. */
+ tap(GFX);
+ int id=-1;
+ for(int i=0;i<245;i++){
+  NpcRef ref;
+  if(npc_near_ref(&ref,0)&&ref.kind==0&&ref.id<STREET_CIVILIANS&&peds[ref.id].s>0){id=ref.id;break;}
+  play(0);
+ }
+ assert(id>=0);
+ tap(BRAKE|USE);
+ assert(npcTalkOn&&npcTalk.id==id&&!npcEnc.phase);
+ float sx0=peds[id].x,sy0=peds[id].y;
+ float px[STREET_CIVILIANS],py[STREET_CIVILIANS];
+ for(int i=0;i<STREET_CIVILIANS;i++){px[i]=peds[i].x;py[i]=peds[i].y;}
+ held_body("selected-at-open",id);
+ U clock=sv.playedTicks;
+ wait_ticks(53);
+ assert(npcTalkOn&&npcTalk.id==id&&npc_holds(id)&&peds[id].x==sx0&&peds[id].y==sy0);
+ held_body("selected-held-mid-menu",id);
+ wait_ticks(52);
+ assert(npcTalkOn&&npcTalk.id==id&&npc_holds(id)&&peds[id].x==sx0&&peds[id].y==sy0&&sv.playedTicks==clock+105);
+ float x,y,a0;int step=-1;
+ assert(npc_present_pose(id,&x,&y,&a0,&step)==1&&x==sx0&&y==sy0&&step==0);
+ int moved=0;
+ for(int i=0;i<STREET_CIVILIANS;i++)if(i!=id&&d2(peds[i].x-px[i],peds[i].y-py[i])>25)moved++;
+ assert(moved>=4);
+ held_body("selected-held-throughout",id);
+ tap(ESC);
+ assert(!npcTalkOn&&!npc_holds(id));
+ int i=0;
+ while(d2(peds[id].x-sx0,peds[id].y-sy0)<36&&i++<90)play(0);
+ assert(i<90);
+ held_body("selected-resumed",id);
+}
+#else
 static void held_body(const char*label,int id){
  Ped *q=peds+id;
  paint();int x=sx(q->x),y=sy(q->y);
@@ -252,13 +311,35 @@ static void conversation_hold(void){
  held_body("selected-resumed",25);
 }
 
-/* No teleports: walk along the open Parkway, stop a passerby, and walk home. */
+#endif
+
+/* This tape uses ordinary keys even when the persistent groups travel
+ * away from the old animated static crowd anchor. Select a real actor
+ * who the current game considers accessible, not a fixed sprite. */
+static U outer_walk_dir(float x,float y,float snap){
+ float dx=x-p.x,dy=y-p.y;U k=0;
+ if(absf(dx)>snap)k|=dx>0?RIGHT:LEFT;
+ if(absf(dy)>snap)k|=dy>0?DOWN:UP;
+ return k;
+}
 static void outer_sidewalk(int strike){
  tap(GFX);
- for(int i=0;i<750&&p.x<2817.f;i++)play(RIGHT|BRAKE);
- assert(p.x>=2817.f&&p.x<2821.f);
- for(int k=0;k<17;k++)play(DOWN);
- tap(USE);assert(npcTalkOn&&npcTalk.id>=160);
+ for(int i=0;i<750&&p.x<2708.f;i++)play(RIGHT|BRAKE);
+ assert(p.x>=2708.f&&p.x<2712.f);
+ NpcRef picked;
+ int found=0;
+ for(int t=0;t<180;t++){
+  if(npc_near_ref(&picked,0)&&picked.id>=N_ACT_OUTER){found=1;break;}
+  NpcRef next;float nearest=1.e20f;
+  for(int i=N_ACT_OUTER;i<N_ACT_MAX;i++){
+   NpcRef q;if(!npc_ref(i,&q)||!street_line_open(p.x,p.y,q.x,q.y,7))continue;
+   float d=d2(q.x-p.x,q.y-p.y);if(d<nearest){next=q;nearest=d;}
+  }
+  assert(nearest<160.f*160.f);
+  play(outer_walk_dir(next.x,next.y,7.f));
+ }
+ assert(found);
+ tap(USE|BRAKE);assert(npcTalkOn&&npcTalk.id==picked.id);
  int id=npcTalk.id;float x=npcTalk.x,y=npcTalk.y;
  panel("parkway-passerby");
  wait_ticks(90);NpcRef r;assert(npc_ref(id,&r)&&r.x==x&&r.y==y);
@@ -267,10 +348,15 @@ static void outer_sidewalk(int strike){
  if(strike){
   /* No phase injection. Turn down from the highway and use ordinary Fire
      on the group we actually walked to. No Rob interaction was selected. */
-  tap(DOWN);int down=-1;NpcRef latest[N_OUTER_SEATS];int present[N_OUTER_SEATS]={0};
+  int down=-1;NpcRef latest[N_OUTER_SEATS];int present[N_OUTER_SEATS]={0};
   int group=N_ACT_OUTER+(id-N_ACT_OUTER)/N_OUTER_SEATS*N_OUTER_SEATS;
   for(int k=0;k<N_OUTER_SEATS;k++)present[k]=npc_ref(group+k,latest+k);
   for(int j=0;j<200&&down<0;j++){
+   NpcRef target;assert(npc_ref(id,&target));
+   U way=outer_walk_dir(target.x,target.y,0.42f*(absf(target.x-p.x)>absf(target.y-p.y)?absf(target.x-p.x):absf(target.y-p.y)));
+   /* Reorient through normal walking inputs, but let the blue target
+    * leave a safe spacing from the player's model on this fixture. */
+   if(j%8==0&&way&&d2(target.x-p.x,target.y-p.y)>14.f*14.f)play(way);
    play(FIRE);
    for(int k=0;k<N_OUTER_SEATS;k++)if(present[k]){
     NpcRef now;if(npc_ref(group+k,&now))latest[k]=now;else{down=k;break;}
@@ -293,11 +379,19 @@ static void outer_sidewalk(int strike){
      /* A moving patrol alternates its uniform flash and walk frame.
         Check an actual uniform/badge pixel near the unit rather than the
         hash of an entire moving group, which varies by host presentation. */
-     U colors[]={0xe8cb86,0x83a4c7,0x9dbed4,mix(0x668df0,0x111a27,1),mix(PINK,0x111a27,1)};
-     int xx=sx(q->x),yy=sy(q->y);
+     StreetPerson pose;
+     if(!street_ped_pose(DISPATCH_FIRST+n,&pose))continue;
+     U colors[]={0xe8cb86,0x83a4c7,0x9dbed4,mix(pose.coat,0x111a27,1),mix(0x668df0,0x111a27,1),mix(PINK,0x111a27,1)};
+     int xx=sx(pose.x),yy=sy(pose.y),tint=cl((int)(nw_dark()*53.f),0,58);
+     U lamp=headlamps_ground(0x131b27,(int)pose.x,(int)pose.y);
+     int glow=cl((int)(lamp&255)-0x27,0,88);
+     if(xx<30||xx>W-30||yy<34||yy>H-16)continue;
      for(int c=0;c<LEN(colors)&&!seen;c++){
-      int hits=0;for(int b=yy-24;b<=yy+4;b++)for(int a=xx-12;a<=xx+12;a++)hits+=(pixels[b*W+a]&0xffffffu)==colors[c];
-      if(hits){shot_test("regional-responder",xx-28,yy-32,57,45,colors[c],1);seen=1;}
+      U ink=colors[c];
+      if(tint)ink=nw_blend(ink,0x252d47,tint);
+      if(glow)ink=nw_blend(ink,lamp,glow);
+      int hits=0;for(int by=yy-24;by<=yy+4;by++)for(int ax=xx-12;ax<=xx+12;ax++)hits+=(pixels[by*W+ax]&0xffffffu)==ink;
+      if(hits){shot_test("regional-responder",xx-28,yy-32,57,45,ink,1);seen=1;}
      }
      if(seen)break;
     }
@@ -305,7 +399,8 @@ static void outer_sidewalk(int strike){
    assert(seen);play(0);return;
   }
  }
- for(int k=0;k<(strike?18:17);k++)play(UP);
+ for(int k=0;k<90&&absf(p.y-1024.f)>1.5f;k++)play(p.y>1024.f?UP:DOWN);
+ assert(absf(p.y-1024.f)<3.f);
  for(int i=0;i<750&&p.x>1985.f;i++)play(LEFT|BRAKE);
  assert(p.x<1986.f&&!outer_is_new(p.x,p.y));play(0);
 }

@@ -1,0 +1,28 @@
+STREET ACTOR DEPTH
+
+There were two distinct failures, in addition to the separate walking-route
+problem:
+
+* At night the screen-effects layer drew 12 human-shaped decorations at
+  three fixed intersections. They were not pedestrians. Each group moved
+  within a 31-unit band with an abrupt wrap and could be placed on the road.
+  Switching to Low FX could make the four people disappear. This layer
+  now draws only lighting/weather, not human figures.
+* The chase view represented a live pedestrian using three upright solid
+  rectangles. These were not literal ground polygons, but had no legs,
+  posture, or contact shadow. The same foot locations now have boots,
+  jointed legs and arms, torso thickness, and a ground-contact shadow.
+  Cars/buildings and pedestrians use the same chase depth buffer.
+* In overhead view, the original actor sprite stays at the same size; the
+  soft contact shadow is painted before bodies. Nearby facades clip just the
+  hidden sprite pixels, rather than re-stamping an unlit wall over other
+  objects. Downed combat actors remain low and distinct; they no longer
+  appear as a diagonal line. No dialogue, movement or combat values changed.
+
+Verified on an isolated Linux workspace: native SDL fresh-door/venue replay,
+the deterministic depth geometry fixture, standing/stride and downed poses,
+fixed height and foot location, near-wall occlusion, and a zero-NPC night
+frame without ghost crowds. With the companion outer-walker implementation,
+both views render the same persistent shoulder walkers and leave their
+routes/positions untouched. The view still has intentionally stylized arcade
+geometry; no real Windows desktop run was used for these checks.

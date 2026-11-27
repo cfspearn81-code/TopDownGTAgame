@@ -302,8 +302,9 @@ static void *A load_radio(const S *name,void *h,D flags){
  assert(!h&&flags==0x800u);return getenv("DC_RADIO_UNAVAILABLE")?NULL:(void*)7;
 }
 static int A play_radio(const unsigned char *wave,void *module,D flags){
- assert(wave&&!module&&flags==7&&!memcmp(wave,"RIFF",4)&&!memcmp(wave+8,"WAVEfmt ",8)&&!memcmp(wave+36,"data",4));
- D size;memcpy(&size,wave+40,4);assert(size==112000);
+ if(!wave){assert(!module&&!flags);return 1;} /* PlaySoundW stop */
+ assert(!module&&(flags==7||flags==15)&&!memcmp(wave,"RIFF",4)&&!memcmp(wave+8,"WAVEfmt ",8)&&!memcmp(wave+36,"data",4));
+ D size;memcpy(&size,wave+40,4);assert(size==112000||(flags==7&&size==40000));
  const char *path=getenv("DC_RADIO_CAPTURE");if(path){
   FILE *f=fopen(path,"ab");assert(f&&fwrite(wave+44,1,size,f)==size&&!fclose(f));}
  return 1;

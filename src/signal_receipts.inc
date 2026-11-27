@@ -2,13 +2,13 @@
  * accessibility replays keep their original pointer/keyboard coordinates. */
 enum { RR_SIGNAL_X=76,RR_SIGNAL_Y=408,RR_SIGNAL_W=211,RR_SIGNAL_H=30,RRC_ROWS=5 };
 static const U rrc_ink=0xf3bf93;
-static int rrc_previous;
+static int rrc_previous,rrc_previous_row;
 static void rrc_open(void){
- if(np_app!=NP_RECEIPTS)rrc_previous=np_app;
+ if(np_app!=NP_RECEIPTS){rrc_previous=np_app;rrc_previous_row=np_row;}
  np_app=NP_RECEIPTS;np_row=sv.charges?2:0;np_confirm=0;np_note[0]=0;
 }
 static void rrc_back(void){
- np_app=cl(rrc_previous,0,NP_NAPP-1);np_row=np_confirm=0;np_note[0]=0;
+ np_app=cl(rrc_previous,0,NP_NAPP-1);np_row=cl(rrc_previous_row,0,np_rows()-1);np_confirm=0;np_note[0]=0;
 }
 static void rrc_line(NPLine*l,int r){
  char*q;RevenueLog stamp;

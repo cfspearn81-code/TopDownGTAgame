@@ -1,0 +1,25 @@
+GREYREED WILDLIFE / Port Vanta field notes
+
+Greyreed's deeper woods have three kinds of roaming game wildlife.
+The large brown bear warns, then commits to a heavy charge. The gray
+wolf circles before a quicker lunge. The spotted bobcat crouches
+then pounces. An amber meter and directional mark give you warning;
+these animals can damage the player in an ordinary career.
+
+Use the normal movement keys and Shift sprint to break the pursuit.
+Return to a marked dirt trail, the Ranger's safe approach or a survey
+post or chest clearing. The late part of an animal's warning locks the
+attack direction. An already missed strike has a short recovery beat.
+Stay on signposted routes between assignments if you do not want to
+encounter wildlife. Some off-trail ways to approach specimens are
+unsafe. The core Ranger tasks and E interaction keys still work.
+
+Very occasionally, an animal wanders out near the Seawall and carries
+away one of the local ambient hikers, offscreen and non-graphically.
+It does not attack the player in town, target named or mission actors,
+change rewards, consume inventory or start a new job. Later a generic
+hiker returns offscreen. The event needs an active street session and
+a nearby player. It is not a forced cutscene.
+
+This feature uses fictional game rules. Wildlife and the next incursion
+timer reset when you load a career. It does not change the save format.

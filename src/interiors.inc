@@ -252,6 +252,7 @@ static void open_interior(int n){
  interior_cam_x=0;interior_cam_y=0;interior_fade=17;menu=-1;mapOn=0;scene=3;
 }
 static int int_solid(float x,float y){
+ if(woodline_bench_solid(x,y))return 1;
  if(y<147||y>429)return 1;
  if(x<max(venue_limit(y-4,0),venue_limit(y+4,0))+10||x>min(venue_limit(y-4,1),venue_limit(y+4,1))-10)return 1;
  for(int i=0;i<interior_nprop;i++){const InteriorProp*f=interior_props+i;
@@ -876,6 +877,7 @@ static void interior_paint(void){
   GrowBatch batch=grow_batch(sv.b);
   int_grow_live(&batch,dx,dy);grow_storage_art(dx,dy);grow_operator_art(&batch,dx,dy);
  }
+ woodline_interior_paint(dx,dy);
  if(li>=0&&interior_subroom)int_staff_panel(li,dx,dy,a);
  mark(dock,doorY,6,int_at_door()?PAPER:a);
  center(dock,447-dy,interior_subroom?(k==4?"BACK TO STORE":k==1?"BACK TO NIGHTCLUB":"BACK TO PUBLIC COUNTER"):"EXIT TO STREET",a,0);

@@ -60,6 +60,13 @@ THE AFTERIMAGE | PORT VANTA AFTER-HOURS CABARET
    and a street queue. New costumes, mirrors and light effects do not change the
    controls; low FX remains available.
 
+11. Velvet Minx, Orbit, Sable, Comet and Prism each have their own stagewear,
+    silhouette, hairstyle and gestures. Juno works the decks, Isabel tends the
+    bar, and Idris's crew wears bomber jackets and door badges. Lounge
+    guests chat from their seats; the same wardrobe appears in the street
+    queue. Opening the field guide, phone or Pause freezes the room's cast.
+    Service, cover, bookings and the existing saved business are unchanged.
+
 REGULARS AND SHOW RIDES
 Bryn Calder (promoter), Jules Vale (vocalist) and Remi Lens (stage
 photographer) have their own spots on the main floor. Approach and

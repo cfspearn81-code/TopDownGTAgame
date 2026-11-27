@@ -110,50 +110,7 @@ static void ch_ground(void){
      }
     }
    }
-   pixels[k]=nw_blend(c,seam,fog);chZ[k]=z0;
-  }
- }
-}
-/* Light only this car's bounded road footprint, before buildings, vehicles
- * and people are depth-rendered. The same sampled barriers/trees as overhead
- * trim each ray; the ground texture and lane stripes stay visible inside it. */
-static void ch_headlights(const Car*c){
- if(fastGfx||c->cond<=0||chDark<=.01f)return;
- float co=cs(c->a),si=sn(c->a);
- int range=61+(c->cond*19)/100,rays[17],lx=W,rx=-1,ty=H,by=-1;
- int shade=cl((int)(255*chDark),0,255);if(!shade)return;
- ChVec p[4];
- for(int i=0;i<4;i++){
-  float f=(i==0||i==3)?12.f:(float)range,w=(i<2?-.39f:.39f)*f;
-  p[i]=ch_local((ChVec){c->x+co*f-si*w,c->y+si*f+co*w,0});
- }
- ChVec last=p[3];
- for(int i=0;i<4;i++){
-  ChVec v=p[i],verts[2];int n=0;
-  if((last.z>=9.f)!=(v.z>=9.f)){
-   float t=(9.f-last.z)/(v.z-last.z);
-   verts[n++]=(ChVec){last.x+(v.x-last.x)*t,last.y+(v.y-last.y)*t,9.f};
-  }
-  if(v.z>=9.f)verts[n++]=v;
-  for(int j=0;j<n;j++){ChPlot pt=ch_screen(verts[j]);lx=min(lx,pt.x);rx=max(rx,pt.x);ty=min(ty,pt.y);by=max(by,pt.y);}
-  last=v;
- }
- lx=max(0,lx-1);rx=min(W-1,rx+1);ty=max(0,ty-1);by=min(H-1,by+1);if(lx>rx||ty>by)return;
- road_beam_rays(c,co,si,range,rays);
- for(int y=ty;y<=by;y++){
-  float ray=(CH_MY-y)*(1.f/CH_F),v=chSin-ray*chCos;if(v<=.048f)continue;
-  float f=ch.h*(chCos-ray*chSin)/v,du=(f*chCos+ch.h*chSin)/CH_F;
-  float wx=ch.x+f*ch.co-(lx-W*.5f)*du*ch.si,wy=ch.y+f*ch.si+(lx-W*.5f)*du*ch.co;
-  for(int x=lx;x<=rx;x++,wx-=du*ch.si,wy+=du*ch.co){
-   float dx=wx-c->x,dy=wy-c->y,front=dx*co+dy*si;if(front<12||front>=range)continue;
-   float side=(dy*co-dx*si)/front,width=absf(side);if(width>.37f)continue;
-   int r=cl((int)(side/.047f+8.5f),0,16);
-   if(front>rays[r]||beam_block((int)wx,(int)wy))continue;
-   int power=(int)((range-front)*9.f/range*(1.f-width/.39f));if(power<1)continue;
-   int j=y*W+x;U b=pixels[j];
-   pixels[j]=RGB(min(255,((b>>16)&255)+power*15*shade/255),
-                 min(255,((b>>8)&255)+power*11*shade/255),
-                 min(255,(b&255)+power*5*shade/255));
+   pixels[k]=headlamps_ground(nw_blend(c,seam,fog),(int)x,(int)j);chZ[k]=z0;
   }
  }
 }
@@ -239,9 +196,7 @@ static void ch_upright(float x,float y,float w,float bottom,float top,U ink){
  float u=ch.si*w,v=-ch.co*w;
  ch_quad((ChVec){x-u,y-v,bottom},(ChVec){x+u,y+v,bottom},(ChVec){x+u,y+v,top},(ChVec){x-u,y-v,top},ink,1);
 }
-static void ch_dressed_person(float x,float y,U jacket){
- ch_upright(x,y,2.2f,.2f,5.3f,0x292e38);ch_upright(x,y,3.6f,5,11,jacket);ch_upright(x,y,2.1f,11,15,0xbe987f);
-}
+#include "chase_people.inc"
 static void ch_lamp(const StreetLamp*s){
  float x=s->x,y=s->y;
  if(d2(x-ch.x,y-ch.y)>765.f*765.f)return;
@@ -252,24 +207,19 @@ static void ch_lamp(const StreetLamp*s){
  ch_upright(x,y,s->lensW*.5f,foot,foot+cap,s->lens);
 }
 static void ch_props(void){
- for(int i=0;i<LEN(peds);i++){
-  Ped*q=peds+i;if(q->hp<=0||d2(ch.x-q->x,ch.y-q->y)>670.f*670.f)continue;
-  ch_dressed_person(q->x,q->y,q->role==1?0x718ffc:q->role==2?0xe08587:(i&1)?0x9ebdb7:0xc28b79);
+ StreetPerson actor;
+ for(int i=0;i<LEN(peds);i++)if(street_ped_pose(i,&actor))ch_character(&actor);
+ if(street_rider_pose(&actor))ch_character(&actor);
+ for(int i=0;i<min(SP_OUT_MAX,outer_walk_count());i++)if(street_outer_pose(i,&actor))ch_character(&actor);
+ int marker;
+ if(street_night_rider_pose(&actor,&marker)){
+  ch_character(&actor);
+  if(marker&&d2(ch.x-actor.x,ch.y-actor.y)<480.f*480.f){
+   float x=actor.x,y=actor.y,u=3.f*ch.si,v=-3.f*ch.co;
+   ch_quad((ChVec){x,y,18.8f},(ChVec){x-u,y-v,16.5f},(ChVec){x,y,14.2f},
+      (ChVec){x+u,y+v,16.5f},0xf18acb,0);
+  }
  }
- if((job.kind==JOB_TAXI&&taxi.phase!=TAXI_RIDING)||(taxi.phase==TAXI_WALKING&&taxi.linger>0))
-  ch_dressed_person(taxi.x,taxi.y,riders[taxi.rider].outfit);
- /* Use the same living cast and curb-pickup state as the overhead view.
-    The projection has its own depth buffer; don't draw flat HUD impostors. */
- if(outCrowdCount)for(int id=N_ACT_OUTER;id<N_ACT_MAX;id++){
-  NpcRef person;
-  if(!npc_replaces(id)&&npc_ref(id,&person)&&d2(ch.x-person.x,ch.y-person.y)<670.f*670.f)
-   ch_dressed_person(person.x,person.y,person.coat);
- }
- #if __has_include("night_club_gig.inc")
- float rx,ry;
- if(ncr_ped(&rx,&ry)&&d2(ch.x-rx,ch.y-ry)<670.f*670.f)
-  ch_dressed_person(rx,ry,ncr_cast[NCR_VOCALIST].coat);
- #endif
  for(int i=0;i<LEN(scenery);i++){
   const BlockScenery*b=scenery+i;for(int j=b->treesFrom;j<b->count;j++){
    const StreetBounds*t=b->walls+j;
@@ -285,6 +235,7 @@ static void ch_props(void){
  for(int j=1;j<BASE_ROOM/256;j++)for(int i=1;i<BASE_ROOM/256;i++)
   for(int k=0;k<2;k++)if(street_lamp_legacy(i,j,k,&fixture))ch_lamp(&fixture);
  for(int i=0;i<LEN(outerNodes);i+=2)if(street_lamp_outer(i,&fixture))ch_lamp(&fixture);
+ for(int i=0;i<HARBOR_LAMPS;i++)if(street_lamp_harbor(i,&fixture))ch_lamp(&fixture);
  for(int i=0;i<LEN(fx);i++)if(fx[i].t>0&&d2(fx[i].x-ch.x,fx[i].y-ch.y)<580.f*580.f)
   ch_upright(fx[i].x,fx[i].y,1.2f,3.f,5.5f,fx[i].c);
 }
@@ -307,6 +258,10 @@ static void ch_outer(void){
   float u=dy*(r->half-3.f)/len,v=-dx*(r->half-3.f)/len;
   for(int j=-1;j<=1;j+=2){
    float x0=x+j*u,x1=xx+j*u,y0=y+j*v,y1=yy+j*v;
+   float tmX=(x+xx)*.5f,tmY=(y+yy)*.5f;
+   /* Land-side sidewalks are now open. Keep guard rails on actual banks
+    * and drop-offs only; no phantom enclosure along walkable meadows. */
+   if(outer_walkable(tmX+j*u*1.8f,tmY+j*v*1.8f,3))continue;
    U rail=r->kind==OUT_HILL?0x84998f:r->kind==OUT_DOCK?0x9aa49b:0x708578;
    ch_quad((ChVec){x0,y0,4.3f},(ChVec){x1,y1,4.3f},(ChVec){x1,y1,6.3f},(ChVec){x0,y0,6.3f},rail,1);
    for(float d=0;d<len;d+=28.f){
@@ -322,8 +277,31 @@ static void ch_outer(void){
   ch_upright(x,y,7.5f,13.5f,20.5f,outerStops[i].tint);
   ch_upright(x,y,4.7f,16.9f,17.8f,0x204453);
  }
+ const U forest[]={0x476954,0x546e50,0x648060,0x4a725b,0x435f58,0x657b55};
+ for(int j=0;j<woodPropN;j++){
+  const WoodProp*p=woodProps+j;float x=p->x,y=p->y,h=p->height,r=p->radius;
+  if(d2(x-ch.x,y-ch.y)>575.f*575.f||p->kind==WOOD_UNDERGROWTH)continue;
+  ChVec a=ch_local((ChVec){x,y,h*.4f});if(a.z<2||absf(a.x)>a.z*1.40f+56.f)continue;
+  if(p->kind==WOOD_TREE){
+   if(a.z<28.f)continue; /* keep a nearby crown from clipping through the camera */
+   U leaves=forest[p->grade%6];
+   ch_upright(x,y,1.5f,0.f,h*.65f,0x695a45);
+   for(int k=0;k<3;k++){
+    float foot=h*(.30f+k*.18f),head=foot+h*.32f,w=h*(.24f-k*.05f),dx=ch.si*w,dy=-ch.co*w;
+    ChVec q[]={{x-dx,y-dy,foot},{x+dx,y+dy,foot},{x,y,head}};
+    ch_face(q,3,mix(leaves,0x254437,2-k),1);
+   }
+  }else if(p->kind==WOOD_ROCK){
+   float dx=ch.si*r,dy=-ch.co*r;
+   ChVec q[]={{x-dx,y-dy,0},{x+dx,y+dy,0},{x+dx*.65f,y+dy*.65f,h*.50f},{x-dx*.45f,y-dy*.45f,h*.69f}};
+   ch_face(q,4,0x65756d,1);
+  }else if(p->kind==WOOD_POST){ch_upright(x,y,1,0,21,0x786d53);ch_upright(x,y,5.5f,15,20,0xa38b61);}
+  else if(p->kind==WOOD_HUT){ch_upright(x,y,r,0,25,0x696a52);ch_upright(x,y,r*.85f,25,30,0x465b4b);}
+  else ch_upright(x,y,r,0,h*.7f,0x756149);
+ }
 #endif
 }
+#include "harbor_chase.inc"
 static int ch_draw(void){
  chProjected=0;if(!ch_enabled())return 0;
  const Car*c=cars+p.car;
@@ -348,7 +326,8 @@ static int ch_draw(void){
  chCos=(fit*.953f+hAim*target)/diag;
  ch.x=c->x-fit*ch.co;ch.y=c->y-fit*ch.si;ch.h=high;
  chDark=nw_dark();chFog=nwFog;chProjected=1;
- ch_ground();ch_headlights(c);ch_buildings();ch_outer();ch_props();
+ headlamps_build(1,(int)ch.x-620,(int)ch.y-620,(int)ch.x+621,(int)ch.y+621);
+ ch_ground();ch_buildings();ch_outer();ch_harbor_props();ch_props();
  for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(cars[i].x>=0&&d2(cars[i].x-ch.x,cars[i].y-ch.y)<755.f*755.f)
   ch_car(cars+i,i==p.car);
  Car ghost;if(ng_ghost_car(&ghost)&&d2(ghost.x-ch.x,ghost.y-ch.y)<730.f*730.f)ch_car(&ghost,-1);

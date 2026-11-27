@@ -86,6 +86,72 @@ static void np_highgrade_patrol(void){
  np_ticks(600);assert(night_phone_action(USE)&&np_job()<0&&night_phone_signature(0,0)==1&&sv.dirty==dirty+305);
 }
 
+static void np_hit(U k){tick(0);tick(k);tick(0);}
+static void np_receipts_and_harbor(void){
+ /* Ordinary keyboard/pointer path from a named room, not a forced phone scene. */
+ scene=1;menu=-1;mapOn=0;job.kind=-1;vdActive=-1;vdPanel=0;p.car=-1;p.dead=0;
+ nv.phone[NP_JOB]=0;nv.phone[HJ_PHASE]=nv.phone[HJ_DONE]=nv.phone[HJ_FLOAT]=0;
+ /* A full pop-up gift must not swallow the shop door's ordinary E. */
+ sv.dayClock=700.f;nv.phone[NP_POPSTAMP]=0;nv.phone[NP_CARD]=1;
+ U old_stock=nv.phone[NP_BAG];nv.phone[NP_BAG]=99;
+ np_goto(2);np_hit(USE);assert(scene==3&&interior_active_loc==2&&nv.phone[NP_CARD]==1&&nv.phone[NP_BAG]==99);
+ nv.phone[NP_CARD]=0;nv.phone[NP_BAG]=old_stock;
+ scene=1;np_goto(4);np_hit(USE);assert(scene==3&&interior_active_loc==4);
+ float ix=interior_x,iy=interior_y;U key=night_phone_toggle(PHONE)?PHONE:PHONE_ALT;
+ np_hit(key);assert(scene==NIGHT_PHONE_SCENE&&np_app==NP_INBOX&&np_return==3);
+ np_hit(RIGHT);np_hit(RIGHT);assert(np_app==NP_WIRE&&np_rows()==18&&np_row==0);
+ /* Every card is reachable on the original seven-app ring. */
+ for(int i=17;i>=0;i--){
+  NPLine l;np_hit(UP);assert(np_row==i);
+  np_line(&l,i);assert(l.label[0]&&l.detail[0]);
+  if(i==NP_WIRE_WOODLINE)assert(strstr(l.label,"Ranger"));
+  if(i>=NP_WIRE_HARBOR)assert(strstr(l.label,"Harbor"));
+  night_phone_paint();
+ }
+ np_hit(UP);np_hit(UP);np_hit(UP);assert(np_row==NP_WIRE_HARBOR+HJ_BLUE);
+ np_hit(ENTER);assert(hj_phase()==HJ_IDLE&&np_confirm);
+ np_hit(MAP);assert(np_app==NP_RECEIPTS&&np_rows()==RRC_ROWS&&!np_confirm);
+ np_hit(MAP);assert(np_app==NP_WIRE&&np_row==NP_WIRE_HARBOR+HJ_BLUE&&!np_confirm);
+ np_hit(ENTER);assert(hj_phase()==HJ_IDLE&&np_confirm);
+ np_hit(ENTER);assert(hj_phase()==HJ_BLUE_CLUE&&!np_confirm);
+ /* Both populations of extension fields must coexist, including nonzero receipts. */
+ sv.dayClock=704.f;
+ nv.garage[WF_FLAGS]=WF_SURVEY_BEGIN|(1u<<WF_PATCH_SHIFT);
+ wf_inventory(2,4);wf_bed_write(0,0,1,900);wf_bed_write(1,1,6,2040);
+ rr_record(RR_PURCHASE,240,0,0);rr_record(REVENUE_THRESHOLD,0,37,79);
+ U f[4];for(int i=0;i<4;i++)f[i]=nv.garage[WF_FLAGS+i];
+ U phase=nv.phone[HJ_PHASE],filed=nv.phone[HJ_DONE],token=nv.phone[HJ_FLOAT];
+ request_save();assert(np_test_size==sizeof(Save11));
+ z(&nv,sizeof nv);load_save();assert(wason);
+ assert(nv.phone[HJ_PHASE]==phase&&nv.phone[HJ_DONE]==filed&&nv.phone[HJ_FLOAT]==token&&hj_phase()==HJ_BLUE_CLUE);
+ for(int i=0;i<4;i++)assert(nv.garage[WF_FLAGS+i]==f[i]);
+ assert(wf_seen(0)&&wf_inv(2)==4&&wf_bed_crop(0,0)==1&&wf_bed_left(1,1)==2040);
+ RevenueLog sale=rr_read(1),loss=rr_read(0);
+ assert(sale.kind==RR_PURCHASE&&sale.clean==240&&loss.kind==REVENUE_THRESHOLD&&loss.dirty==37&&loss.pending==79);
+ NPLine l;np_line(&l,np_row);assert(strstr(l.suffix,"IN PROGRESS"));
+ pointer_input(RR_SIGNAL_X+8,RR_SIGNAL_Y+5,1);assert(np_app==NP_RECEIPTS);
+ np_line(&l,1);assert(strstr(l.detail,"Dirty -$37")&&strstr(l.detail,"Unclaimed settlements -$79"));
+ np_hit(LEFT);assert(np_app==NP_WIRE&&np_row==NP_WIRE_HARBOR+HJ_BLUE&&hj_phase()==HJ_BLUE_CLUE);
+ np_hit(ESC);assert(scene==3&&interior_active_loc==4&&interior_x==ix&&interior_y==iy);
+}
+static void np_import_old_receipt(void){
+ /* A genuine pre-merge 1044 layout has seizure fields at garage 49-52,
+  * and no data in the new holes. It should import without phantom crops. */
+ Save11 old;
+ assert(np_test_size==sizeof old);memcpy(&old,np_test_disk,sizeof old);
+ old.night.phone[DC_SEIZURE_META]=0;old.night.phone[DC_SEIZURE_CLEAN]=0;
+ old.night.garage[DC_SEIZURE_DIRTY]=0;old.night.phone[DC_SEIZURE_PENDING]=0;
+ old.night.garage[DC_SEIZURE_LEGACY_META]=RR_MAGIC|(REVENUE_THRESHOLD<<RR_TIME_BITS)|708u;
+ old.night.garage[DC_SEIZURE_LEGACY_CLEAN]=0;
+ old.night.garage[DC_SEIZURE_LEGACY_DIRTY]=403;
+ old.night.garage[DC_SEIZURE_LEGACY_PENDING]=79;
+ for(int i=HJ_PHASE;i<=HJ_FLOAT;i++)old.night.phone[i]=0;
+ old.hash=night_hash(&old,sizeof old-4);
+ assert(disk_write(&old,sizeof old));load_save();assert(wason);
+ RevenueLog s=rr_read(0);assert(s.kind==REVENUE_THRESHOLD&&s.dirty==403&&s.pending==79&&s.minute==708);
+ for(int k=0;k<4;k++)assert(!nv.garage[WF_FLAGS+k]);
+ assert(hj_phase()==HJ_IDLE);request_save();load_save();assert(wason&&rr_read(0).dirty==403);
+}
 int main(int argc,char **argv){
  init_city();scene=1;menu=-1;mapOn=0;p.car=-1;sv.cash=4000;sv.dirty=0;
  for(int k=0;k<12;k++)night_phone_world_tick(1.f/60.f);for(int i=0;i<64;i++)assert(nv.phone[i]==0);
@@ -118,5 +184,6 @@ int main(int argc,char **argv){
 #ifdef BASE_ROOM
  np_live_lane();
 #endif
- printf("PASS: handset apps, original ownership, timed cabinet, exact grades, satchel, rivals, cash, doors, weather feed, station routing, binding, rotating pop-ups, explicit browser handoff, physical closure and district patrol, all rows painted.\n");return 0;
+ np_receipts_and_harbor();np_import_old_receipt();
+ printf("PASS: merged receipts, 18 accessible cards, active harbor case, planter save, named room return, handset apps, original ownership, timed cabinet, exact grades, satchel, rivals, cash, doors, weather feed, station routing, binding, rotating pop-ups, explicit browser handoff, physical closure and district patrol, all rows painted.\n");return 0;
 }

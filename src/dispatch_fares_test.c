@@ -43,6 +43,6 @@ int main(void){
    fares++;
   }
  }
- assert(pickups==(1<<LEN(outerStops))-1&&drops==pickups&&city&&expansion);
+ assert(pickups==(1<<TAXI_OUTER_STOPS)-1&&drops==pickups&&city&&expansion);
  printf("Completed %d priced and tipped trips: six outer pickup/drop neighborhoods, %d inner / %d outer drop-offs, four road-closure times. No repeats between successive call identities or duplicate payouts.\n",fares,city,expansion);
 }

@@ -1,0 +1,93 @@
+WOODLINE & LANTERN QUAY | RELEASE VERIFICATION
+
+The same C source builds both native x86-64 executables. Linux tests
+use the actual SDL2 executable with scripted input and software/dummy
+drivers. The Windows tests exercise the exact PE within the existing
+simulated Win32 harness on Linux, not a Windows 11 desktop or Wine.
+Testing uses disposable synthetic careers only.
+
+Terrain:
+- Both old city seams were tested at fractional positions, not only
+  integer collision coordinates. A live southbound walk crossed from
+  Seawall Road into Greyreed Wood; the coast, Mirror Tarn, trees,
+  rocks and older buildings stay solid.
+- 120 real road-to-ground-and-back walks worked across all five road
+  classes. The two rejected sampled sides were visible water/obstacles.
+  The 3-unit survey traced over 398,000 exterior places. Eight named
+  walking routes, exact atlas pins and driving-to-parking legs passed.
+- A new Linux process resumed exact fractional forest ground while
+  the compatibility prefix retained a safe original-city coordinate.
+
+Ranger and planter gameplay:
+- The exact native ELF and exact Windows PE (Win32 simulation) passed
+  a 3,052-frame button-only route: the original Seawall entry, all three
+  stamps, four fictional variants, three paid quests and three chests.
+  Retrying a claimed reward didn't duplicate it; old med stock survived.
+- Both shop benches were entered through ordinary doors and walking
+  controls. All crop outcomes, all four active beds together, stock,
+  distinct saved timers, full inventory and once-only harvest passed.
+- No shroom item is a real species or advice. Seed tokens are only
+  selectable game items and the plants use an in-game countdown.
+
+Wildlife:
+- All three species needed a warning before an attack could hit; each
+  yielded to live Shift-sprint back to safety. Tested bear (24 HP),
+  wolf (15) and bobcat (12), and threat within E range of an actual
+  off-trail specimen. Pause halted encounters and timers completely.
+- A normal active-session countdown permitted a rare event only by the
+  developed Seawall edge. The animal took an ambient hiker only; health,
+  rewards and old city RNG were unchanged. A hiker later returned
+  offscreen. Ranger, survey and chest refuges remained available.
+
+Art and driving:
+- Native SDL captures verified a new career at the Base Village
+  queue, E directly inside, changing cast poses, frozen guide/pause
+  pose and the walk to VIP. Existing receipts, cover/guest selection,
+  booking confirmation, pause and exact save reload passed.
+- Two separated front cones were measured in both cameras, including
+  unchanged driving physics, wet-road response, blocking one beam at
+  a wall, dry off-road shoulder light, water occlusion and F2 fallback.
+- Four minutes of active city movement kept all 40 pedestrians walking
+  a block or more, with no shared positions in the spacing samples.
+  All 24 outer walkers retained their identities and clear shoulder
+  paths across location changes and day/night. A real parked car caused
+  retreat and rerouting; hold froze only the selected speaker.
+- Render fixtures checked upright gait in chase view, foot/shadow
+  alignment, doorway/facade depth and no paint-only midnight crowds.
+
+Lantern Quay harbor:
+- Three landings have separate foot decks and boat berths. All six
+  old-city approaches were routable, including from a registered car.
+  1,089 hull samples covered the nine new roads; boat charts cleared all
+  piers and did not accept the Mirror Tarn or the land banks.
+- Real controls reached the public landing, boarded, accelerated and
+  turned, moored there and at Cargo Quay, and rejected E at sea. F1,
+  Signal and the atlas work afloat. Saving/restoring reopens ashore,
+  preserving the existing car and career. A wreck tows to safety.
+- Ambient workboats and a scheduled patrol stayed in legal navigable
+  water. Step-by-step mission states use three previously unused data
+  fields without expanding either Rev11 on-disk format.
+- Live inputs finished all three commissions and reloaded filed rewards.
+  The reactive arcade automaton temporarily interrupted E, then allowed
+  retry; it did not use weapons or change HP/heat. Relay used a registered
+  trunk and a real boat trip; a wreck/model change could recover the case.
+  Blue rendezvoused with a distinct contact launch. The training float
+  paid $105 alone or $150 with the optional scoring chip, only once.
+  All three cases, both parking modes and an aboard save were replayed
+  against actual ELF and PE with their native-entry test harnesses.
+
+Legacy:
+- Both original 3,664-frame key replays retained the old explicit save
+  digest. The native Linux run also verified inherited Rev2–10, slot
+  protections, pointer/focus, guide, normal exit and source-save backups.
+- Actual predecessor-written 304-byte stocked Rev11, 1,044-byte Base
+  Village and combined Rev11 were exercised on both executables. A
+  mixed exact previous Crossroads career retained old clubs, Trap House,
+  garage and med counts. Unused Woodline save fields remain zero.
+- Previous Vault 39, Mika/Ivo, NPC hold, wheel, street lights, and
+  the Windows letterbox presentation were exercised separately.
+
+Rebuild: bash scripts/build-linux.sh ; bash scripts/build.sh
+Native acceptance: bash scripts/test-woodline.sh
+Windows cross-check: bash scripts/test.sh --tour
+Package a tested source tree: python3 scripts/package-woodline.py PATH

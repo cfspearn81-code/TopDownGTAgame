@@ -180,16 +180,8 @@ static void night_world_street_fx(void){
    for(int gx=max(1,(cx-85)/256);gx<=min(BASE_ROOM/256-1,(cx+W+85)/256);gx++)
     for(int k=0;k<2;k++)if(street_lamp_legacy(gx,gy,k,&fixture))nw_fixture(&fixture,fog,tint);
   for(int i=0;i<LEN(outerNodes);i+=2)if(street_lamp_outer(i,&fixture))nw_fixture(&fixture,fog,tint);
-  /* Late buses and clubgoers read immediately as short moving silhouettes. */
-  static const int aw[3][2]={{777,1789},{1526,523},{1270,1041}};
-  for(int k=0;k<3;k++){
-   int x=sx(aw[k][0]),y=sy(aw[k][1]);
-   if((unsigned)x>=W||(unsigned)y>=H)continue;
-   for(int j=0;j<4;j++){
-    int pace=(int)(anim*(5+j))%31;
-    person(x+j*11-16,y+(k&1?31-pace:pace)-15,j&1?0x8b6381:0x53898e,1,(k&1)?-1.57f:1.57f,0,j);
-   }
-  }
+  for(int i=0;i<HARBOR_LAMPS;i++)if(street_lamp_harbor(i,&fixture))nw_fixture(&fixture,fog,tint);
+  /* People are rendered by the depth-sorted actor pass, never as FX. */
  }
  const int streaks=(int)(nwStorm*145.f);
  for(int i=0;i<streaks;i++){

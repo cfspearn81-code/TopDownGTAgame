@@ -194,8 +194,12 @@ int main(void){
   for(int j=i+1;j<LEN(loc);j++)assert(zone_idx[j]!=id);
   int road=(v->gy+1)*256;for(int y=loc[i].y;y<=road;y++)assert(open_space(loc[i].x,y));
  }
- for(int y=35;y<ROOM-35;y+=2)for(int x=35;x<ROOM-35;x+=2)
-   if(x%256<=29||x%256>=227||y%256<=29||y%256>=227)assert(!roofMask[y*ROOM+x]);
+ /* Legacy grid margins and actual outer road ribbons must remain clear.
+    The new harbor's off-road warehouses need not fit the old city grid. */
+ for(int y=35;y<ROOM-35;y+=2)for(int x=35;x<ROOM-35;x+=2){
+  if(outer_is_new(x,y)){if(outer_onroad(x,y))assert(!roofMask[y*ROOM+x]);}
+  else if(x%256<=29||x%256>=227||y%256<=29||y%256>=227)assert(!roofMask[y*ROOM+x]);
+ }
  move_to(256,512);p.a=0;p.shot=0;p.heat=0;
  peds[0]=(Ped){275,512,0,0,2,0,0,0,0};press(PUNCH);assert(punchFlash>0&&peds[0].hp==1&&p.heat>=26&&p.trail<=0);
  dispatch_reset();p.heat=180;p.quiet=100;
@@ -205,9 +209,12 @@ int main(void){
  for(int i=0;i<200;i++)street_tick_civilian(0,1.f/60);
  for(int i=0;i<LEN(peds);i++)pedHit[i]=0;
  for(int j=0;j<nb;j++){Building*b=buildings+j;if(b->w>0&&b->h>0)assert(beam_block(b->x+2,b->y+3));}
- cx=0;cy=270;Car lamp={256,512,0,50,0,1,100};rect(0,0,W,H,0x19324c);projectLights(&lamp);
- U lit=pixels[(512-cy)*W+276];assert(lit>0x19324c);
- fastGfx=1;rect(0,0,W,H,0x19324c);projectLights(&lamp);assert(pixels[(512-cy)*W+276]==0x19324c);fastGfx=0;
+ cx=0;cy=270;Car lamp={256,512,0,50,0,1,100};rect(0,0,W,H,0x19324c);
+ hlCount=0;z(hlIndex,sizeof hlIndex);hlGain=27;hlWet=0;
+ headlamps_pair(&lamp,0,0,270,W,810);
+ assert(headlamps_energy(276,506)>10&&headlamps_energy(276,518)>10&&!headlamps_energy(276,512));
+ assert(headlamps_ground(0x19324c,276,506)>0x19324c);
+ fastGfx=1;headlamps_overhead();assert(!hlCount&&pixels[(506-cy)*W+276]==0x19324c);fastGfx=0;
  press(MAP);assert(mapOn);pointer_input(610,334,1);assert(navHasManual);frame("build/map.ppm");
  pointer_input(610,334,2);assert(!navHasManual);pointer_input(500,330,0);press(ENTER);assert(navHasManual);press(ENTER);assert(!navHasManual);
  press(ESC);assert(!mapOn);pointer_input(610,334,1);assert(!navHasManual);

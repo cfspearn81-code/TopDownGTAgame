@@ -11,8 +11,138 @@ typedef struct{int route,next,driven,yielding;float outOfSight;} OutDriver;
 static OutLane outLane[4];
 static OutDriver outDriver[OUT_TRAFFIC_COUNT];
 static int outCrowdCount;
+static void out_prepare_lanes(void);
 typedef struct{int damage;float x,y,down,flash;} OuterCondition;
 static OuterCondition outBody[N_ACT_MAX-N_ACT_OUTER];
+#define DC_OUTER_WALK_POSES 1
+/* Fixed world identities. Each walker stays on a surveyed shoulder/stroll
+ * segment, then pauses at a distinct end point. No viewport-time loops. */
+enum{OUT_WALK_COUNT=24};
+typedef struct{
+ float x,y,a,x0,y0,x1,y1,pace,pause,stride;
+ int ready,leg;
+} OuterWalker;
+static OuterWalker outWalkers[OUT_WALK_COUNT];
+static int outWalkReady;
+_Static_assert(OUT_WALK_COUNT==N_ACT_MAX-N_ACT_OUTER,"each surveyed walker keeps its original regional NPC identity");
+static int outer_walk_count(void);
+static int outer_walk_pose(int,float*,float*,float*,int*,U*);
+static int outer_walk_clear(float x,float y){
+ /* A side-road shoulder can cross the middle of a wider road.
+  * The baked union's deepest asphalt band wins at every intersection;
+  * walk paths cannot mistake that band for a shoulder. */
+ return outer_is_new(x,y)&&outer_walkable(x,y,4.f)&&!solid(x,y,4.f)&&
+        outerInk[(int)y*ROOM+(int)x]<=12;
+}
+static int outer_walk_check(float x,float y,float xx,float yy){
+ float dx=xx-x,dy=yy-y;int n=1+(int)(sq(d2(dx,dy))/3.f);
+ for(int i=0;i<=n;i++)if(!outer_walk_clear(x+dx*i/n,y+dy*i/n))return 0;
+ return 1;
+}
+static int outer_walk_away_from_lane(float x,float y){
+ /* The old decorative cars could pass through a shoulder card. The
+  * reserved physical traffic must not turn into (or permanently yield
+  * to) a stroller. Survey both the open and closed swept lane centers. */
+ for(int i=0;i<LEN(outLane);i++){
+  const OutLane*l=outLane+i;
+  for(int j=0;j<l->n;j++){
+   OutLanePoint a=l->point[j],b=l->point[(j+1)%l->n];
+   const float left=a.x<b.x?a.x:b.x,right=a.x>b.x?a.x:b.x;
+   const float top=a.y<b.y?a.y:b.y,bottom=a.y>b.y?a.y:b.y;
+   if(x<left-24.f||x>right+24.f||y<top-24.f||y>bottom+24.f)continue;
+   float dx=b.x-a.x,dy=b.y-a.y,d=d2(dx,dy),t=d>0?((x-a.x)*dx+(y-a.y)*dy)/d:0.f;
+   if(t<0)t=0;if(t>1)t=1;
+   if(d2(x-a.x-dx*t,y-a.y-dy*t)<24.f*24.f)return 0;
+  }
+ }
+ return 1;
+}
+static void outer_walk_init(void){
+ static const int sites[]={10,19,25,36,45,54};
+ out_prepare_lanes();
+ z(outWalkers,sizeof outWalkers);outCrowdCount=0;outWalkReady=1;
+ for(int k=0;k<LEN(sites);k++)for(int j=0;j<4;j++){
+  int id=k*4+j,side=(j&2)?-1:1;
+  OuterWalker*w=outWalkers+id;
+  float best=0;int site=sites[k];const OuterPoint*near=outerNodes+site;
+  for(int n=0;n<LEN(outerRoads);n++){
+   const OuterRoad*r=outerRoads+n;
+   int r0=r->a,r1=r->b;
+   float gap=sq(d2(outerNodes[r0].x-near->x,outerNodes[r0].y-near->y));
+   float alt=sq(d2(outerNodes[r1].x-near->x,outerNodes[r1].y-near->y));
+   if(alt<gap){int t=r0;r0=r1;r1=t;gap=alt;}
+   if(gap>158.f)continue;
+   const OuterPoint*a=outerNodes+r0,*b=outerNodes+r1;
+   float dx=b->x-a->x,dy=b->y-a->y,length=sq(d2(dx,dy));if(length<56.f)continue;
+   float u=dx/length,v=dy/length;
+   static const float offsets[]={8.f,13.f,2.f,19.f,25.f,-5.f,-8.f,33.f};
+   for(int off=0;off<LEN(offsets);off++){
+    float yoff=side*(r->half+offsets[off]);
+    float x=a->x-v*yoff,y=a->y+u*yoff;
+    /* Only award this slot's half; adjacent walkers cannot lap or meet
+     * head-to-head at the same station. Leave a full body space at the seam. */
+    float lo=(j&1)?length*.5f+11.f:12.f,hi=(j&1)?length-12.f:length*.5f-11.f;
+    if(hi-lo<30.f)continue;
+    float bestStart=0,bestEnd=0,open=-1;
+    for(float d=lo;d<=hi;d+=3.f){
+     if(outer_walk_clear(x+u*d,y+v*d)&&outer_walk_away_from_lane(x+u*d,y+v*d)){
+      if(open<0)open=d;
+      if(d-open>bestEnd-bestStart){bestStart=open;bestEnd=d;}
+     }else open=-1;
+    }
+    float span=bestEnd-bestStart;if(span<29.f)continue;
+    float score=span-gap*.20f-off*4.f;
+    if(score<=best||!outer_walk_check(x+u*bestStart,y+v*bestStart,x+u*bestEnd,y+v*bestEnd))continue;
+    /* Other station shoulders may share a real road bend; reject
+     * overlapping templates once, not by blinking out passing actors. */
+    int overlap=0;
+    for(int other=0;other<id;other++){
+     const OuterWalker*q=outWalkers+other;if(!q->ready)continue;
+     for(int m=0;m<=8&&!overlap;m++)for(int nn=0;nn<=8;nn++){
+      float d=bestStart+span*m/8.f;
+      float qx=q->x0+(q->x1-q->x0)*nn/8.f,qy=q->y0+(q->y1-q->y0)*nn/8.f;
+      if(d2(x+u*d-qx,y+v*d-qy)<13.f*13.f){overlap=1;break;}
+     }
+    }
+    if(overlap)continue;
+    best=score;w->ready=1;w->x0=x+u*bestStart;w->y0=y+v*bestStart;w->x1=x+u*bestEnd;w->y1=y+v*bestEnd;
+   }
+  }
+  if(w->ready){
+   float begin=.15f+(id%7)*.105f;w->x=w->x0+(w->x1-w->x0)*begin;w->y=w->y0+(w->y1-w->y0)*begin;
+   w->leg=id&1;w->pace=(24.f+(id%6)*2.3f)*FOOT_PACE;w->pause=(id%6)*.34f;
+   w->a=look(w->leg?w->x1-w->x:w->x0-w->x,w->leg?w->y1-w->y:w->y0-w->y);outCrowdCount++;
+  }
+ }
+}
+static void outer_walk_tick(float dt){
+ for(int i=0;i<LEN(outWalkers);i++){
+  OuterWalker*w=outWalkers+i;int id=N_ACT_OUTER+i;
+  if(!w->ready||outBody[i].damage==3||npc_holds(id)||npc_replaces(id))continue;
+  if(w->pause>0){w->pause-=dt;continue;}
+  float x=w->leg?w->x1:w->x0,y=w->leg?w->y1:w->y0;
+  float dx=x-w->x,dy=y-w->y,n=sq(d2(dx,dy));
+  if(n<.03f){w->leg^=1;w->pause=1.7f+(i%7)*.47f;continue;}
+  float m=w->pace*dt;if(m>n)m=n;
+  x=w->x+dx*m/n;y=w->y+dy*m/n;
+  float facing=look(dx,dy),turn=wrap(facing-w->a),steer=dt*5.4f;
+  if(turn>steer)turn=steer;if(turn<-steer)turn=-steer;
+  w->a=wrap(w->a+turn);
+  /* Wait on the shoulder rather than squeezing through a stopped
+   * car, the player or the walker at the next bend. */
+  if(absf(wrap(facing-w->a))>.30f||!outer_walk_clear(x,y)){w->pause=.10f;continue;}
+  if(!street_step_past_cars(w->x,w->y,x,y,3.f)){w->pause=.18f;continue;}
+  int blocked=0;
+  for(int k=0;k<LEN(outWalkers)&&!blocked;k++)if(k!=i&&outWalkers[k].ready&&outBody[k].damage!=3){
+   float dd=d2(outWalkers[k].x-x,outWalkers[k].y-y);
+   if(dd<11.f*11.f&&dd<d2(outWalkers[k].x-w->x,outWalkers[k].y-w->y))blocked=1;
+  }
+  if(p.car<0&&!p.dead&&d2(p.x-x,p.y-y)<12.f*12.f&&d2(p.x-x,p.y-y)<d2(p.x-w->x,p.y-w->y))blocked=1;
+  if(blocked){w->pause=.19f;continue;}
+  w->x=x;w->y=y;w->stride+=m;if(w->stride>=25.13274f)w->stride-=25.13274f;
+ }
+}
+static int outer_walk_count(void){return outWalkReady?LEN(outWalkers):0;}
 /* 3HP for unarmoured civilians, as on the city blocks. These short-lived
    states, like the original downtown bodies, are not career data. */
 static int outer_injure(int id,int damage,float x,float y){
@@ -35,7 +165,7 @@ static void outer_condition_tick(float dt){
 static int outNight(void){return sv.dayClock<348.f||sv.dayClock>=1120.f;}
 static int outer_person_ref(int,NpcRef*,int*);
 static void outer_life_reset(void){
- z(outBody,sizeof outBody);z(outDriver,sizeof outDriver);outCrowdCount=0;
+ z(outBody,sizeof outBody);z(outDriver,sizeof outDriver);z(outWalkers,sizeof outWalkers);outCrowdCount=outWalkReady=0;
  for(int i=STREET_CITY_CAR_LIMIT;i<LEN(cars);i++)cars[i]=(Car){.x=-100,.y=-100};
 }
 static void outer_take_wheel(int id){
@@ -65,6 +195,13 @@ static void out_lane_bake(OutLane*l,const unsigned char *route,int n,int loop){
    if(z>0)q->y-=11.f*(z>1.f?1.f:z);
   }
  }
+}
+static void out_prepare_lanes(void){
+ if(outLane[0].n)return;
+ out_lane_bake(outLane,outMain,LEN(outMain),1);
+ out_lane_bake(outLane+1,outDetour,LEN(outDetour),1);
+ out_lane_bake(outLane+2,outBluff,LEN(outBluff),0);
+ out_lane_bake(outLane+3,outHarbor,LEN(outHarbor),0);
 }
 static int out_seen(const Car*c){
  /* Vehicle remains intact well beyond both the overhead and chase views. */
@@ -150,13 +287,9 @@ static void out_drive(int slot,float dt){
 static void outer_life_tick(float dt){
  outer_condition_tick(dt);
  const int nearby=p.x>=1610.f||p.y>=1600.f;
- outCrowdCount=nearby?(outNight()?8:4):0;
- if(!outLane[0].n&&nearby){
-  out_lane_bake(outLane,outMain,LEN(outMain),1);
-  out_lane_bake(outLane+1,outDetour,LEN(outDetour),1);
-  out_lane_bake(outLane+2,outBluff,LEN(outBluff),0);
-  out_lane_bake(outLane+3,outHarbor,LEN(outHarbor),0);
- }
+ if(nearby&&!outWalkReady)outer_walk_init();
+ if(outWalkReady)outer_walk_tick(dt);
+ if(nearby)out_prepare_lanes();
  if(nearby||street_next_car(nc-1)<LEN(cars))out_sample_feet();
  for(int i=0;i<OUT_TRAFFIC_COUNT;i++){
   int id=STREET_CITY_CAR_LIMIT+i;Car*c=cars+id;OutDriver*d=outDriver+i;
@@ -186,34 +319,33 @@ static int outer_person_ref(int id,NpcRef*r,int*step){
   {"Sid Bass","Lane Moon","Mae Cove","Jori Niles"},
   {"Wynn Hart","Rune Hale","Cal Firth","Emery Lin"}
  };
- _Static_assert(LEN(outerStops)==N_OUTER_SITES,"update Outer Loop actor identities");
+ _Static_assert(LEN(outerStops)>=N_OUTER_SITES,"preserve the six original regional identity groups");
  if(id<N_ACT_OUTER||id>=N_ACT_MAX||scene!=1)return 0;
  if(outBody[id-N_ACT_OUTER].damage==3)return 0;
  if(npc_holds(id)){*r=npcTalk;if(step)*step=0;return 1;}
- if(!outCrowdCount)return 0;
+ /* Static shoulder routes have no time-of-day or viewport discontinuity.
+  * The raw actor supplies the same coordinates for walkers, NPC contacts,
+  * ambient traffic yielding and direct overlap checks. */
+ if(!outWalkReady){
+  if(p.x<1610.f&&p.y<1600.f)return 0;
+  outer_walk_init();
+ }
  int s=id-N_ACT_OUTER,k=s/N_OUTER_SEATS,i=s%N_OUTER_SEATS;
- OuterPoint site=outerNodes[outerStops[k].node];
- /* Distant actors do not need trigonometry or terrain queries. */
- if(absf(p.x-site.x)>W+120||absf(p.y-site.y)>H+140)return 0;
- int night=outNight(),n=k==1||k==2?(night?2:4):outCrowdCount/2;
- if(i>=n)return 0;
- float swing=sn(anim*(night?.7f:1.5f)+i*.81f);
- /* Surveyed walkable shoulder runs. Each tangent stays on the road's
-    raised outer ribbon for the full swing, including curved sites; the
-    highway's white lane dividers are NOT sidewalks. Do not move a held
-    conversation when its shift changes (handled above). */
- static const struct{float x,y,u,v;} walks[N_OUTER_SITES]={
-  {2644,350,.99746f,.06976f},{2794,1072,1,0},{2368,794,1,0},
-  {2734,1754,.03490f,.99926f},{2032,2532,1,0},{1160,2301,.96123f,.27564f}
- };
- float along=(i-(n-1)*.5f)*13.f+swing*13.f;
- float x=walks[k].x+walks[k].u*along,y=walks[k].y+walks[k].v*along;
- float heading=look(walks[k].u,walks[k].v)+(cs(anim*(night?.7f:1.5f)+i*.81f)<0?3.141593f:0);
- U coat=i%3==0?0x758fbd:i%3==1?0xca9fa0:0x82b8ad;
- if(outBody[id-N_ACT_OUTER].flash>0)coat=0xffdfbc;
- if(step)*step=(int)(swing*3);
- return npc_spot(r,id,0,names[k][i],x,y,heading,MODEL_CIVILIAN,i+k,coat);
+ const OuterWalker*w=outWalkers+s;
+ if(!w->ready)return 0;
+ static const U coats[]={0x758fbd,0xca9fa0,0x82b8ad,0xb89a79,0x907caa,0x6b8d96};
+ U coat=outBody[s].flash>0?0xffdfbc:coats[s%LEN(coats)];
+ if(step)*step=w->pause>0?0:(int)(sn(w->stride*.5f)*4.f);
+ return npc_spot(r,id,0,names[k][i],w->x,w->y,w->a,MODEL_CIVILIAN,s+13,coat);
 }
+static int outer_walk_pose(int i,float*x,float*y,float*a,int*step,U*coat){
+ if((U)i>=(U)outer_walk_count())return 0;
+ int id=N_ACT_OUTER+i;NpcRef r;
+ if(npc_replaces(id)||!outer_person_ref(id,&r,step))return 0;
+ npc_present_pose(id,&r.x,&r.y,&r.a,step);
+ *x=r.x;*y=r.y;*a=r.a;*coat=r.coat;return 1;
+}
+
 /* Melee ranks by squared distance, pulses by forward distance, matching
    their city equivalents so a nearer target from either group wins. */
 static OuterHit outer_pick(float x,float y,float co,float si,int melee,float limit,float minimum,float mx,float my){
@@ -242,18 +374,14 @@ static int outer_car_hit(float x,float y,float co,float si){
 static void outer_life_paint(void){
  if(outCrowdCount){
   for(int id=N_ACT_OUTER;id<N_ACT_MAX;id++){
-   NpcRef r;int step=0;OuterCondition*b=outBody+(id-N_ACT_OUTER);
+   OuterCondition*b=outBody+(id-N_ACT_OUTER);
    if(npc_replaces(id))continue;
    if(b->damage==3&&b->down>0){
     int x=sx(b->x),y=sy(b->y);if(x>=-12&&x<W+12&&y>=-10&&y<H+10){
      line(x-7,y-3,x+7,y+3,0x815763);disc(x-7,y-4,3,0x85757b);
     }continue;
    }
-   if(!outer_person_ref(id,&r,&step))continue;
-   int x=sx(r.x),y=sy(r.y);
-   if(x<-32||x>W+32||y<-32||y>H+44)continue;
-   npc_present_pose(id,&r.x,&r.y,&r.a,&step);
-   person(x,y,r.coat,step,r.a,r.model,r.hue);
+
   }
  }
 }

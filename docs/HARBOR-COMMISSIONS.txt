@@ -1,0 +1,46 @@
+HARBOR OFFICE / COMMISSION BOARD
+===============================
+Lantern Quay is at the east end of the southeastern shoreline.
+Use Signal (P, or your F7 setting) > Night Wire. The final four
+posts are Relay recovery, Blue parcel, Breakwater bump and Cancel.
+You can also reach the marked Harbor Office in person and press E
+on foot. In either board, choose a commission and confirm twice.
+The map and HUD mark the current target. If another timed land
+job is active, finish or cancel that job before starting a case.
+
+RELAY RECOVERY ($185 CLEAN)
+A nonhuman security automaton patrols the marked service alley.
+E disables it in a scripted arcade interaction; a fresh E carries
+its inert shell. Use E at the highlighted trunk of a stopped,
+working car you own. Drive to the cargo inspection area. Park
+at the wide north pullout and walk to the marked quay transfer
+point; E completes the transfer. Walk to
+the cargo dock, board a public skiff and follow the receiver marker
+offshore. E at the survey receiver finishes the commission.
+The automaton briefly interrupts its E prompt if you linger.
+Wait for the on-screen prompt to return. The encounter has no
+civilian targets or weapon interactions.
+
+BLUE PARCEL ($150 CLEAN)
+Visit the blue-painted gantry at the cargo pier and press E to read
+its fictional marker clue. Board a skiff. A blue cabin launch waits
+southwest of the cargo berth. Its exact marker appears only when
+you're close. E triggers a boat-to-boat exchange for a fictional
+contraband Starcoil. Moor, then return to Harbor Office to file it.
+
+BREAKWATER BUMP ($105 CLEAN, +$45 OPTIONAL)
+In a skiff, make an arcade bump against the marked orange uncrewed
+training float, not a public boat. It drops one floating scoring chip.
+You can file the base commission at Harbor Office without the chip,
+or press E by the chip first for the bonus. No other vessel or
+character can grant this scoring cargo.
+
+E boards free public skiffs and moors at docks; dock controls take
+priority over a mission action. The boat is session-only. A save on
+the water reopens at its safe shore berth, and the same mission stage
+is still available. Case progress, a loaded registered model, a
+dropped scoring chip and filed rewards persist per career. Each
+commission pays once. Cancel before filing to restart it any time.
+If the loaded car changes or is wrecked, recover the case at its
+alley stand and use a working registered car again. The cargo never
+enters the regular delivery, stock or personal inventory systems.

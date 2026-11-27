@@ -28,6 +28,13 @@ static int street_lamp_outer(int i,StreetLamp *s){
  *s=street_lamp_style(q.x+23,q.y-17,q.y<810?0x845987:q.y<1520?0x8d7352:0x388b8c,0);
  return 1;
 }
+enum { HARBOR_LAMPS=3 };
+static int street_lamp_harbor(int id,StreetLamp*s){
+ if((unsigned)id>=HARBOR_LAMPS||!s)return 0;
+ const OuterPoint*q=harborDockPoints+id*2;
+ *s=street_lamp_style(q->x+(id==0?16:13),q->y-12,id==1?0xa38a5d:0x488f87,0);
+ s->radius=27;s->weight=3;return 1;
+}
 static void street_lamp_bake(const StreetLamp*s){
  light(s->x,s->y,s->radius,s->pool,s->weight);
  rect(s->x+s->poleX,s->y+s->poleY,s->poleW,s->poleH,s->pole);
