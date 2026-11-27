@@ -4,7 +4,7 @@ Usage: python3 scripts/qa/npc_keyboard_replay.py [source root]
 Build scripts/build.sh and scripts/build-linux.sh first. This uses fresh
 synthetic careers only; SDL runs with dummy drivers, PE uses check_pe.c
 Win32 stubs. Set DC_NPC_BITMAPS to retain reference crops from each host,
-or DC_NPC_CASE to run just conversation, surrender, defeat, flee, guide, or hold.
+or DC_NPC_CASE to run just conversation, surrender, defeat, flee, guide, hold, outer, or modal.
 For historical reproduction, use hold with DC_NPC_HOLD_BASELINE=1 and the previous release root.
 """
 import os
@@ -77,11 +77,16 @@ def run(args, **kw):
 
 def save(path, dirty, hp, expected_digest):
     b = path.read_bytes()
-    assert len(b) == 304
+    assert len(b) in (304, 1044)
     field = lambda o: struct.unpack_from("<I", b, o)[0]
     digest = 2166136261
     for v in b[:-4]: digest = ((digest ^ v) * 16777619) & 0xffffffff
-    assert (field(0), field(4), field(300)) == (0x44433131, 10, digest)
+    rev = 10 if len(b)==304 else 11
+    assert (field(0), field(4), field(len(b)-4)) == (0x44433131, rev, digest)
+    if rev==11:
+        prefix=2166136261
+        for v in b[:300]: prefix=((prefix^v)*16777619)&0xffffffff
+        assert field(300)==prefix and (field(968)&0x7fffffff)//64>2750
     assert (field(8), field(12), field(20), field(136)) == (70, hp, 0, dirty)
     assert digest == expected_digest
     return b
@@ -90,9 +95,13 @@ cases = {
     "conversation": (0, 100, 1),
     "surrender": (36, 100, 2),
     "defeat": (17, 84, 2),
+    "modal": (17, 84, 2),
     "flee": (0, 100, 1),
     "guide": (0, 100, 1),
     "hold": (0, 100, 1),
+    "outer": (0, 100, 1),
+    "outer-strike": (0, 92, 1),
+    "outer-response": (0, 100, 1),
 }
 requested = os.getenv("DC_NPC_CASE", "all")
 assert requested == "all" or requested in cases
@@ -142,7 +151,7 @@ int SDL_UpdateTexture(SDL_Texture*t,const SDL_Rect*r,const void*p,int pitch){
             assert len(actual) == len(names) and set(actual) == names and b"MISSING" not in res.stderr
             return res.stdout
 
-        seed = 2 if case in ("defeat", "flee") else 0
+        seed = 2 if case in ("defeat", "flee", "modal") else 0
         win_path = tmp/"win.dat"
         windows_log = play([tmp/"pe", root/"build/DeadChannel.exe", "--tour"], seed, DC_NPC_HOST="pe",
                            DC_TRIP_LOAD=str(start), DC_TRIP_SAVE=str(win_path))
@@ -159,4 +168,4 @@ int SDL_UpdateTexture(SDL_Texture*t,const SDL_Rect*r,const void*p,int pitch){
              DC_LINUX_SNAPSHOT=str(lin_path))
         assert save(lin_path, dirty, hp, expected_digest) == windows
         print(f"PASS {case}: {frame_count.decode()} key frames, {len(names)} RGB checkpoints per launcher, "
-              f"byte-identical Rev10 {expected_digest:08x} ($70 clean, ${dirty} dirty, {hp} HP).", flush=True)
+              f"byte-identical Rev{windows[4]} {expected_digest:08x} ($70 clean, ${dirty} dirty, {hp} HP).", flush=True)

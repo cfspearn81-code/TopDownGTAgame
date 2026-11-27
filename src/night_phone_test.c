@@ -16,9 +16,8 @@ static void np_new_cards(void){
  np_press(NP_WIRE,6);assert(np_app==NP_INBOX&&np_row==1);
  np_app=NP_WIRE;np_line(&l,8);assert(strstr(l.label,"Freight Parkway"));
  int x=0,y=0;night_garage_meet_site(&x,&y);np_press(NP_WIRE,1);assert(navHasManual&&navManual.x==x&&navManual.y==y);
- int v=night_venue_vendor_stop();
- sv.dayClock=700;np_press(NP_WIRE,7);if(v>=0)assert(navManualLoc==LEN(loc)+night_venue_vendor_stop());
- sv.dayClock=1200;int vx,vy;assert(night_venue_vendor_pos(&vx,&vy));np_press(NP_WIRE,7);assert(navManualLoc==-1&&navManual.x==vx&&navManual.y==vy);
+ sv.dayClock=700;np_press(NP_WIRE,7);assert(nav_cart_tracking()&&!navCartOpen&&navCartClock==150);
+ sv.dayClock=1200;int vx,vy;assert(night_venue_vendor_pos(&vx,&vy));nav_update();assert(nav_cart_tracking()&&navCartOpen&&navManual.x==vx&&navManual.y==vy);
  np_press(NP_WIRE,10);assert(navManualLoc==12);
  np_press(NP_RADIO,5);assert(!night_phone_take_link()&&np_confirm);
  night_phone_tick(0,UP);assert(!night_phone_take_link()&&!np_confirm);

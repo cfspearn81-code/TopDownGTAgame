@@ -4,7 +4,7 @@
 enum { NP_BIND, NP_STATION, NP_POST, NP_CURSOR, NP_CARD, NP_JOB, NP_DONE, NP_SAMPLE,
  NP_NEWTYPE,NP_NEWGRADE,NP_MODULES,NP_BATCH,NP_LEFT,NP_SHELF=16,NP_BAG=25,
  NP_HEAT=34,NP_DECAY=40,NP_HOLD,NP_REP,NP_POPSTAMP,NP_RIVAL,NP_LASTSALE,NP_STREAK,NP_PROFILE,NP_BATCH_MODE,NP_PATROL,NP_SIM,NP_SIM_COOL,NP_ALIAS,NP_HEAT_EAST };
-enum { NP_INBOX,NP_TRACE,NP_WIRE,NP_LOFT,NP_STOCK,NP_RADIO,NP_PREF,NP_NAPP };
+enum { NP_INBOX,NP_TRACE,NP_WIRE,NP_LOFT,NP_STOCK,NP_RADIO,NP_PREF,NP_NAPP,NP_RECEIPTS=NP_NAPP };
 /* These are supplied by the release's venue, club, and garage modules. */
 static int night_garage_meet_site(int*,int*),night_venue_vendor_stop(void),night_venue_vendor_pos(int*,int*),night_club_signature_demand(int);
 
@@ -95,6 +95,17 @@ static int np_fair_selector(void){int h=np_hour();return h>=8&&h<18?1:h>=22||h<2
 static int np_fair_location(int which){return which==2?7:2;}
 static const char *np_fair_name(int which){return which==2?"Kiosk Lantern Exchange":"Ferry Night Garden";}
 static U np_stamp(void){return 1u+sv.playedTicks/(DAY_SECONDS*60u);}
+static int daily_rewards_tick(int closed,float dt){
+ const U day=DAY_SECONDS*60u;
+ int bucket=!closed&&absf(dt-1.f/60.f)<.000001f&&sv.playedTicks&&!(sv.playedTicks%day);
+ if(!closed&&!bucket)return 0;
+ U *marks[]={&nv.phone[NP_POPSTAMP],&nv.garage[36]},stamp=np_stamp();int changed=0;
+ for(int i=0;i<2;i++){
+  if(closed&&*marks[i]){*marks[i]=0;changed=1;}
+  else if(bucket&&*marks[i]==stamp-1){*marks[i]=stamp;changed=1;}
+ }
+ return changed;
+}
 static int np_new_order(void){return 1+(int)(nv.phone[NP_DONE]%9u);}
 enum {NP_PARKWAY_X=2464,NP_PARKWAY_Y=1024,NP_PARKWAY_MIN=968,NP_PARKWAY_MAX=1080};
 static int np_closed(void){int h=np_hour();return (h>=6&&h<8)||(h>=16&&h<18);}
@@ -184,8 +195,9 @@ static int night_phone_action(U tap){
  int fair=np_fair_selector(),venue=np_fair_location(fair);
  if(fair&&np_get(NP_CARD,2)==fair&&d2(p.x-loc[venue].x,p.y-loc[venue].y)<43.f*43.f){
   U stamp=np_stamp();int slot=fair==2?NP_BAG+3:NP_BAG;
-  if(nv.phone[NP_POPSTAMP]!=stamp){
-   if(np_get(slot,99)==99){tell("Signal / That strain and grade slot is full. The pop-up gift is still reserved.");return 1;}
+  /* Only an actual gift consumes E. A full satchel must not lock both the
+   * shop doorway and an unrelated handoff at this same street address. */
+  if(nv.phone[NP_POPSTAMP]!=stamp&&np_get(slot,99)<99){
    nv.phone[NP_CARD]=0;nv.phone[NP_POPSTAMP]=stamp;nv.phone[slot]=np_get(slot,99)+1;
    tell(fair==2?"Lantern Exchange / Free House-grade Prism Fern lot collected.":"Ferry Night Garden / Free House-grade Halo Moss lot collected.");request_save();return 1;
   }
@@ -230,14 +242,16 @@ static const char *const np_style[]={"Mute the handset and car station.","Glass 
 static const char *const np_modules[]={"Lighting upgrade","Hydroponics upgrade","Ventilation upgrade"};
 static const char *const np_moddesc[]={"Unlocks Prism Fern and Select grade. Adds one power slot.","Unlocks Echo Bloom and Select grade. Adds one power slot.","Unlocks Top Shelf for all unlocked strains. Adds one slot."};
 typedef struct{char label[100],suffix[95],detail[155];} NPLine;
-static int np_rows(void){static const int counts[]={4,4,13,10,9,6,4};return counts[cl(np_app,0,NP_NAPP-1)];}
+
 static void np_label(NPLine*r,const char*name,const char*small,const char*detail){append(r->label,name);append(r->suffix,small);append(r->detail,detail);}
+#include "signal_receipts.inc"
+static int np_rows(void){static const int counts[]={4,4,13,10,9,6,4};return np_app==NP_RECEIPTS?RRC_ROWS:counts[cl(np_app,0,NP_NAPP-1)];}
 static const char *const np_meet_name[]={"Switchyard Social","Bluff Lights","Wharf After Dark"};
 static const char *const np_booth[]={"Velvet","Mirage","Aurora"};
 static int np_card_booth(void){return (np_hour()/4)%LEN(np_booth);}
 static const char*np_wthr(void){int w=night_world_weather();return w==NIGHT_FOG?"FOG":w==NIGHT_RAIN?"RAIN":"CLEAR";}
 static void np_line(NPLine *l,int r){
- z(l,sizeof *l);int j=np_job(),batch=np_active_batch(),edition=np_sel();char*q;
+ z(l,sizeof *l);if(np_app==NP_RECEIPTS){rrc_line(l,r);return;}int j=np_job(),batch=np_active_batch(),edition=np_sel();char*q;
  switch(np_app){
  case NP_INBOX:{
   int id=np_offer(r);const NPBrief *b=np_brief+id;append(l->label,b->name);fmt(l->suffix,"$",b->pay);append(l->suffix+sl(l->suffix),j==id?"  ACTIVE":!id?"  CLEAN":"  SCRIP");
@@ -262,16 +276,23 @@ static void np_line(NPLine *l,int r){
    else append(l->detail,"Nightly meet opens at 19:00. Select to pin tonight's stop in advance.");}
   if(r==2)np_label(l,"@motordesk / Race invite","RACE DESK","Take an owned ride to Motor Works for a time trial, or join tonight's meet for an invitation to the street race circuit.");
   if(r==3){np_label(l,"@ferrygarden / Pop-up",fair?"LIVE":"SCHEDULE","");if(fair){
-     q=append(l->detail,np_fair_name(fair));append(q,": RSVP here, then E on foot outside the venue. One free House-grade lot per elapsed day.");}
+     q=append(l->detail,np_fair_name(fair));append(q,np_get(fair==2?NP_BAG+3:NP_BAG,99)==99?
+      ": matching satchel slot full. Free one space to collect; the shop door still works.":
+      ": RSVP here, then E on foot outside the venue. One free House-grade lot per elapsed day.");}
    else append(l->detail,"Ferry Night Garden: 08:00-17:59. Kiosk Lantern Exchange: 22:00-01:59. Check back for RSVP.");}
   if(r==4)np_label(l,"@curbwire / Street report",np_wthr(),night_world_weather()==NIGHT_RAIN?"Rain bulletin: watch for wet pavement. Pin Breakwater.":night_world_weather()==NIGHT_FOG?"Fog bulletin: reduced visibility by the port. Pin Breakwater.":"No storm bulletin. Clear sightlines reported on the waterfront. Pin Breakwater.");
   if(r==5){np_label(l,"@backpage / District pulse","","Repeated sales, sightings and high-value grades raise local attention. At 65 a rival may delay a handoff; at 85 patrols notice Top Shelf.");q=number(l->suffix,night_phone_heat_at((int)p.x,(int)p.y));append(q," / 100");}
   if(r==6){const NPBrief *offer=np_brief+np_new_order();np_label(l,"@requestline / Customer DM","OPEN MESSAGE","");
    q=append(l->detail,offer->name);q=append(q,": ");q=number(q,offer->qty);q=append(q," x ");q=append(q,np_design[offer->id/3]);q=append(q," / ");q=append(q,np_ed[offer->id%3]);q=append(q,". Pays $");number(q,offer->pay);}
-  if(r==7){int vx,vy,on=night_venue_vendor_pos(&vx,&vy);np_label(l,"@cartwatch / Night Cart tip",on?"VENDOR ONLINE":"19:00","");
-   if(on){q=append(l->detail,"Signal Cart gear counter checked in: ");q=append(q,district(vx,vy));append(q,". Select to pin the active street stop.");}
-   else{int showroom=night_venue_vendor_stop();q=append(l->detail,"Gear counter runs 19:00-04:59.");
-    if(showroom>=0&&showroom<nb){q=append(q," Daytime cosmetic showroom: ");append(q,walkin_name(showroom));}}}
+  if(r==7){
+   int vx,vy,vtime,on=night_venue_vendor_report(&vx,&vy,&vtime);char stamp[6];city_time_label(vtime,stamp);
+   int tracked=navSlot==sideSlot&&nav_cart_tracking();
+   np_label(l,"@cartwatch / Night Cart",on?tracked?"LIVE TRACKING":"VENDOR ONLINE":tracked?"WAITING":"CLOSED","");
+   q=append(l->detail,on?"Latest report ":"Last report ");q=append(q,stamp);q=append(q," / ");
+   q=append(q,district(vx,vy));
+   if(!on)q=append(q,". Reopens 19:00");
+   append(q,tracked?". Enter stops tracking.":". Enter follows each stop on the atlas.");
+  }
   if(r==8)np_label(l,"@roadworks / Freight Parkway",np_closed()?"CLOSED":"OPEN",np_closed()?"Signed parkway closure ahead. Local streets remain open. Pin the approach to see the barriers.":"Parkway open now. Temporary roadworks are posted 06:00-07:59 and 16:00-17:59 daily.");
   if(r==9){int booth=np_card_booth(),need=night_club_signature_demand(booth);np_label(l,"@silkcurtain / VIP order","TOP SHELF","");
    if(need>=0&&need<LEN(np_design)){q=append(l->detail,np_booth[booth]);q=append(q," booth requests ");q=append(q,np_design[need]);append(q," / Top Shelf A. Pin The Afterimage management.");}
@@ -307,6 +328,7 @@ static void np_line(NPLine *l,int r){
  }
 }
 static void np_apply(void){int r=np_row,j=np_job();
+ if(np_app==NP_RECEIPTS){rrc_apply();return;}
  if(np_app==NP_INBOX){np_accept(np_offer(r));return;}
  if(np_app==NP_TRACE){if(r==0)np_track();else if(r==3&&j>=0){if(!np_confirm){np_confirm=1;np_msg("Press Enter again to cancel. Any direction backs out.");return;}
     np_clear_ours(np_job_dest());nv.phone[NP_JOB]=nv.phone[NP_SAMPLE]=nv.phone[NP_HOLD]=nv.phone[NP_RIVAL]=nv.phone[NP_PATROL]=0;np_confirm=0;np_msg("Request canceled. Your satchel was not touched.");request_save();}
@@ -322,9 +344,14 @@ static void np_apply(void){int r=np_row,j=np_job();
   else if(r==4)np_venue(9);
   else if(r==5){np_msg(np_areas[np_area((int)p.x,(int)p.y)]);return;}
   else if(r==6){np_app=NP_INBOX;np_row=1;np_msg("Customer DM opened. Confirm in Inbox to accept the exact strain and grade.");return;}
-  else if(r==7){int vx,vy;if(night_venue_vendor_pos(&vx,&vy))np_pin(-1,vx,vy);
-   else{int stop=night_venue_vendor_stop();if(stop<0||stop>=nb){np_msg("Gear counter closed. Watch this post after 19:00.");return;}
-    np_pin(LEN(loc)+stop,ordinaryDoorX[stop],ordinaryDoorY[stop]);np_msg("Night gear counter closed. Pinned the cosmetic showroom instead.");return;}}
+  else if(r==7){
+   np_tracking=-1;nav_slot();
+   if(nav_cart_tracking()){nav_clear();np_msg("Night Cart tracking stopped.");}
+   else{nav_track_cart();np_msg(navCartOpen?
+    "Tracking the Night Cart. M opens the regional atlas after returning to the street.":
+    "Tracking the Night Cart. Atlas shows its last stop; the route resumes at 19:00.");}
+   return;
+  }
   else if(r==8)np_pin(-1,NP_PARKWAY_X-66,NP_PARKWAY_Y);
   else if(r==10)np_venue(12);
   else if(r==11){np_app=NP_LOFT;np_row=9;np_msg("Glasshouse profile opened.");return;}
@@ -351,6 +378,8 @@ static void night_phone_open(void){
 }
 static void night_phone_tick(U keys,U tap){(void)keys;
  if(tap&ESC||night_phone_toggle(tap)){scene=np_return;np_confirm=np_link_pending=0;return;}
+ if(tap&MAP){if(np_app==NP_RECEIPTS)rrc_back();else rrc_open();return;}
+ if(np_app==NP_RECEIPTS&&(tap&(LEFT|RIGHT))){rrc_back();return;}
  if(tap&(LEFT|RIGHT)){np_app=(np_app+NP_NAPP+((tap&RIGHT)?1:-1))%NP_NAPP;np_row=np_confirm=0;np_note[0]=0;return;}
  int n=np_rows();if(tap&(UP|DOWN)){np_row=(np_row+n+((tap&DOWN)?1:-1))%n;np_confirm=0;np_note[0]=0;return;}
  if(tap&(USE|ENTER))np_apply();
@@ -387,6 +416,7 @@ static int np_first(void){return cl(np_row-2,0,max(0,np_rows()-5));}
 static void night_phone_pointer(int sx,int sy,U clicks){
  if(scene!=NIGHT_PHONE_SCENE||!(clicks&1))return;
  if(sx>=77&&sx<289&&sy>=144&&sy<144+7*38){np_app=cl((sy-144)/38,0,6);np_row=np_confirm=0;np_note[0]=0;}
+ else if(sx>=RR_SIGNAL_X&&sx<RR_SIGNAL_X+RR_SIGNAL_W&&sy>=RR_SIGNAL_Y&&sy<RR_SIGNAL_Y+RR_SIGNAL_H)rrc_open();
  else if(sx>=326&&sx<855&&sy>=170&&sy<330){int r=np_first()+(sy-170)/32;if(r>=np_rows())return;if(r==np_row)np_apply();else{np_row=r;np_confirm=0;np_note[0]=0;}}
  else if(sx>=727&&sy>=445&&sx<=874&&sy<=475){scene=np_return;np_confirm=np_link_pending=0;}
 }
@@ -401,14 +431,22 @@ static void night_phone_paint(void){
  char clock[6];day_clock_label(clock);textat(776,60,clock,0xc3dbd8,0);for(int i=0;i<4;i++)rect(837+i*5,75-i*3,3,3+i*3,0x86d9be);box(865,68,16,8,0x10202a,0x8eb9b6);rect(867,70,10,4,0x8eb9b6);rect(881,70,2,4,0x8eb9b6);
  rect(70,90,228,346,0x132530);rect(298,90,1,347,0x30454b);
  textat(81,91,"Signal",0xe3f6ed,1);static const char *const np_alias_label[]={"// 09","// WAVE","// MOSS","// ECHO"};textat(206,107,np_alias_label[np_get(NP_ALIAS,3)],0x71b6ac,0);
- rect(81,134,196,1,0x344951);int display=np_get(NP_DONE,1000000);
+ rect(81,134,196,1,0x344951);
  for(int i=0;i<NP_NAPP;i++){
   int y=144+i*38,on=i==np_app;U c=np_color[i];if(on){np_round(76,y,211,33,5,0x243e45);rect(76,y+4,3,25,c);}
   np_glyph(i,97,y+15,on?c:0x698c96);textat(118,y+6,np_apps[i],on?PAPER:0x9fb6bd,0);
   if(on)textat(265,y+6,">",c,0);
  }
- char calls[72];fmt(calls,"CAREER   /   ",display);textat(82,414,calls,0x86a3a8,0);
- U a=np_color[np_app];textat(326,93,np_apps[np_app],PAPER,1);textat(328,140,np_sub[np_app],a,0);
+ int receipts=np_app==NP_RECEIPTS,rx=RR_SIGNAL_X,ry=RR_SIGNAL_Y;
+ U a=receipts?rrc_ink:np_color[np_app];
+ np_round(rx,ry,RR_SIGNAL_W,RR_SIGNAL_H,5,receipts?0x3b3434:0x1a3037);
+ if(receipts)rect(rx,ry+3,3,24,rrc_ink);
+ box(rx+15,ry+6,12,17,0x1c2b31,rrc_ink);
+ for(int j=0;j<3;j++)line(rx+18,ry+10+j*4,rx+24,ry+10+j*4,rrc_ink);
+ textat(rx+42,ry+4,"Revenue receipts",receipts?PAPER:0xc8a99a,0);
+ textat(rx+181,ry+4,"M",rrc_ink,0);
+ textat(326,93,receipts?"Revenue receipts":np_apps[np_app],PAPER,1);
+ textat(328,140,receipts?"Municipal account / latest wallet changes":np_sub[np_app],a,0);
  char pg[48];number(append(number(pg,np_row+1)," / "),np_rows());textat(862-textw(pg,0),141,pg,0x91a6ac,0);
  rect(325,162,538,1,0x395058);int first=np_first();for(int j=0;j<5&&first+j<np_rows();j++){
   NPLine l;np_line(&l,first+j);int y=170+j*32,hi=first+j==np_row;np_round(325,y,538,29,3,hi?0x274047:j%2?0x162932:0x192d36);

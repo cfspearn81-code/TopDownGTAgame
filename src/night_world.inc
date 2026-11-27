@@ -25,14 +25,10 @@ static float night_world_brake(void){return 1.f-.19f*nwWet;}
 static float night_world_foot(void){return 1.f-.10f*nwWet;}
 static void night_rest_clock(unsigned hours,int clear_weather){
  if(hours>12)hours=12;
- /* Use the real economy clock rather than changing its day label alone. */
- for(unsigned tick=0;tick<hours*60;tick++){
-  production_tick(1.f);
-  if(sv.charges){
-   sv.sweepTicks=max(1,sv.sweepTicks-59);
-   revenue_tick();
-  }
- }
+ /* Time passes for plants, promised closings, daily counters and weather.
+  * A nap is not eight real minutes worked, or time spent on a Revenue
+  * deadline. The ordinary ticks opening/closing the bunk still count. */
+ for(unsigned tick=0;tick<hours*60;tick++)production_tick_mode(1.f,0);
  night_phone_rest((int)hours);
  if(clear_weather)nv.world[0]=120*60;
 }

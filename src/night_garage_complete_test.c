@@ -18,7 +18,7 @@ static void meet_schedule(void){
   sv.dayClock=630;ng_schedule_tick();sv.dayClock=1250;ng_schedule_tick();
   assert(night_garage_meet_site(&x,&y)==2&&x==1792&&y==2304&&!solid(x,y,15));
   for(int r=3;r<5;r++){
-   ng.event=NG_RACE;ng.route=r;
+   ng.event=NG_RACE;ng.bookedCourse=r;
    for(int i=0;i<5;i++)assert(!solid(ngRun[r].gate[i].x,ngRun[r].gate[i].y,14));
    for(int i=0;i<110;i++){Car g;ng.frames=(ngRun[r].seconds*60*i)/110;assert(ng_ghost_car(&g)&&!solid(g.x,g.y,5));}
   }
@@ -29,7 +29,7 @@ static void rear_tags_and_editions(void){
  ng.idx=ng.part=6;ng.model=0;ng.val=3;int before=sv.cash;
  assert(ng_buy_part()&&ng_installed(0).tag==3&&sv.cash==before-35);
  int r=2,t=ngRun[r].type;sv.owned|=(1<<t)|(1<<1);sv.carCond[t]=100;
- nv.garage[1+t*6]=1;ng.route=r;ng.frames=60;ng.paid=2;ng.spare=1;sv.owned&=~2;
+ nv.garage[1+t*6]=1;ng.bookedCourse=r;ng.frames=60;ng.paid=2;ng.spare=1;sv.owned&=~2;
  ng_finish_run();assert(ng_archive(r)&&ng_installed(t).paint==1&&sv.owned&2);
  ng_enter_panel(NG_COLLECTION,1);ng.chosen=r;ng.idx=1;ng_ui_accept();
  assert(ng.tab==NG_CONFIRM&&ng.idx==0);ng_ui_accept();assert(ng_installed(t).paint==1);
@@ -49,6 +49,9 @@ static void drive_expanded(int route){
  if(ng_courses()!=5)return;
  setup();sv.dayClock=650;sv.owned=1u<<3;sv.selection=3;sv.carCond[3]=100;
  nc=1;z(streetDrivers,sizeof streetDrivers);
+ /* Controlled course/geometry test: no ambient traffic in either fleet.
+    The separate Outer Loop traffic regression tests physical interactions. */
+ for(int i=0;i<OUT_TRAFFIC_COUNT;i++)outDriver[i]=(OutDriver){.driven=1,.outOfSight=-10000.f};
  for(int i=0;i<LEN(peds);i++)peds[i]=(Ped){.life=900.f};
  static const NavPoint b[]={{2690,384},{2598,380},{2530,437},{2460,481},{2388,471},{2332,421},{2263,382},{2197,411},{2144,482},{2048,512},{1792,512},{1792,1024}};
  static const NavPoint h[]={{1792,2304},{1792,1792},{1024,1792},{1024,2144},{1136,2265},{1360,2321},{1520,2368},{1592,2464}};

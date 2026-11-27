@@ -95,7 +95,7 @@ static int cr_walkers_in_box(void){
  return 0;
 }
 static int cr_native_car_at(float x,float y,int halfx,int halfy){
- for(int i=0;i<nc;i++)if((i||sv.owned)&&absf(cars[i].x-x)<halfx+19&&absf(cars[i].y-y)<halfy+19){
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(absf(cars[i].x-x)<halfx+19&&absf(cars[i].y-y)<halfy+19){
   /* Use the rotated native chassis rather than demanding a clear city
    * block. Parked curbside vehicles have room beside the narrow tugs. */
   const Car*c=cars+i;

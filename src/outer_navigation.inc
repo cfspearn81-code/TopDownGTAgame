@@ -23,16 +23,42 @@ static int nav_outer_attach(NavPoint p,OuterAttach att[OUT_ATTACH_CAP]){
   for(int k=0;k<2;k++){
    int e=nodes[k];NavPoint q=nav_outer_point(e);
    if(night_phone_lane_stop(mid.x,mid.y,q.x,q.y,4))continue;
-   OuterAttach*a=att+n++;a->node=e;a->count=0;a->dist=nav_dist(p,mid)+nav_dist(mid,q);
+   OuterAttach*a=att+n++;a->node=e;a->count=0;a->dist=nav_length(p,mid)+nav_length(mid,q);
    a->count=nav_append(a->via,a->count,p);a->count=nav_append(a->via,a->count,mid);
    a->count=nav_append(a->via,a->count,q);
   }
  }
  return n;
 }
+static int nav_outer_gate(int node){
+ for(int k=0;k<LEN(outGates);k++)if(outGates[k]==node)return 1;
+ return 0;
+}
+/* All four junctions sit on the original, continuous arterial grid. A
+ * route may enter the old city and then leave it again. Save the bend
+ * explicitly so the rendered line doesn't cut diagonally across buildings. */
+static NavPoint nav_gate_bend(NavPoint from,NavPoint to){return (NavPoint){to.x,from.y};}
 static int nav_outer_add(int n,NavPoint p){
  if(n>=LEN(navNodes))return n;
  return nav_append(navNodes,n,p);
+}
+/* A grid approach can double back on the same arterial at its regional
+ * graph join. Remove only an EXACT collinear reversal (never round a
+ * corner or invent a diagonal). The surviving segment is a subset of the
+ * two already validated road segments, including during Parkway closure. */
+static void nav_trim_retraces(void){
+ int n=0;
+ for(int i=0;i<navCount;i++){
+  NavPoint c=navNodes[i];
+  while(n>=2){
+   NavPoint a=navNodes[n-2],b=navNodes[n-1];
+   int x=b.x-a.x,y=b.y-a.y,u=c.x-b.x,v=c.y-b.y;
+   if(x*v!=y*u||x*u+y*v>=0)break;
+   n--;
+  }
+  if(n==0||!nav_same(navNodes[n-1],c))navNodes[n++]=c;
+ }
+ navCount=n;
 }
 static void nav_solve(NavPoint from,NavPoint to){
  if(!outer_is_new(from.x,from.y)&&!outer_is_new(to.x,to.y)){nav_solve_base(from,to);return;}
@@ -40,7 +66,7 @@ static void nav_solve(NavPoint from,NavPoint to){
  int ns=nav_outer_attach(from,start),ne=nav_outer_attach(to,end);
  navCount=navDist=0;
  if(nav_traversable(from,to,10)&&!night_phone_lane_stop(from.x,from.y,to.x,to.y,4)){
-  navNodes[0]=from;navNodes[1]=to;navCount=2;navDist=nav_dist(from,to);return;
+  navNodes[0]=from;navNodes[1]=to;navCount=2;navDist=nav_length(from,to);return;
  }
  if(!ns||!ne)return;
  enum{N=LEN(outerNodes),INF=100000};
@@ -54,13 +80,19 @@ static void nav_solve(NavPoint from,NavPoint to){
   int u=-1,best=INF;
   for(int j=0;j<N;j++)if(!done[j]&&d[j]<best){best=d[j];u=j;}
   if(u<0)break;done[u]=1;
+  if(nav_outer_gate(u))for(int j=0;j<LEN(outGates);j++){
+   int v=outGates[j];if(done[v])continue;
+   NavPoint a=nav_outer_point(u),b=nav_outer_point(v);
+   int alt=d[u]+nav_dist(a,b);
+   if(alt<d[v]){d[v]=alt;prev[v]=u;which[v]=which[u];}
+  }
   for(int j=0;j<LEN(outerRoads);j++){
    const OuterRoad*r=outerRoads+j;
    int v=r->a==u?r->b:r->b==u?r->a:-1;
    if(v<0||done[v])continue;
    NavPoint a=nav_outer_point(u),b=nav_outer_point(v);
    if(night_phone_lane_stop(a.x,a.y,b.x,b.y,4))continue;
-   int alt=d[u]+nav_dist(a,b);
+   int alt=d[u]+nav_length(a,b);
    if(alt<d[v]){d[v]=alt;prev[v]=u;which[v]=which[u];}
   }
  }
@@ -74,7 +106,13 @@ static void nav_solve(NavPoint from,NavPoint to){
  for(int i=0;i<first->count;i++)navCount=nav_outer_add(navCount,first->via[i]);
  int back[N],count=0;
  for(int n=last->node;n>=0&&count<N;n=prev[n])back[count++]=n;
- for(int i=count-1;i>=0;i--)navCount=nav_outer_add(navCount,nav_outer_point(back[i]));
+ for(int i=count-1;i>=0;i--){
+  NavPoint q=nav_outer_point(back[i]);
+  if(i+1<count&&nav_outer_gate(back[i+1])&&nav_outer_gate(back[i]))
+   navCount=nav_outer_add(navCount,nav_gate_bend(nav_outer_point(back[i+1]),q));
+  navCount=nav_outer_add(navCount,q);
+ }
  for(int i=last->count-1;i>=0;i--)navCount=nav_outer_add(navCount,last->via[i]);
- navDist=0;for(int i=1;i<navCount;i++)navDist+=nav_dist(navNodes[i-1],navNodes[i]);
+ nav_trim_retraces();
+ navDist=0;for(int i=1;i<navCount;i++)navDist+=nav_length(navNodes[i-1],navNodes[i]);
 }

@@ -102,7 +102,7 @@ static void vd_reset(void){
 static int vd_locked(void){return vdActive>=0;}
 static int vd_launch(int id){
  if(id<0||id>=VA_COUNT||!vdHandlers[id])return 0;
- if(vdActive>=0||job.kind>=0){tell("Finish your current work before starting another listing.");return 0;}
+ if(vdActive>=0||job.kind>=0||ncr_active()){tell("Finish your current work before starting another listing.");return 0;}
  if(sv.intro<3){tell("First, finish Mara's opening courier shift at Mercury Dispatch.");return 0;}
  vdPanel=0;vdActive=id;vd_goal(-1,-1,0);vd_status(0);vdChoice=0;
  vdHandlers[id](VE_START,0,0);return vdActive==id;
@@ -127,8 +127,11 @@ static int vd_input(U tap){
   }
   if(tap&UP)vdSelected=(vdSelected+VA_COUNT-1)%VA_COUNT;
   if(tap&DOWN)vdSelected=(vdSelected+1)%VA_COUNT;
-  if(tap&LEFT)vdSelected=(vdSelected+VA_COUNT-6)%VA_COUNT;
-  if(tap&RIGHT)vdSelected=(vdSelected+6)%VA_COUNT;
+  if(tap&(LEFT|RIGHT)){
+   const int pages=(VA_COUNT+5)/6,row=vdSelected%6;
+   int page=(vdSelected/6+((tap&RIGHT)?1:pages-1))%pages;
+   vdSelected=min(page*6+row,VA_COUNT-1);
+  }
   if(tap&(ENTER|USE)){vdPanel=0;vd_launch(vdSelected);}
   return 1;
  }

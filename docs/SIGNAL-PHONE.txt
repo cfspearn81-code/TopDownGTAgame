@@ -4,6 +4,20 @@ P opens Signal. Left/right selects an app, up/down selects a row, and
 Enter or E acts. P or Escape closes it. Settings can switch the handset
 key to F7 for this save. Time stops while reading.
 
+REVENUE RECEIPTS
+Press M with Signal open, or click Revenue receipts. Up/down selects
+the last major purchase ($240 or more), last seizure, current case,
+next sweep or optional Revenue Annex GPS pin. Each transaction shows
+what actually left clean cash, dirty cash and the protected bank.
+A new case can also forfeit pending settlements, shown separately.
+The case row shows the outstanding fine and service alternative. The
+countdown resumes when the phone closes. Select Pin Revenue Annex
+and press Enter to replace your GPS pin; simply reading receipts never
+changes it. M returns to the previous app.
+The latest two event types persist with each career. Earlier events
+are not reconstructed. Writing your first receipt may expand a compact
+save to the 1,044-byte layout, with the existing backup on both hosts.
+
 YOUR FIRST REQUEST
 Inbox > Mara is a prepaid legal job: after accepting, press E on foot
 outside Ferry Market, then outside Mercury Dispatch, for $105 clean.
@@ -52,8 +66,12 @@ NIGHT WIRE
 Use this one feed for customer DMs, nightly rotating meets and race
 invitations, Afterimage headliners and live VIP demands, weather,
 rotating Signal Cart vendor clues, road closures and housing pointers.
-Night Cart gear is posted 19:00-04:59. The same clue pins the daytime
-cosmetic showroom when the street gear counter is not open.
+Select the Night Cart post to follow its check-ins on the regional
+atlas. It operates 19:00-04:59; the GPS follows new stops without
+re-pinning. Closed hours show the last reported stop and its time, not
+an active shop or driving objective. At 19:00 the follow resumes.
+Select the post again or clear/replace the map pin to stop following.
+Use M at Apartment Four's Display Case for a daytime showroom pin.
 Ferry Night Garden runs 08:00-17:59; Kiosk Lantern Exchange runs
 22:00-01:59. RSVP to the open pop-up, then press E on foot by its
 address for one House-grade welcome sample per elapsed game day.

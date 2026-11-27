@@ -13,6 +13,16 @@ static float nt_x,nt_y,nt_angle;
 static int nt_walking,nt_pane,nt_sel,nt_confirm;
 static char nt_msg[120];
 static int night_trap_owned(void){return !!(nv.phone[NT_DEED]&1u);}
+static const char *nt_station_name(int id){
+ return id==NT_STOCK_DOOR&&night_trap_owned()?"GRADED STOCKROOM":nt_station[id];
+}
+static const char *nt_floor_prompt(int at){
+ if(at==NT_EXIT_DOOR)return "E / RETURN TO BELL LANE";
+ if(at<0)return "WASD WALK   /   E AT A STATION";
+ if(at==NT_DESK_DOOR)return night_trap_owned()?"E / CONSTRUCTION BENCH":"E / REVIEW THE DEED";
+ if(!night_trap_owned())return "DEED REQUIRED   /   VISIT THE CENTER DESK";
+ return at==NT_STOCK_DOOR?"E / OPEN GRADED STOCKROOM":"E / REPAIR DISPATCH";
+}
 static int nt_level(int id){return min(2,(nv.phone[NT_DEED]>>(1+2*id))&3u);}
 static int nt_capacity(void){return 9*(1+nt_level(NT_RACK));}
 static int nt_count(int id){int slot=id<6?NT_SHELF0:NT_SHELF1,shift=(id%6)*5;return (nv.phone[slot]>>shift)&31u;}
@@ -27,7 +37,7 @@ static int nt_fee(int ticket){return ticket==2?30:14;}
 static int nt_delay(int ticket){return (ticket==2?44:26)-nt_level(NT_RELAY)*6;}
 static int nt_overhead(void){int h=night_phone_heat_at(NT_DOOR_X,NT_DOOR_Y);return max(0,(h>=70?15:h>=40?6:0)-8*nt_level(NT_SHUTTER));}
 static void nt_note(const char*s){char*q=nt_msg;int i=0;while(s[i]&&i<(int)sizeof(nt_msg)-1){q[i]=s[i];i++;}q[i]=0;}
-static int nt_pay(int value){if(sv.cash<value){nt_note("Not enough clean cash on hand. Community dispatch is separate from the scrip wallet.");return 0;}sv.cash-=value;return 1;}
+static int nt_pay(int value){if(case_blocks_price(value)){nt_note("Purchase on hold. Settle your case at the Revenue Annex.");return 0;}if(sv.cash<value){nt_note("Not enough clean cash on hand. Community dispatch is separate from the scrip wallet.");return 0;}return spend(value);}
 static void nt_save(const char*s){request_save();nt_note(saveFlash<0?"Save failed. The changes are still in this session; use F5 to retry.":s);}
 static void nt_open(int pane){nt_pane=pane;nt_sel=nt_confirm=0;nt_msg[0]=0;}
 static int nt_door_ready(void){
@@ -146,7 +156,7 @@ static void nt_show_floor(void){
  if(nt_level(NT_RELAY))for(int i=0;i<nt_level(NT_RELAY)+1;i++){box(757+i*18,155,15,27,0x142735,0x50848a);rect(761+i*18,163,7,2,nt_mint);}
  for(int x=360;x<=600;x+=8){int c=(x/8)&1;rect(x,421,4,3,c?0x986a52:0x5e5552);}
  rect(440,440,81,26,0x131b28);box(445,447,72,17,0x192632,0x5e6f73);center(481,445,"EXIT",nt_amber,0);
- for(int i=0;i<3;i++){int x=nt_sz[i]-95,y=nt_sy[i]-23;int near=d2(nt_x-nt_sz[i],nt_y-nt_sy[i])<54*54;nt_label(x,y,nt_station[i],near?nt_amber:nt_low);}
+ int nearest=nt_nearest();for(int i=0;i<3;i++){int x=nt_sz[i]-95,y=nt_sy[i]-23;nt_label(x,y,nt_station_name(i),nearest==i?nt_amber:nt_low);}
  disc((int)nt_x,(int)nt_y+4,11,0x20343d);person((int)nt_x,(int)nt_y,0x6b9a90,nt_walking?((int)(anim*15)&3):0,nt_angle,4,0);
 }
 static void nt_panel_paint(void){
@@ -188,7 +198,7 @@ static void night_trap_paint(void){
  if(nt_pane>=0)nt_panel_paint();
  else{
   int near=nt_nearest();box(61,471,838,35,0x101c28,0x475d63);
-  textat(75,478,near<0?"WASD WALK   /   E AT A STATION":near==NT_EXIT_DOOR?"E / RETURN TO BELL LANE":nt_station[near],nt_amber,0);
+  textat(75,478,nt_floor_prompt(near),nt_amber,0);
   textat(638,478,"ESC EXIT   /   F5 SAVE",0xb8c5c8,0);
   if(nt_msg[0])center(480,446,nt_msg,nt_mint,0);
  }

@@ -19,12 +19,14 @@ static void v39_expire_caption(const char*speaker){
  if(!*speaker)p.noticeT=0;
 }
 static void v39_order(void){
- if(v39.playerServed){v39.playerServed=0;tell("Mika: Enjoy. If you're meeting Ivo, use the staff door past the bar.");return;}
+ if(v39.playerServed){v39.playerServed=0;tell(npc_replaces(N_ACT_MIKA)?"You collect the house soda Mika already left on the counter.":"Mika: Enjoy. If you're meeting Ivo, use the staff door past the bar.");return;}
+ if(npc_replaces(N_ACT_MIKA)){tell("Mika is away from the counter. Service will resume when she returns.");return;}
  if(v39.requested||v39.playerTick){tell("Mika: I have your order. I'll bring it to the bar.");return;}
  v39.requested=1;
  tell("Mika: One house soda, coming up. Stay by the counter.");
 }
 static void v39_bar_tick(void){
+ if(npc_replaces(N_ACT_MIKA))return; /* No service from a bartender absent in an encounter. */
  if(v39.playerTick){
   if(++v39.playerTick==81){
    v39.playerTick=0;v39.playerServed=1;

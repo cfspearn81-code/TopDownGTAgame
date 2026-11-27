@@ -75,7 +75,7 @@ static int street_line_open(float x,float y,float tx,float ty,float radius){
 static float street_car_fraction(float x,float y,float tx,float ty,float r,int ignore){
  float dx=tx-x,dy=ty-y,first=1.f;
  float xl=x<tx?x:tx,xh=x>tx?x:tx,yl=y<ty?y:ty,yh=y>ty?y:ty;
- for(int i=0;i<nc;i++)if(i!=ignore&&(i||sv.owned)){
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(i!=ignore){
   const Car*c=cars+i;float pad=18.f+r*2;
   if(c->x<xl-pad||c->x>xh+pad||c->y<yl-pad||c->y>yh+pad)continue;
   float co=cs(c->a),si=sn(c->a),ox=x-c->x,oy=y-c->y,t0=0,t1=first;
@@ -143,9 +143,8 @@ static int street_hits_wall(const Car*c){return street_wall_depth(c)>0.f;}
 static int street_car_clear(int id,const Car*old,const Car*next){
  float penetration=street_wall_depth(next);
  if(penetration>0.f&&(!old||penetration+.001f>=street_wall_depth(old)))return 0;
- if(!outer_vehicle_clear(old,next))return 0;
- for(int j=0;j<nc;j++){
-  if(j==id||(j==0&&!sv.owned))continue;
+ for(int j=street_next_car(-1);j<LEN(cars);j=street_next_car(j)){
+  if(j==id)continue;
   const Car*b=cars+j;
   if(street_overlap(next,b)&&(!old||!street_overlap(old,b)||
       d2(next->x-b->x,next->y-b->y)<=d2(old->x-b->x,old->y-b->y)))return 0;
@@ -174,7 +173,7 @@ static int street_turn_car(int id,float angle){
  Car*c=cars+id,next=*c;next.a=angle;
  float penetration=street_wall_depth(&next);
  if(penetration>0.f&&penetration+.001f>=street_wall_depth(c))return 0;
- for(int j=0;j<nc;j++)if(j!=id&&(j!=0||sv.owned)&&
+ for(int j=street_next_car(-1);j<LEN(cars);j=street_next_car(j))if(j!=id&&
       street_overlap(&next,cars+j)&&!street_overlap(c,cars+j))return 0;
  c->a=angle;return 1;
 }
@@ -187,7 +186,7 @@ static float street_foot_car_depth(const Car*c,float x,float y,float feet){
  return along>0&&across>0?(along<across?along:across):0;
 }
 static int street_foot_car_clear(float x,float y,int ignore,float feet){
- for(int i=0;i<nc;i++)if(i!=ignore&&(i||sv.owned)){
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(i!=ignore){
   if(street_foot_car_depth(cars+i,x,y,feet)>0)return 0;
  }
  return 1;
@@ -196,7 +195,7 @@ static int street_foot_car_clear(float x,float y,int ignore,float feet){
  * by a moving car can step back out but cannot move deeper into it. */
 static int street_step_past_cars(float x,float y,float nx,float ny,float feet){
  if(vd_cross_foot(x,y,nx,ny,feet))return 0;
- for(int i=0;i<nc;i++)if(i||sv.owned){
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i)){
   const Car*c=cars+i;float after=street_foot_car_depth(c,nx,ny,feet);
   if(after<=0)continue;
   float before=street_foot_car_depth(c,x,y,feet);
@@ -254,27 +253,38 @@ static int street_near_car(void){
  if(p.car>=0)return -1;
  float best=38.f*38.f;
  int choice=-1;int boardable=0;
- for(int i=0;i<nc;i++){
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i)){
   const Car*c=cars+i;
   float dx=c->x-p.x,dy=c->y-p.y,d=d2(dx,dy);
   if(c->cond<=0||(i==0&&!sv.owned)||d>=38.f*38.f)continue;
   int slow=absf(c->s)<=STREET_BOARD_SPEED;
   if(slow<boardable||(slow==boardable&&d>=best))continue;
-  if(street_reach_open(p.x,p.y,c->x,c->y,2,i)){best=d;choice=i;boardable=slow;}
+  if(!night_phone_lane_stop(p.x,p.y,c->x,c->y,2)&&street_reach_open(p.x,p.y,c->x,c->y,2,i)){best=d;choice=i;boardable=slow;}
  }
  return choice;
 }
 /* +1 entered, 0 unrelated/unavailable, -1 moving too fast to board. */
 static int street_enter_car(int i){
- if(p.car>=0||i<0||i>=nc||i!=street_near_car())return 0;
+ if(p.car>=0||!street_car_exists(i)||i!=street_near_car())return 0;
  Car*c=cars+i;
  if(absf(c->s)>STREET_BOARD_SPEED)return -1;
- streetDrivers[i].live=0;
+ streetDrivers[i].live=0;outer_take_wheel(i);
  p.car=i;p.x=c->x;p.y=c->y;p.a=c->a;
  return 1;
 }
+/* A stopped car's door may itself be clear while closing traffic would
+ * reach the landing point before the player can step away. */
+static int street_safe_landing(float x,float y){
+  for(int j=street_next_car(-1);j<LEN(cars);j=street_next_car(j))if(j!=p.car&&absf(cars[j].s)>14.f){
+   Car*d=cars+j;
+   if(d2(d->x-x,d->y-y)>90.f*90.f)continue;
+   float a=cs(d->a),b=sn(d->a),ahead=((x-d->x)*a+(y-d->y)*b)*(d->s>0?1:-1),side=absf((y-d->y)*a-(x-d->x)*b);
+   if(ahead>=-8&&ahead<20+absf(d->s)*.60f&&side<14)return 0;
+  }
+ return 1;
+}
 static int street_exit_car(void){
- if(p.car<0||p.car>=nc)return 0;
+ if(!street_car_exists(p.car))return 0;
  Car*c=cars+p.car;
  if(absf(c->s)>STREET_EXIT_SPEED)return 0;
  float co=cs(c->a),si=sn(c->a);
@@ -283,15 +293,20 @@ static int street_exit_car(void){
  static const float candidates[][2]={{0,21},{0,-21},{-25,0},{-19,19},{-19,-19},{25,0},{19,19},{19,-19}};
  for(int i=0;i<LEN(candidates);i++){
   float u=candidates[i][0],v=candidates[i][1],x=c->x+u*co-v*si,y=c->y+u*si+v*co;
-  if(!street_foot_clear(x,y,p.car)||!street_reach_open(c->x,c->y,x,y,3,p.car))continue;
-  int safe=1;
-  for(int j=0;j<nc;j++)if(j!=p.car&&absf(cars[j].s)>14.f){
-   Car*d=cars+j;
-   if(d2(d->x-x,d->y-y)>90.f*90.f)continue;
-   float a=cs(d->a),b=sn(d->a),ahead=((x-d->x)*a+(y-d->y)*b)*(d->s>0?1:-1),side=absf((y-d->y)*a-(x-d->x)*b);
-   if(ahead>=-8&&ahead<20+absf(d->s)*.60f&&side<14){safe=0;break;}
-  }
-  if(safe){p.x=x;p.y=y;p.car=-1;c->s=0;return 1;}
+  if(night_phone_lane_stop(c->x,c->y,x,y,7)||!street_foot_clear(x,y,p.car)||!street_reach_open(c->x,c->y,x,y,3,p.car))continue;
+  if(street_safe_landing(x,y)){p.x=x;p.y=y;p.car=-1;c->s=0;return 1;}
+ }
+ /* Only on a wreck: a normal door can be boxed in on all four sides.
+  * Look for the closest clear landing with walkable onward space. Pass
+  * over the pileup only, never through walls/terrain or a closed gate.
+  * Ordinary exits and garage handoffs still require an actual free door. */
+ if(c->cond<=0)for(int r=26;r<=240;r+=6)for(int j=0;j<24;j++){
+  float a=c->a+(j+6)*.26179939f,dx=cs(a),dy=sn(a),x=c->x+r*dx,y=c->y+r*dy;
+  float tx=x+dx*10,ty=y+dy*10;
+  if(!street_foot_clear(x,y,-1)||!street_foot_clear(tx,ty,-1)||
+     night_phone_lane_stop(c->x,c->y,tx,ty,7)||!street_line_open(c->x,c->y,x,y,7)||
+     !street_reach_open(x,y,tx,ty,7,-1)||!street_safe_landing(x,y))continue;
+  p.x=x;p.y=y;p.car=-1;c->s=0;return 1;
  }
  return 0;
 }
@@ -447,7 +462,7 @@ static int street_civ_traffic(const Ped*q,float tx,float ty){
   * a marked crossing just because it has zero closing speed. */
  for(int n=1;n<=10;n++)
   if(!street_foot_car_clear(q->x+(tx-q->x)*n*.1f,q->y+(ty-q->y)*n*.1f,-1,3.f))return 1;
- for(int i=0;i<nc;i++){
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i)){
   const Car*c=cars+i;
   if((i==0&&!sv.owned)||c->cond<=0||absf(c->s)<8.f||d2(c->x-q->x,c->y-q->y)>116.f*116.f)continue;
   float co=cs(c->a)*(c->s>0?1:-1),si=sn(c->a)*(c->s>0?1:-1),spd=absf(c->s);

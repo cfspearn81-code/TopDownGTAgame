@@ -11,7 +11,7 @@ static int chZ[W*H];
 static float chSin=.249f,chCos=.9685f;
 static float chFit;
 static int ch_pref(void){return nv.garage[60]==1u;}
-static int ch_enabled(void){return ch_pref()&&!fastGfx&&p.car>=0&&p.car<nc&&!p.dead;}
+static int ch_enabled(void){return ch_pref()&&!fastGfx&&street_car_exists(p.car)&&!p.dead;}
 static void ch_motion(float speed,float err){
  float unit=speed/205.f;if(unit>1)unit=1;
  float bend=absf(err);if(bend>.8f)bend=.8f;
@@ -114,6 +114,49 @@ static void ch_ground(void){
   }
  }
 }
+/* Light only this car's bounded road footprint, before buildings, vehicles
+ * and people are depth-rendered. The same sampled barriers/trees as overhead
+ * trim each ray; the ground texture and lane stripes stay visible inside it. */
+static void ch_headlights(const Car*c){
+ if(fastGfx||c->cond<=0||chDark<=.01f)return;
+ float co=cs(c->a),si=sn(c->a);
+ int range=61+(c->cond*19)/100,rays[17],lx=W,rx=-1,ty=H,by=-1;
+ int shade=cl((int)(255*chDark),0,255);if(!shade)return;
+ ChVec p[4];
+ for(int i=0;i<4;i++){
+  float f=(i==0||i==3)?12.f:(float)range,w=(i<2?-.39f:.39f)*f;
+  p[i]=ch_local((ChVec){c->x+co*f-si*w,c->y+si*f+co*w,0});
+ }
+ ChVec last=p[3];
+ for(int i=0;i<4;i++){
+  ChVec v=p[i],verts[2];int n=0;
+  if((last.z>=9.f)!=(v.z>=9.f)){
+   float t=(9.f-last.z)/(v.z-last.z);
+   verts[n++]=(ChVec){last.x+(v.x-last.x)*t,last.y+(v.y-last.y)*t,9.f};
+  }
+  if(v.z>=9.f)verts[n++]=v;
+  for(int j=0;j<n;j++){ChPlot pt=ch_screen(verts[j]);lx=min(lx,pt.x);rx=max(rx,pt.x);ty=min(ty,pt.y);by=max(by,pt.y);}
+  last=v;
+ }
+ lx=max(0,lx-1);rx=min(W-1,rx+1);ty=max(0,ty-1);by=min(H-1,by+1);if(lx>rx||ty>by)return;
+ road_beam_rays(c,co,si,range,rays);
+ for(int y=ty;y<=by;y++){
+  float ray=(CH_MY-y)*(1.f/CH_F),v=chSin-ray*chCos;if(v<=.048f)continue;
+  float f=ch.h*(chCos-ray*chSin)/v,du=(f*chCos+ch.h*chSin)/CH_F;
+  float wx=ch.x+f*ch.co-(lx-W*.5f)*du*ch.si,wy=ch.y+f*ch.si+(lx-W*.5f)*du*ch.co;
+  for(int x=lx;x<=rx;x++,wx-=du*ch.si,wy+=du*ch.co){
+   float dx=wx-c->x,dy=wy-c->y,front=dx*co+dy*si;if(front<12||front>=range)continue;
+   float side=(dy*co-dx*si)/front,width=absf(side);if(width>.37f)continue;
+   int r=cl((int)(side/.047f+8.5f),0,16);
+   if(front>rays[r]||beam_block((int)wx,(int)wy))continue;
+   int power=(int)((range-front)*9.f/range*(1.f-width/.39f));if(power<1)continue;
+   int j=y*W+x;U b=pixels[j];
+   pixels[j]=RGB(min(255,((b>>16)&255)+power*15*shade/255),
+                 min(255,((b>>8)&255)+power*11*shade/255),
+                 min(255,(b&255)+power*5*shade/255));
+  }
+ }
+}
 static void ch_facade(float x,float y,float xx,float yy,float ht,U c,int id,int side,int detail){
  ch_quad((ChVec){x,y,0},(ChVec){xx,yy,0},(ChVec){xx,yy,ht},(ChVec){x,y,ht},c,1);
  float dx=xx-x,dy=yy-y,l=sq(d2(dx,dy));
@@ -196,8 +239,7 @@ static void ch_upright(float x,float y,float w,float bottom,float top,U ink){
  float u=ch.si*w,v=-ch.co*w;
  ch_quad((ChVec){x-u,y-v,bottom},(ChVec){x+u,y+v,bottom},(ChVec){x+u,y+v,top},(ChVec){x-u,y-v,top},ink,1);
 }
-static void ch_person(float x,float y,int kind,int i){
- U jacket=kind==1?0x718ffc:kind==2?0xe08587:(i&1)?0x9ebdb7:0xc28b79;
+static void ch_dressed_person(float x,float y,U jacket){
  ch_upright(x,y,2.2f,.2f,5.3f,0x292e38);ch_upright(x,y,3.6f,5,11,jacket);ch_upright(x,y,2.1f,11,15,0xbe987f);
 }
 static void ch_lamp(const StreetLamp*s){
@@ -212,10 +254,22 @@ static void ch_lamp(const StreetLamp*s){
 static void ch_props(void){
  for(int i=0;i<LEN(peds);i++){
   Ped*q=peds+i;if(q->hp<=0||d2(ch.x-q->x,ch.y-q->y)>670.f*670.f)continue;
-  ch_person(q->x,q->y,q->role,i);
+  ch_dressed_person(q->x,q->y,q->role==1?0x718ffc:q->role==2?0xe08587:(i&1)?0x9ebdb7:0xc28b79);
  }
  if((job.kind==JOB_TAXI&&taxi.phase!=TAXI_RIDING)||(taxi.phase==TAXI_WALKING&&taxi.linger>0))
-  ch_person(taxi.x,taxi.y,0,taxi.rider);
+  ch_dressed_person(taxi.x,taxi.y,riders[taxi.rider].outfit);
+ /* Use the same living cast and curb-pickup state as the overhead view.
+    The projection has its own depth buffer; don't draw flat HUD impostors. */
+ if(outCrowdCount)for(int id=N_ACT_OUTER;id<N_ACT_MAX;id++){
+  NpcRef person;
+  if(!npc_replaces(id)&&npc_ref(id,&person)&&d2(ch.x-person.x,ch.y-person.y)<670.f*670.f)
+   ch_dressed_person(person.x,person.y,person.coat);
+ }
+ #if __has_include("night_club_gig.inc")
+ float rx,ry;
+ if(ncr_ped(&rx,&ry)&&d2(ch.x-rx,ch.y-ry)<670.f*670.f)
+  ch_dressed_person(rx,ry,ncr_cast[NCR_VOCALIST].coat);
+ #endif
  for(int i=0;i<LEN(scenery);i++){
   const BlockScenery*b=scenery+i;for(int j=b->treesFrom;j<b->count;j++){
    const StreetBounds*t=b->walls+j;
@@ -294,11 +348,9 @@ static int ch_draw(void){
  chCos=(fit*.953f+hAim*target)/diag;
  ch.x=c->x-fit*ch.co;ch.y=c->y-fit*ch.si;ch.h=high;
  chDark=nw_dark();chFog=nwFog;chProjected=1;
- ch_ground();ch_buildings();ch_outer();ch_props();
- for(int i=0;i<nc;i++)if((i||sv.owned)&&cars[i].x>=0&&d2(cars[i].x-ch.x,cars[i].y-ch.y)<755.f*755.f)
+ ch_ground();ch_headlights(c);ch_buildings();ch_outer();ch_props();
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(cars[i].x>=0&&d2(cars[i].x-ch.x,cars[i].y-ch.y)<755.f*755.f)
   ch_car(cars+i,i==p.car);
- for(int i=0;i<outCarCount;i++)if(outCars[i].cond>0&&d2(outCars[i].x-ch.x,outCars[i].y-ch.y)<710.f*710.f)
-  ch_car(outCars+i,0);
  Car ghost;if(ng_ghost_car(&ghost)&&d2(ghost.x-ch.x,ghost.y-ch.y)<730.f*730.f)ch_car(&ghost,-1);
  int x,y,meet;
  if(ng_route_goal(&x,&y)){if(d2(x-ch.x,y-ch.y)<645.f*645.f)ch_road_glyph(x,y,GOLD);}

@@ -10,7 +10,7 @@ enum { NC_OWN,NC_COVER,NC_ACT,NC_STAFF,NC_DRINK,NC_DECOR,NC_REP,NC_CLEAN,
        NC_LAST_VIP,NC_LAST_DOOR,NC_LAST_DRINKS,NC_LAST_COST,NC_LAST_AUX,NC_PREVENT,NC_FIELD_COUNT };
 _Static_assert(NC_FIELD_COUNT<=32,"club save bounds");
 enum { NC_FLOOR,NC_SUITE,NC_OFFICE };
-enum { NC_NONE,NC_DESK,NC_DECK,NC_TABLE,NC_STOCK,NC_BAR,NC_CUE,NC_GUARD,NC_DANCE_CONFIRM,NC_DANCE_PLAY };
+enum { NC_NONE,NC_DESK,NC_DECK,NC_TABLE,NC_STOCK,NC_BAR,NC_CUE,NC_GUARD,NC_DANCE_CONFIRM,NC_DANCE_PLAY,NC_REGULAR,NC_OLD_LEDGER };
 static const U ncGold=0xf4cd86,ncRose=0xf691b4,ncIce=0x8ce7df,ncDim=0xaba7bc;
 static const char*const ncTracks[3]={"Velvet Relay","Copper Current","Last Transmission"};
 static const char*const ncDrinks[3]={"Rose Comet","Mint Static","Amber Halo"};
@@ -172,8 +172,10 @@ static const char*nc_hint(int target){
  return h[cl(target,0,LEN(h)-1)];
 }
 static void nc_showpanel(int panel){ncPanel=panel;ncChoice=0;}
+static void nc_label(int,int,const char*,U);
+#include "night_club_gig.inc"
 static int nc_items(void){
- switch(ncPanel){case NC_DESK:return nc_owned()?9:2;case NC_DECK:return 4;case NC_TABLE:return nc_owned()?6:5;case NC_DANCE_CONFIRM:return 2;
+ switch(ncPanel){case NC_DESK:return nc_owned()?9:2;case NC_DECK:return 4;case NC_TABLE:return nc_owned()?6:5;case NC_DANCE_CONFIRM:return 2;case NC_OLD_LEDGER:return 3;case NC_REGULAR:return ncr_contact==NCR_PROMOTER?2:1;
  case NC_BAR:return 3;case NC_STOCK:return 5;case NC_GUARD:return nc_owned()&&nc_get(NC_DISPUTE)?4:2;case NC_CUE:return 2;}return 0;
 }
 static void nc_use_target(int target){
@@ -247,6 +249,8 @@ static void nc_activate(int row){
   p.noticeT=0;ncDanceTicks=0;nc_showpanel(NC_DANCE_PLAY);return;
  }
  if(row==count-1){ncPanel=NC_NONE;return;}
+ if(ncPanel==NC_REGULAR){ncr_contact_act();return;}
+ if(ncPanel==NC_OLD_LEDGER){ncr_old_select(row);return;}
  switch(ncPanel){
  case NC_DESK:nc_ledger(row);break;
  case NC_DECK:
@@ -545,13 +549,21 @@ static void nc_dynamics(void){
   const short crowd[16][3]={{391,264,5},{554,269,0},{620,275,14},{374,283,1},
     {423,286,9},{529,294,7},{585,299,2},{324,306,11},{470,311,12},{608,320,8},
     {344,327,3},{446,335,6},{513,339,13},{359,348,10},{567,351,4},{645,357,15}};
-  int plotted=0;
+  int plotted=0,regular=0;
   for(int i=0;i<16;i++){
    int idx=crowd[i][2];if(idx>=guests)continue;
    int yy=crowd[i][1]+(int)(sn(anim*1.9f+idx)*2),xx=crowd[i][0]+(int)(sn(anim*.83f+idx*4.2f)*7);
+   while(regular<LEN(ncr_cast)&&ncr_cast[regular].y<=yy){
+    if(!plotted&&ncY<=ncr_cast[regular].y){nc_player();plotted=1;}
+    ncr_actor(regular++);
+   }
    if(!plotted&&ncY<=yy){nc_player();plotted=1;}
    person(xx,yy,idx%3==0?0xb77f9d:idx%3==1?0x6a999e:0x938ba9,
           (int)(sn(anim*3+idx*1.7f)*4),1.5f+sn(anim*.5f+idx)*1.7f,0,idx);
+  }
+  while(regular<LEN(ncr_cast)){
+   if(!plotted&&ncY<=ncr_cast[regular].y){nc_player();plotted=1;}
+   ncr_actor(regular++);
   }
   if(!plotted)nc_player();
   person(159,201,0x82718a,0,1.4f,3,1);person(795,203,0x61958e,0,1.25f,0,2);
@@ -607,9 +619,10 @@ static void nc_draw_status(void){
  /* A narrow marquee, separate from the architecture. */
  char marquee[95];char*q=append(marquee,nc_headline()?"HEADLINE SET":"MATINEE");q=append(q,"   /   ");q=append(q,ncActs[nc_get(NC_ACT)]);q=append(q,"    *    ON DECK: ");append(q,ncTracks[nc_music()]);
  int mw=textw(marquee,0);rect(470-mw/2,82,mw+20,22,0x201b2a);center(480,82,marquee,0xe1c1b5,0);
- int t=nc_target();rect(0,455,W,85,0x161622);rect(0,455,W,1,0x715764);
- box(35,466,30,24,0x342a3b,t?accent:0x66596b);center(50,467,"E",t?PAPER:ncDim,0);
- textat(76,467,nc_hint(t),PAPER,0);
+ int t=nc_target(),nearRegular=!t?ncr_near():-1;rect(0,455,W,85,0x161622);rect(0,455,W,1,0x715764);
+ box(35,466,30,24,0x342a3b,t||nearRegular>=0?accent:0x66596b);center(50,467,"E",t||nearRegular>=0?PAPER:ncDim,0);
+ if(nearRegular>=0){char prompt[70];append(append(prompt,"Talk to "),ncr_cast[nearRegular].name);textat(76,467,prompt,PAPER,0);}
+ else textat(76,467,nc_hint(t),PAPER,0);
  char meter[115];if(nc_owned()){q=append(meter,"REP ");q=number(q,nc_get(NC_REP));q=append(q,"   /   TILL $");q=number(q,nc_get(NC_TILL));q=append(q,"   /   SET ");q=number(q,(NC_SHOW-nc_get(NC_CLOCK)+59)/60);append(q,"s");}
  else append(meter,"PUBLIC ENTRY   /   DEED AVAILABLE");
  textat(925-textw(meter,0),468,meter,accent,0);
@@ -617,6 +630,8 @@ static void nc_draw_status(void){
  else textat(36,507,"WASD / ARROWS  MOVE      SHIFT  RUN      E  INTERACT      ESC  PAUSE",ncDim,0);
 }
 static const char*nc_panel_title(void){
+ if(ncPanel==NC_OLD_LEDGER)return "Bryn / legacy receipt";
+ if(ncPanel==NC_REGULAR)return ncr_cast[ncr_contact].name;
  switch(ncPanel){case NC_DESK:return "Box office";case NC_DECK:return "Selector's booth";
  case NC_STOCK:return "Stock cabinet";case NC_TABLE:return ncBooths[ncBooth];case NC_BAR:return "The house bar";
  case NC_GUARD:return "Door staff";case NC_DANCE_CONFIRM:return "Private cabaret";default:return "Stage cue";}
@@ -625,6 +640,8 @@ static const char*nc_title_row(int r,char out[90]){
  static const char*const mgmt[]={"Collect till","Set door price","Book residency","Hire door staff","Order drinks","Interior fit-out","Exchange arcade token","Reset house crew","Close ledger"};
  if(ncPanel==NC_DANCE_CONFIRM)return r?"Confirm and pay $25":"Back without paying";
  if(r==nc_items()-1)return "Back to the room";
+ if(ncPanel==NC_OLD_LEDGER)return r?"Redeem matching lots for fee":"Keep my loft stock";
+ if(ncPanel==NC_REGULAR)return ncr_option();
  switch(ncPanel){
  case NC_DESK:
   if(!nc_owned())return "Purchase deed  /  $480";
@@ -663,7 +680,9 @@ static void nc_panel_draw(void){
  }
  rect(rx-12,144,1,266,0x524551);
  char row[100];textat(rx,118,"HOUSE NOTES",color,0);
- if(ncPanel==NC_DESK&&nc_owned()){
+ if(ncPanel==NC_OLD_LEDGER){ncr_old_note(rx,160);}
+ else if(ncPanel==NC_REGULAR){textat(rx,152,ncr_cast[ncr_contact].role,color,0);ncr_contact_note(rx,183);}
+ else if(ncPanel==NC_DESK&&nc_owned()){
   nc_stat_row(rx,148,"REPUTATION",nc_get(NC_REP),ncRose);
   nc_stat_row(rx,181,"CLEANLINESS",nc_get(NC_CLEAN),ncIce);
   nc_stat_row(rx,214,"SERVICE",nc_get(NC_SERVICE),ncGold);
@@ -830,7 +849,10 @@ static void night_club_tick(U keys,U tap){
  float v=(keys&BRAKE?WALKIN_RUN_STEP:WALKIN_WALK_STEP)*(dx&&dy?.707107f:1.f);walking=dx||dy;
  if(walking){ncAngle=look(dx,dy);footcycle=wrap(footcycle+.25f*FOOT_PACE);}
  if(!nc_solid(ncX+dx*v,ncY))ncX+=dx*v;if(!nc_solid(ncX,ncY+dy*v))ncY+=dy*v;
- if(tap&(USE|ENTER))nc_use_target(nc_target());
+ if(tap&(USE|ENTER)){
+  int station=nc_target(),regular=station?-1:ncr_near();
+  if(regular>=0)ncr_contact_open(regular);else nc_use_target(station);
+ }
 }
 static void night_club_paint(void){
  int key=ncRoom*3+nc_get(NC_DECOR);

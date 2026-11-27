@@ -71,7 +71,7 @@ static void profiles_open(int create){
 static void profiles_activate(void){
  vd_reset();night_world_reset();outer_life_reset();ng_reset();
  revenueCrossed=0;revenueReceipt=(RevenueReceipt){0};
- sprintBest=0;end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
+ sprintBest=0;taxi_reset_radio();end_job();spawnCars();spawnPlayer();shelterT=0;z(wi_sw,sizeof wi_sw);z(&taxi,sizeof taxi);z(fx,sizeof fx);z(pedHit,sizeof pedHit);
  navSlot=-1;walking=fn=deadAnim=saveFlash=0;punchFlash=crashFlash=0;lastCar=near=by=-1;
  lastTaxiPickup=lastTaxiDrop=lastTaxiRider=-1;menu=-1;mapOn=0;profileReturn=0;profileError=0;
  if(sv.intro==0)open_interior(12);

@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum {KEY_CAP=1800};
+enum {KEY_CAP=4800};
 static U tape[KEY_CAP];
 static int frames;
 static FILE *report;
@@ -127,7 +127,18 @@ static void give_cash(void){
  wait_ticks(50);
  assert(npcEnc.phase==NPC_IDLE&&sv.dirty==amount&&!p.dead);
 }
-static void fight(int flee){
+static void modal_roundtrip(void){
+ /* Genuine launcher key chain; opening a non-world view must not spend a
+    target, discard ground loot, or restart a battle. Do not test save slots
+    here: the two live launchers use different native card inventories. */
+ U mods[]={HELP,PHONE}; int back=scene;
+ for(int j=0;j<LEN(mods);j++){
+  int phase=npcEnc.phase,prize=npcEnc.prize;
+  tap(mods[j]);assert(scene!=back);wait_ticks(12);tap(ESC);
+  assert(scene==back&&npcEnc.phase==phase&&npcEnc.prize==prize);
+ }
+}
+static void fight(int flee,int modal){
  int id=choose_rob(),amount=npcEnc.prize;
  assert(!npcEnc.surrender);
  wait_for_choice(0);
@@ -141,6 +152,7 @@ static void fight(int flee){
   play(0);
   return;
  }
+ if(modal)modal_roundtrip();
  for(int i=0;i<75&&p.hp==100;i++)play(0);
  assert(npcEnc.phase==NPC_FIGHT&&p.hp<100&&p.hp>=76);
  state("npc-strike");
@@ -160,6 +172,7 @@ static void fight(int flee){
  for(int i=0;i<22;i++)play(FIRE);
  play(0);
  assert(npcEnc.phase==NPC_DROP&&!sv.dirty&&p.trail<=0&&p.shot<=0&&p.heat==drop_heat);
+ if(modal)modal_roundtrip();
  for(int i=0;i<24&&npcEnc.phase==NPC_DROP;i++){
   float dx=npcEnc.actor.x-p.x,dy=npcEnc.actor.y-p.y;
   U dir=0;if(absf(dx)>2)dir|=dx>0?RIGHT:LEFT;
@@ -239,35 +252,99 @@ static void conversation_hold(void){
  held_body("selected-resumed",25);
 }
 
+/* No teleports: walk along the open Parkway, stop a passerby, and walk home. */
+static void outer_sidewalk(int strike){
+ tap(GFX);
+ for(int i=0;i<750&&p.x<2817.f;i++)play(RIGHT|BRAKE);
+ assert(p.x>=2817.f&&p.x<2821.f);
+ for(int k=0;k<17;k++)play(DOWN);
+ tap(USE);assert(npcTalkOn&&npcTalk.id>=160);
+ int id=npcTalk.id;float x=npcTalk.x,y=npcTalk.y;
+ panel("parkway-passerby");
+ wait_ticks(90);NpcRef r;assert(npc_ref(id,&r)&&r.x==x&&r.y==y);
+ tap(UP);panel("parkway-hello");tap(ENTER);
+ assert(!npcTalkOn&&npcLetters[id]==1&&strstr(notice,r.name));toast("parkway-reply");
+ if(strike){
+  /* No phase injection. Turn down from the highway and use ordinary Fire
+     on the group we actually walked to. No Rob interaction was selected. */
+  tap(DOWN);int down=-1;NpcRef latest[N_OUTER_SEATS];int present[N_OUTER_SEATS]={0};
+  int group=N_ACT_OUTER+(id-N_ACT_OUTER)/N_OUTER_SEATS*N_OUTER_SEATS;
+  for(int k=0;k<N_OUTER_SEATS;k++)present[k]=npc_ref(group+k,latest+k);
+  for(int j=0;j<200&&down<0;j++){
+   play(FIRE);
+   for(int k=0;k<N_OUTER_SEATS;k++)if(present[k]){
+    NpcRef now;if(npc_ref(group+k,&now))latest[k]=now;else{down=k;break;}
+   }
+  }
+  assert(down>=0&&npcEnc.phase==NPC_IDLE&&p.heat>50&&!sv.dirty);paint();
+  /* Neighbors are still moving on the same shoulder. Verify the fallen
+     actor's guaranteed sprite ink instead of hashing nearby footfalls. */
+  shot_test("parkway-contact",sx(latest[down].x)-18,sy(latest[down].y)-14,37,29,0x85757bu,1);
+  play(0);
+  if(strike==2){
+   for(int t=0;t<2100&&!dispatch_visible();t++)play(FIRE);
+   assert(dispatch_visible()&&dispatch_engaged()>0);
+   int seen=0;
+   for(int n=0;n<DISPATCH_UNITS;n++){
+    Ped*q=peds+DISPATCH_FIRST+n;
+    if(q->hp>0&&dispatchUnits[n].state==D_RESPONSE&&d2(q->x-p.x,q->y-p.y)<177.f*177.f&&
+       street_line_open(q->x,q->y,p.x,p.y,2)){
+     paint();
+     /* A moving patrol alternates its uniform flash and walk frame.
+        Check an actual uniform/badge pixel near the unit rather than the
+        hash of an entire moving group, which varies by host presentation. */
+     U colors[]={0xe8cb86,0x83a4c7,0x9dbed4,mix(0x668df0,0x111a27,1),mix(PINK,0x111a27,1)};
+     int xx=sx(q->x),yy=sy(q->y);
+     for(int c=0;c<LEN(colors)&&!seen;c++){
+      int hits=0;for(int b=yy-24;b<=yy+4;b++)for(int a=xx-12;a<=xx+12;a++)hits+=(pixels[b*W+a]&0xffffffu)==colors[c];
+      if(hits){shot_test("regional-responder",xx-28,yy-32,57,45,colors[c],1);seen=1;}
+     }
+     if(seen)break;
+    }
+   }
+   assert(seen);play(0);return;
+  }
+ }
+ for(int k=0;k<(strike?18:17);k++)play(UP);
+ for(int i=0;i<750&&p.x>1985.f;i++)play(LEFT|BRAKE);
+ assert(p.x<1986.f&&!outer_is_new(p.x,p.y));play(0);
+}
+
 int main(int argc,char **argv){
- assert(argc==4&&"usage: plan START.DAT PROBE_FILE conversation|surrender|defeat|flee|guide|hold");
+ assert(argc==4&&"usage: plan START.DAT PROBE_FILE conversation|surrender|defeat|flee|guide|hold|outer");
  int case_id=!strcmp(argv[3],"conversation")?0:!strcmp(argv[3],"surrender")?1:
-             !strcmp(argv[3],"defeat")?2:!strcmp(argv[3],"flee")?3:!strcmp(argv[3],"guide")?4:!strcmp(argv[3],"hold")?5:-1;
+             !strcmp(argv[3],"defeat")?2:!strcmp(argv[3],"flee")?3:!strcmp(argv[3],"guide")?4:!strcmp(argv[3],"hold")?5:!strcmp(argv[3],"outer")?6:!strcmp(argv[3],"modal")?7:!strcmp(argv[3],"outer-strike")?8:!strcmp(argv[3],"outer-response")?9:-1;
  assert(case_id>=0);
  /* Seed0 first roll: $36, 34 (surrenders). Seed2: $17, 44 (fights).
   * The walking route approaches the normal Tide Market sidewalk actors
   * at the southeast corner of the old apartment block. */
- set_session_seed(case_id==2||case_id==3?2u:0u);init_city();starter_save();
- sv.intro=4;sv.gear=0;sv.cash=70;sv.x=case_id==5?1880.f:336.f;sv.y=case_id==5?1006.f:762.f;stamp_save();
+ set_session_seed(case_id==2||case_id==3||case_id==7?2u:0u);init_city();starter_save();
+ sv.intro=4;sv.gear=0;sv.cash=70;sv.x=(case_id==6||case_id==8||case_id==9)?1980.f:case_id==5?1880.f:336.f;sv.y=(case_id==6||case_id==8||case_id==9)?1024.f:case_id==5?1006.f:762.f;stamp_save();
  FILE *career=fopen(argv[1],"wb");assert(career&&fwrite(&sv,sizeof sv,1,career)==1&&!fclose(career));
  report=fopen(argv[2],"w");assert(report);
  profiles_activate();tape[frames++]=0;tape[frames++]=ENTER;
  wait_ticks(4);
- if(case_id!=5){
+ if(case_id==6||case_id==8||case_id==9)outer_sidewalk(case_id==9?2:case_id==8);else if(case_id!=5){
  float oldy=p.y;
  for(int i=0;i<4;i++)play(UP);
  assert(scene==1&&p.y<oldy-6.f&&p.y>oldy-7.f);
  wait_ticks(2);
  if(case_id==0)conversation();
  if(case_id==1)give_cash();
- if(case_id==2||case_id==3)fight(case_id==3);
+ if(case_id==2||case_id==3||case_id==7)fight(case_id==3,case_id==7);
  if(case_id==4)guide_hotfix();
  }else conversation_hold();
- assert(sv.cash==70&&sv.dirty==(case_id==1?36:case_id==2?17:0)&&!npcTalkOn&&!p.dead&&scene==1);
+ assert(sv.cash==70&&sv.dirty==(case_id==1?36:(case_id==2||case_id==7)?17:0)&&!npcTalkOn&&!p.dead&&scene==1);
  play(SAVE);assert(sv.hash==savehash()&&sv.x==p.x&&sv.y==p.y&&sv.hp==p.hp);
+ U digest=sv.hash;
+ if(case_id==9){
+  Save11 blob={0};blob.base=sv;blob.night=nv;blob.base.rev=NIGHT_SAVE_REV;
+  outer_safe_anchor(&blob.base);blob.night.world[NW_SAVE_X]|=0x80000000u;
+  blob.base.hash=night_hash(&blob.base,sizeof(Save)-4);digest=night_hash(&blob,sizeof blob-4);
+ }
  wait_ticks(3);
  fprintf(stderr,"%s: %d frames, %d dirty/%d clean, %d HP, saved %.2f/%.2f.\n",argv[3],frames,sv.dirty,sv.cash,p.hp,sv.x,sv.y);
  assert(!fclose(report));
- printf("%d %08x\n",frames,sv.hash);
+ printf("%d %08x\n",frames,digest);
  for(int i=0;i<frames;){int j=i+1;while(j<frames&&tape[j]==tape[i])j++;printf("%d %u\n",j-i,tape[i]);i=j;}
 }

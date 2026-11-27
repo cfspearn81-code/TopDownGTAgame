@@ -49,15 +49,16 @@ static int atm_amount(void){
  return atmStep<LEN(atmAmounts)?min(atmAmounts[atmStep],available):available;
 }
 static void atm_adjust(int delta){
- /* A small wallet jumps directly from the largest usable step to MAX. */
- int available=atm_available();
+ /* Step between distinct displayed amounts rather than hidden preset
+  * indices: the opening $100 step may already display a $9 MAX. A
+  * single Left must move that $9 to $1, not show MAX three more times. */
+ const int available=atm_available(),shown=atm_amount(),n=LEN(atmAmounts);
  if(delta>0){
-  if(atmStep<LEN(atmAmounts)&&atmAmounts[atmStep]<available)atmStep++;
-  if(atmStep<LEN(atmAmounts)&&atmAmounts[atmStep]>=available)atmStep=LEN(atmAmounts);
+  for(int i=0;i<n;i++)if(atmAmounts[i]>shown&&atmAmounts[i]<available){atmStep=i;return;}
+  atmStep=n;
  }else{
-  if(atmStep==LEN(atmAmounts)){
-   do{atmStep--;}while(atmStep>0&&atmAmounts[atmStep]>=available);
-  }else atmStep=max(0,atmStep-1);
+  for(int i=n-1;i>=0;i--)if(atmAmounts[i]<shown){atmStep=i;return;}
+  atmStep=0;
  }
 }
 static int bank_ui_tick(U tap){
@@ -82,6 +83,9 @@ static int bank_warning_offset(void){
  return !fastGfx&&elapsed>=0&&elapsed<SEIZURE_SHAKE?
      (int)(sn(elapsed*.79f)*4*(SEIZURE_SHAKE-elapsed)/SEIZURE_SHAKE):0;
 }
+static const char *bank_alert_title(RevenueReceipt r){
+ return r.clean||r.dirty||r.pending?"ASSETS SEIZED":"REVENUE NOTICE";
+}
 static void bank_warning_draw(void){
  if(!assetAlert||p.dead)return;
  int cx=W/2+bank_warning_offset(),x=cx-265,y=(H-122)/2;
@@ -89,7 +93,7 @@ static void bank_warning_draw(void){
  rect(x+1,y+1,528,3,CASH_RED);
  tri(cx-210,y+18,cx-227,y+49,cx-193,y+49,GOLD);
  rect(cx-212,y+28,4,11,0x422428);rect(cx-212,y+42,4,4,0x422428);
- center(cx+10,y+14,"ASSETS SEIZED",PAPER,1);
+ center(cx+10,y+14,bank_alert_title(assetSeizure),PAPER,1);
  rect(x+24,y+62,482,1,0x75414d);
  center(cx,y+68,assetSeizure.kind==REVENUE_SWEEP?
      "Bank funds safe. Settle at Revenue Annex.":"Go to Revenue Annex to settle your debt.",GOLD,0);
@@ -99,8 +103,11 @@ static void bank_warning_draw(void){
   if(assetSeizure.clean)q=number(append(q,"CLEAN -$"),assetSeizure.clean);
   if(assetSeizure.clean&&assetSeizure.dirty)q=append(q,"  /  ");
   if(assetSeizure.dirty)q=number(append(q,"DIRTY -$"),assetSeizure.dirty);
+ }else if(assetSeizure.pending>0){
+  char*q=s;if(assetSeizure.dirty){q=number(append(q,"DIRTY -$"),assetSeizure.dirty);q=append(q,"  /  ");}
+  number(append(q,"PENDING -$"),assetSeizure.pending);
  }else if(assetSeizure.dirty>0){char*q=append(s,"DIRTY MONEY: -$");q=number(q,assetSeizure.dirty);append(q,"  /  CLEAN BANK SAFE");}
- else append(s,"CASE OPEN  /  CLEAN BANK SAFE");
+ else append(s,"NO FUNDS SEIZED  /  CLEAN BANK SAFE");
  center(cx,y+94,s,MUTED,0);
 }
 static void atm_kiosk(int x,int y){

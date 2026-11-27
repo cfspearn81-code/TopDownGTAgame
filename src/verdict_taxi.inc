@@ -18,7 +18,7 @@ static int taxi_detour_bonus(void){return taxi.copper==CAB_SEEN?20:0;}
 static const char *taxi_route_name(void){
  if(taxi_via_copper())return "COPPER PLAYHOUSE";
  if(job.step==0&&taxi.copper!=CAB_NONE)return callPickup[0];
- return loc[job.step==0?taxi.pickup:taxi.dropoff].label;
+ return taxi_stop_label(job.step==0?taxi.pickup:taxi.dropoff);
 }
 static int taxi_authored_offer(int which){
  if((unsigned)which>=LEN(cabCalls))return 0;

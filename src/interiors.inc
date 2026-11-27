@@ -914,7 +914,7 @@ static void interior_paint(void){
  const char *prompt="WASD / WALK   E / INTERACT   ESC / MENU";
  if(int_at_door())prompt=interior_subroom?(k==4?"E / RETURN TO STORE":k==1?"E / RETURN TO NIGHTCLUB":"E / RETURN TO PUBLIC COUNTER"):"E / EXIT TO STREET";
  else if(k==1&&v39_staff_near())prompt="E / EMPLOYEES ONLY";
- else if(k==1&&!interior_subroom&&int_at_desk())prompt=v39.playerServed?"E / TAKE HOUSE SODA":v39.playerTick||v39.requested?"MIKA / ORDER IN PROGRESS":"E / TALK TO MIKA AT THE BAR";
+ else if(k==1&&!interior_subroom&&int_at_desk())prompt=v39.playerServed?"E / TAKE HOUSE SODA":npc_replaces(N_ACT_MIKA)?"BAR / SERVICE PAUSED":v39.playerTick||v39.requested?"MIKA / ORDER IN PROGRESS":"E / TALK TO MIKA AT THE BAR";
  else if(k==4&&int_at_grow_gate())prompt=sv.b[0].own?"E / OPEN GROW ROOM":"GROW ROOM / OWNER ACCESS";
  else if(li>=0&&int_at_staff_gate())prompt=sv.legit[li].owned?"E / OPEN STAFF DOOR":"STAFF DOOR / FRANCHISE OWNERS ONLY";
  else if(k==15&&int_at_chief())prompt="E / SPEAK TO CHIEF RIVAS";

@@ -16,7 +16,7 @@ static const char *const nvs_motion[]={"WEST","EAST","NORTH"};
 static const int nvs_targets[]={1,3,2},nvs_prices[]={0,24,36,48};
 static int nvs_back,nvs_room,nvs_tab,nvs_sel,nvs_mode,nvs_step,nvs_dials[3],nvs_saved,nvs_folio;
 static U nvs_frames;
-static int nvs_recov_ticks,nvs_leaf_grade,nvs_position,nvs_bonus;
+static int nvs_recov_ticks,nvs_leaf_grade,nvs_position,nvs_bonus,nvs_rail_dir,nvs_rail_walk;
 static char nvs_log[150];
 static void nvs_msg(const char*s){append(nvs_log,s);}
 static int nvs_stage(void){return cl((int)(nv.world[NVS_STAGE]&255u),0,5);}
@@ -26,15 +26,24 @@ static int night_venue_vendor_stop(void){return nvs_stops[cl((int)sv.dayClock/(D
 static int nvs_cart_here(void){return night_venue_vendor_stop();}
 static int nvs_penthouse(void){return !!(nv.world[NVH_DEED]&1u);}
 static int nvs_renovated(void){return !!(nv.world[NVH_DEED]&2u);}
-static int night_venue_vendor_pos(int *x,int *y){
- if(sv.dayClock>=300.f&&sv.dayClock<1140.f)return 0;
+/* The public Night Wire report is derived from the city timetable, even
+ * if the player was inside when the Cart checked in. It isn't a sensor
+ * for an unseen or moving street actor. */
+static int night_venue_vendor_report(int *x,int *y,int *clock){
+ int open=sv.dayClock<300.f||sv.dayClock>=1140.f;
  int minNight=(int)sv.dayClock+(sv.dayClock<300.f?300:-1140);
- int pick=cl(minNight/150,0,3);
+ int pick=open?cl(minNight/150,0,3):3;
  static const short stops[4][2]={{2172,1280},{2660,824},{2696,1480},{2240,2280}};
+ static const short reports[4]={1140,1290,0,150};
  int here=nvs_stops[pick];
  *x=ROOM>2740?stops[pick][0]:ordinaryDoorX[here];
  *y=ROOM>2740?stops[pick][1]:ordinaryDoorY[here];
- return 1;
+ *clock=reports[pick];
+ return open;
+}
+static int night_venue_vendor_pos(int *x,int *y){
+ if(sv.dayClock>=300.f&&sv.dayClock<1140.f)return 0;
+ int clock;return night_venue_vendor_report(x,y,&clock);
 }
 static int night_venue_vendor_entry(U tap){
  int x,y;
@@ -81,6 +90,24 @@ static int nvs_wrasse(int t){
  /* 3.5-second return sweep, central target with a generous exposure window. */
  int k=t%210;return 174+(k<=105?k:210-k)*595/105;
 }
+/* Completed story objectives stay completed even when the clean wallet is
+ * full. Two spare one-bit flags hold the indivisible $75 and $30 receipts. */
+#define DC_VENUE_AQUA_PAYOUT
+enum { NVS_GRANT_HELD=1<<9,NVS_STIPEND_HELD=1<<10 };
+static int nvs_aqua_pay(int value,int bit){
+ if(sv.cash>WALLET_LIMIT-value){nv.world[NVS_STAGE]|=(U)bit;return 0;}
+ credit_wallet(1,value);nv.world[NVS_STAGE]&=~(U)bit;return value;
+}
+static int nvs_aqua_claim(void){
+ U hold=nv.world[NVS_STAGE]&(NVS_GRANT_HELD|NVS_STIPEND_HELD);if(!hold)return 0;
+ int paid=0;if(hold&NVS_GRANT_HELD)paid+=nvs_aqua_pay(75,NVS_GRANT_HELD);
+ if(hold&NVS_STIPEND_HELD)paid+=nvs_aqua_pay(30,NVS_STIPEND_HELD);
+ if(paid){char line[140];char*q=number(append(line,"Inez paid $"),paid);
+  append(q,nv.world[NVS_STAGE]&(NVS_GRANT_HELD|NVS_STIPEND_HELD)?" clean. Your other receipt is still here.":" clean. Your receipts are settled.");
+  nvs_msg(line);nvs_store();}
+ else nvs_msg("Deposit some clean cash at an ATM. Inez is holding your payment here at Shoal Walk.");
+ return 1;
+}
 static void nvs_aqua_tick(U tap){
  int stage=nvs_stage();
  if(nvs_mode==1){ /* spot a species moving through the polarized gate */
@@ -114,13 +141,14 @@ static void nvs_aqua_tick(U tap){
     "East bench: The restored wing finally gives the night volunteers a place to sit."};
    nvs_msg(text[window]);nvs_bonus|=1<<window;
    if(nvs_bonus==15&&!(nv.world[NVS_STAGE]&256u)){
-    nv.world[NVS_STAGE]|=256u; credit_wallet(1,30);
-    nvs_msg("Your full tour is in the keeper's journal. $30 overnight steward stipend awarded.");nvs_store();
+    nv.world[NVS_STAGE]|=256u;
+    nvs_msg(nvs_aqua_pay(30,NVS_STIPEND_HELD)?"Your full tour is in the keeper's journal. $30 overnight steward stipend awarded.":
+     "Tour recorded. Inez is holding your full $30 stipend. Make room in your wallet, then press E at Shoal Walk.");nvs_store();
    }
   }return;
  }
  if(stage>=5&&nvs_tab==3&&(tap&FIRE)){
-  nvs_mode=4;nvs_position=126;nvs_bonus=0;nvs_msg("The east wing is open. Walk the rail and inspect all four stops.");return;
+  nvs_mode=4;nvs_position=126;nvs_bonus=nvs_rail_walk=0;nvs_rail_dir=1;nvs_msg("The east wing is open. Walk the rail and inspect all four stops.");return;
  }
  if(tap&(LEFT|RIGHT)){nvs_tab=nvs_go(nvs_tab,(tap&LEFT)?-1:1,4);nvs_msg("");}
  if(!nvs_use_key(tap))return;
@@ -129,9 +157,10 @@ static void nvs_aqua_tick(U tap){
  if(stage==2&&nvs_tab==1){nvs_mode=2;nvs_sel=0;z(nvs_dials,sizeof nvs_dials);nvs_msg("Three banks, three detents: match the numbers engraved above each lamp.");return;}
  if(stage==3&&nvs_tab==2){nvs_mode=3;nvs_step=0;nvs_msg("Open the channels in order: WEST, EAST, NORTH. Use the arrows.");return;}
  if(stage==4&&nvs_tab==3){
-  int paid=credit_wallet(1,75);char msg[140];char *q=append(msg,"Shutter raised! Shoal Walk reopened. Conservation grant: $");number(q,paid);
-  nvs_progress(5,msg);return;
+  nvs_progress(5,nvs_aqua_pay(75,NVS_GRANT_HELD)?"Shutter raised! Shoal Walk reopened. Conservation grant: $75":
+   "Shoal Walk reopened. Your full $75 grant is on hold. Make room in your wallet, then press E here.");return;
  }
+ if(stage==5&&nvs_tab==3&&nvs_aqua_claim())return;
  static const char*const lens[]={"Gold wrasse thread the fronds; silvery baitfish follow the warm current.",
  "Moon bells pulse from their rims. Under the lamps, their trailing threads shimmer.",
  "The little kite rays dip a wing when they turn above the lagoon floor.",
@@ -141,13 +170,18 @@ static void nvs_aqua_tick(U tap){
 #if __has_include("night_phone.inc")
 /* Three independent 7-bit shelf counts per design, distinct from the
  * commissioned stockroom. A transfer never converts or re-grades a print. */
-static int nvs_ed_count(int id){return cl((nv.world[21+id/3]>>((id%3)*7))&127,0,99);}
+#include "venue_shelf_ledger.inc"
+static U nvs_ed_word(int id){return id>=6?venue_stock():nv.world[21+id/3];}
+static int nvs_ed_count(int id){return cl((nvs_ed_word(id)>>((id%3)*7))&127,0,99);}
+static int nvs_ed_review(int id){return id>=6&&venue_ambiguous(nv.world[NCR_OWED_WORD]);}
 static void nvs_ed_xfer(int out){
  int id=nvs_sel,shelf=nvs_ed_count(id),bag=np_get(NP_BAG+id,99),next=out?shelf-1:shelf+1;
+ if(nvs_ed_review(id)){nvs_msg("These three grades share an old ride receipt. No lots moved. M pins Bryn at The Afterimage to resolve it.");return;}
  if((out&&!shelf)||(!out&&!bag)){nvs_msg(out?"No prints of this edition on your home shelf.":"No matching print in your satchel.");return;}
  if((out&&bag>=99)||(!out&&shelf>=99)){nvs_msg("The destination for this edition is full.");return;}
  int shift=(id%3)*7;
- nv.world[21+id/3]=(nv.world[21+id/3]&~(127u<<shift))|((U)next<<shift);
+ U word=(nvs_ed_word(id)&~(127u<<shift))|((U)next<<shift);
+ if(id>=6)venue_split_write(word,venue_fee_token());else nv.world[21+id/3]=word;
  nv.phone[NP_BAG+id]=bag+(out?1:-1);
  nvs_msg(out?"One exact strain and grade returned to your satchel.":"One matching lot stashed with its grade intact.");nvs_store();
 }
@@ -226,15 +260,22 @@ static void nvs_home_tick(U tap){
  if((nvs_tab==1||nvs_tab==0||nvs_tab==4)&&(tap&MAP)){
   int b=nvs_tab==4?NVH_GLASS_CROWN:nvs_cart_here();
   if(nvs_tab==0){
+#if __has_include("night_phone.inc") && __has_include("night_club.inc")
+   if(nvs_folio&&nvs_ed_review(nvs_sel)){nvs_pin(night_club_listing());nvs_msg("The Afterimage pinned. Ask Bryn about the old shelf/ride entry.");return;}
+#endif
    int best=0;float dist=1e9f;
    for(int i=0;i<4;i++){int k=nvs_aquaria[i];float d=d2(ordinaryDoorX[k]-p.x,ordinaryDoorY[k]-p.y);if(d<dist){dist=d;best=i;}}
    b=nvs_aquaria[best];
   }
   if(nvs_tab==1){
    int x,y;
-   if(night_venue_vendor_pos(&x,&y)){nav_slot();navManualLoc=-1;navManual=(NavPoint){x,y};navHasManual=1;nvs_msg("Night Cart pinned. Its location rotates while open.");return;}
+   if(night_venue_vendor_pos(&x,&y)){nav_track_cart();nvs_msg("Tracking the Night Cart. The atlas updates at each new stop.");return;}
   }
-  nvs_pin(b);nvs_msg(nvs_tab==4?"Glass Crown Sky Club pinned. Use Enter in its lobby.":
+  nvs_pin(b);
+  if(nvs_tab==4){
+   char where[135];char*q=append(where,walkin_name(b));append(q," pinned. Press Enter in its lobby for the Glass Crown lease desk.");nvs_msg(where);return;
+  }
+  nvs_msg(
    nvs_tab==1?"Cosmetic gallery pinned. The equipment van operates from 19:00 until 05:00.":"Nearest aquarium pinned. Enter its lobby, then press ENTER for the Glass Relay.");return;
  }
  if(nvs_tab==0){if(nvs_use_key(tap))nvs_transfer(0);else if(tap&FIRE)nvs_transfer(1);return;}
@@ -244,9 +285,6 @@ static void nvs_home_tick(U tap){
  else if(nvs_tab==2){
   if(p.heat>.1f||job.kind>=0||vdActive>=0){nvs_msg("You cannot sleep during a job or pursuit.");return;}
   night_rest_clock(nvs_rest_hours[nvs_sel],nvs_sel==2);
-#ifdef NIGHT_PHONE_HAS_REST
-  night_phone_rest(nvs_rest_hours[nvs_sel]);
-#endif
   nv.world[NVS_SURF]=nv.world[NVS_ECHO]=nv.world[NVF_EXTRA]=nv.world[NVS_TOL]=0;nvs_recov_ticks=0;
   p.hp=min(100,p.hp+(nvs_sel==1?(nvs_sky()&&nvs_renovated()?48:35):12));
   nvs_msg(nvs_sel==2?"Four hours later. The front passed; the harbor is clear for a while.":
@@ -261,8 +299,9 @@ static void nvs_home_tick(U tap){
 static void nvs_lease_tick(U tap){
  if(!nvs_use_key(tap))return;
  if(!sv.home){nvs_msg("Earn your resident references by buying the Breakwater Safehouse first.");return;}
+ if(case_blocks_price(NVH_PRICE)){nvs_msg("Purchase on hold. Settle your case at the Revenue Annex.");return;}
  if(sv.cash<NVH_PRICE){nvs_msg("The Glass Crown penthouse costs $640 clean cash.");return;}
- sv.cash-=NVH_PRICE;nv.world[NVH_DEED]|=1;nvs_room=NVR_HOME;nvs_tab=nvs_sel=0;
+ spend(NVH_PRICE);nv.world[NVH_DEED]|=1;nvs_room=NVR_HOME;nvs_tab=nvs_sel=0;
  nvs_msg("Penthouse purchased. Your private inventory and display are accessible here too.");nvs_store();
 }
 static void nvs_cart_tick(U tap){
@@ -284,8 +323,9 @@ static void nvs_cart_tick(U tap){
   if(nvs_tab==1){
    id++;
    if(!nvk_owned(id)){
+    if(case_blocks_price(nvk_frames[id].price)){nvs_msg("Purchase on hold. Settle your case at the Revenue Annex.");return;}
     if(sv.cash<nvk_frames[id].price){nvs_msg("Not enough clean cash for this frame.");return;}
-    sv.cash-=nvk_frames[id].price;nv.world[NVK_BUYS]|=1u<<id;
+    spend(nvk_frames[id].price);nv.world[NVK_BUYS]|=1u<<id;
     nvk_put(0,nvk_reserve(0)+min(6,max(0,99-nvk_reserve(0)-(nvk_kind()==0?nvk_load():0))));
    }
    if(nvk_frame()!=id)nvk_cycle_frame(id);
@@ -308,7 +348,16 @@ static void nvs_cart_tick(U tap){
  nvs_store();
 }
 static void night_venues_tick(U keys,U tap){
- if(nvs_room==NVR_GLASS&&nvs_mode==4)nvs_position=cl(nvs_position+(!!(keys&RIGHT)-!!(keys&LEFT))*3,72,918);
+ if(nvs_room==NVR_CART&&nvs_back==1){
+  int x,y,open=night_venue_vendor_pos(&x,&y);
+  if(!open||d2(p.x-x,p.y-y)>42*42){
+   scene=1;nvs_room=0;tell(open?"Signal Cart moved to its next stop. Check Night Wire for the new pin.":"Signal Cart closed for the day. It returns at 19:00.");return;
+  }
+ }
+ if(nvs_room==NVR_GLASS&&nvs_mode==4){
+  int dx=!!(keys&RIGHT)-!!(keys&LEFT),next=cl(nvs_position+dx*3,72,918);
+  nvs_rail_walk=next!=nvs_position;if(dx)nvs_rail_dir=dx;nvs_position=next;
+ }
  nvs_frames++;if(nvs_frames>1200000U)nvs_frames=0;
  p.secs+=1.f/60.f;
  if(tap&ESC){
@@ -644,8 +693,8 @@ static void nvs_aqua_paint(void){
   static const char*const stops[]={"Inez","Lightwell","Nursery","East bench"};
   for(int i=0;i<4;i++){int xx=119+i*222;rect(xx,285,2,32,0xa2b092);
    box(xx-48,291,101,23,0x18313a,nvs_bonus&(1<<i)?TEAL:GOLD);center(xx+2,291,stops[i],PAPER,0);}
-  person(151,329,0xbcb98a,0,3.14f,4,1);
-  person(nvs_position,335,0x51948b,(nvs_frames%16)/4,0.f,4,1);
+  person(151,329,0xbcb98a,0,3.14f,MODEL_STAFF,1);
+  person(nvs_position,335,0x51948b,nvs_rail_walk?(int)(nvs_frames%16)/4:0,nvs_rail_dir<0?3.14159f:0.f,MODEL_PLAYER,1);
   nvs_tail("WALK THE EAST WING","Four marked stops: E to meet Inez or inspect the viewing station by your feet.",
    "The reopened promenade is visible here and remains available after restarting.",
    "LEFT / RIGHT: walk the rail     E / Inspect stop     ESC / Back to gallery");
@@ -660,11 +709,12 @@ static void nvs_aqua_paint(void){
   for(int i=0;i<3;i++){int xx=249+i*157;box(xx,252,148,44,0x193038,i==nvs_step?GOLD:0x588480);
    center(xx+74,262,nvs_motion[i],i<nvs_step?TEAL:i==nvs_step?GOLD:MUTED,0);}
  }
- const char *actions=stage==0?"E: sign work order":stage==1&&nvs_tab==0?"E: start observation":stage==2&&nvs_tab==1?"E: service lamp bank":stage==3&&nvs_tab==2?"E: guide the kite ray":stage==4&&nvs_tab==3?"E: reopen east wing":"E: inspect exhibit";
+ int waiting=stage==5&&nvs_tab==3&&(nv.world[NVS_STAGE]&(NVS_GRANT_HELD|NVS_STIPEND_HELD));
+ const char *actions=waiting?"E: collect held payment":stage==0?"E: sign work order":stage==1&&nvs_tab==0?"E: start observation":stage==2&&nvs_tab==1?"E: service lamp bank":stage==3&&nvs_tab==2?"E: guide the kite ray":stage==4&&nvs_tab==3?"E: reopen east wing":"E: inspect exhibit";
  const char *commands=nvs_mode==1?"E / Capture through brass frame     ESC / Cancel":
  nvs_mode==2?"LEFT / RIGHT: select lamp     E / Turn dial     ESC / Cancel":
- nvs_mode==3?"ARROWS / Route the ray     ESC / Cancel":stage>=5&&nvs_tab==3?"LEFT / RIGHT: gallery     E / Inspect     SPACE / Walk the open wing     ESC / Lobby":"LEFT / RIGHT: change gallery     E / Interact     ESC / Return to lobby";
- nvs_tail(nvs_mode?"FIELD OPERATION":actions,nvs_orders[stage],
+ nvs_mode==3?"ARROWS / Route the ray     ESC / Cancel":waiting?"LEFT / RIGHT: gallery     E / Collect     SPACE / Walk the open wing     ESC / Lobby":stage>=5&&nvs_tab==3?"LEFT / RIGHT: gallery     E / Inspect     SPACE / Walk the open wing     ESC / Lobby":"LEFT / RIGHT: change gallery     E / Interact     ESC / Return to lobby";
+ nvs_tail(nvs_mode?"FIELD OPERATION":actions,stage==5&&(nv.world[NVS_STAGE]&(NVS_GRANT_HELD|NVS_STIPEND_HELD))?"Inez has a payment on hold. Make wallet space and press E at Shoal Walk.":nvs_orders[stage],
  "The four aquariums share a live glass relay. Switch galleries to operate their viewing stations.",commands);
 }
 static const char*const nvs_pantry[]={"Sunline / bright fizz","Night Bell / cocktail   $5","Glassleaf / selected roll","Quiet reset"};
@@ -676,8 +726,8 @@ static void nvs_home_paint(void){
  if(nvs_tab==0){
 #if __has_include("night_phone.inc")
   if(nvs_folio){
-   np_print(title,nvs_sel);char*q=append(summary,"Satchel: ");q=number(q,np_get(NP_BAG+nvs_sel,99));q=append(q,"  /  Private shelf: ");q=number(q,nvs_ed_count(nvs_sel));
-   append(q,"  /  Keeps this exact strain and grade.");
+   np_print(title,nvs_sel);char*q=append(summary,"Satchel: ");q=number(q,np_get(NP_BAG+nvs_sel,99));if(nvs_ed_review(nvs_sel))append(q,"  /  Shelf on hold: ask Bryn at The Afterimage to resolve your old ride receipt. M pins the club.");
+   else{q=append(q,"  /  Private shelf: ");q=number(q,nvs_ed_count(nvs_sel));append(q,"  /  Keeps this exact strain and grade.");}
   }else
 #endif
   {
@@ -685,7 +735,7 @@ static void nvs_home_paint(void){
    q=append(summary,"Bulk warehouse: ");q=number(q,sv.stocks[i]);q=append(q,"    /    On shelf: ");q=number(q,nv.world[NVS_SHELF+nvs_sel]);append(q,g?"   /   $3 clean to case each lot.":"    /    Free to store.");
   }
 #if __has_include("night_phone.inc")
-  help="T Stock/Lots   UP/DOWN Bin   E Store   SPACE Take   M Pin aquarium   LEFT/RIGHT   ESC";
+  help=nvs_folio&&nvs_ed_review(nvs_sel)?"M / Pin Bryn     T / Stock or lots     UP/DOWN / Bin     LEFT/RIGHT / Room     ESC / Back":"T Stock/Lots   UP/DOWN Bin   E Store   SPACE Take   M Pin aquarium   LEFT/RIGHT   ESC";
 #else
   help="UP/DOWN Shelf   E Store   SPACE Take   M Pin aquarium   LEFT/RIGHT Room   ESC Back";
 #endif
@@ -695,11 +745,11 @@ static void nvs_home_paint(void){
   nvk_format(summary,nvk_frame(),nvk_glass(),nvk_kind(),nvk_load());
   help="UP/DOWN Finish   E Mount   SPACE Clear   M Pin cart   LEFT/RIGHT Room   ESC Back";
   int x,y;
-  note=night_venue_vendor_pos(&x,&y)?"Night Cart is open. M pins its current stop. E mounts the equipped look.":"Night Cart opens 19:00-05:00. M pins the cosmetic gallery when the van is closed.";
+  note=night_venue_vendor_pos(&x,&y)?"Night Cart is open. M tracks its moving route. E mounts the equipped look.":"Night Cart opens 19:00-05:00. M pins the cosmetic gallery when the van is closed.";
  }else if(nvs_tab==2){
   append(title,nvs_sleep[nvs_sel]);append(summary,"Rest changes city time and restores health. Timed jobs and pursuits block sleep.");
   help="UP / DOWN: duration     E / Sleep     LEFT / RIGHT: room     ESC / Back";
-  note="Clock and weather changes persist.";
+  note="The city clock, plants and closing time advance. Franchise wages and Revenue deadlines count active play.";
  }else if(nvs_tab==3){
   append(title,nvs_pantry[nvs_sel]);char*q=summary;
   static const char*const effect[]={"Gold light, bright tones and a brisk stride.","Cool blue edges, lower tones and weightier footsteps.","Curling teal haze, a glass chime and a lighter stride.","Clear all afterglow, restore regular movement and reset familiarity."};

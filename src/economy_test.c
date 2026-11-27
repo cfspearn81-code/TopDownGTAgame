@@ -3,10 +3,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-static unsigned char stored[sizeof(Save)];
+static unsigned char stored[sizeof(Save11)];
 static unsigned stored_n;
 static int failWrite;
-int disk_write(const void*p,unsigned n){assert(n==sizeof(Save));if(failWrite)return 0;cp(stored,p,n);stored_n=n;return 1;}
+int disk_write(const void*p,unsigned n){assert(n==sizeof(Save)||n==sizeof(Save11));if(failWrite)return 0;cp(stored,p,n);stored_n=n;return 1;}
 int disk_read(void*p,unsigned n){if(n!=stored_n)return 0;cp(p,stored,n);return 1;}
 static void historical_save(void){
  /* Construct the bytes an old build wrote, not the current save writer. */

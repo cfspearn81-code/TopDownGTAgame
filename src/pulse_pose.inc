@@ -90,6 +90,9 @@ static PulsePose pulse_pose(float recoil){
      street_reach_open(p.x,p.y,peds[i].x,peds[i].y,1,-1))
    scale=pulse_min(scale,(d>2.f?d-2.f:d*.35f)/forward);
  }
+
+ OuterHit crowd=outer_pick(p.x,p.y,co,si,0,forward,0,p.x,p.y);
+ if(crowd.id>=0)scale=pulse_min(scale,(crowd.rank>2.f?crowd.rank-2.f:crowd.rank*.35f)/forward);
  float targetX,targetY;
  if(npc_fighter_position(&targetX,&targetY)){
   float x=targetX-p.x,y=targetY-p.y,d=x*co+y*si;

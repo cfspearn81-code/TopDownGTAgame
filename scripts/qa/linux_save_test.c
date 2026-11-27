@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,29 @@ static void no_stages(const char *folder){
  DIR*d=opendir(folder);assert(d);
  for(struct dirent*e;(e=readdir(d));)assert(strncmp(e->d_name,".stage-",7));
  closedir(d);
+}
+/* A restored directory can already contain a truncated migration backup.
+   A name match cannot substitute for the exact predecessor bytes. */
+static void verify_migration(int parent){
+ uint32_t old[76]={0x44433131,10},hash=2166136261u;
+ unsigned char *p=(unsigned char*)old;
+ for(int i=0;i<300;i++)hash=(hash^p[i])*16777619u;
+ old[75]=hash;
+ char backup[96];snprintf(backup,sizeof backup,".pre-afterhours-career.dat-r10-%08x.bak",hash);
+ disk_slot(0);assert(disk_write(old,sizeof old));
+ int bad=openat(parent,backup,O_WRONLY|O_CREAT|O_EXCL,0600);
+ assert(bad>=0&&write(bad,old,64)==64&&!close(bad));
+ assert(!linux_disk_backup_upgrade(0)); /* wrong size */
+ uint32_t readback[76];assert(disk_read(readback,sizeof readback)&&!memcmp(old,readback,sizeof old));
+ struct stat st;assert(!fstatat(parent,backup,&st,0)&&st.st_size==64);
+ bad=openat(parent,backup,O_WRONLY|O_TRUNC);assert(bad>=0);
+ old[2]=94;assert(write(bad,old,sizeof old)==sizeof old&&!close(bad));old[2]=0;
+ assert(!linux_disk_backup_upgrade(0)); /* correct length, wrong bytes */
+ assert(!unlinkat(parent,backup,0)&&linux_disk_backup_upgrade(0)&&linux_disk_backup_upgrade(0));
+ int good=openat(parent,backup,O_RDONLY);assert(good>=0);
+ assert(read(good,readback,sizeof readback)==sizeof readback&&!close(good)&&!memcmp(old,readback,sizeof old));
+ assert(!unlinkat(parent,backup,0));
+ puts("Migration guard: refuses short and equal-sized conflicting backups; retry preserves exact prior career.");
 }
 int main(int argc,char **argv){
  assert(argc==2);
@@ -34,7 +58,7 @@ int main(int argc,char **argv){
  disk_slot(2);assert(mkdirat(parent,"fresh-001.dat",0700)==0);
  assert(disk_present()&&!disk_write(payload,304)&&!disk_read(loaded,304));
  no_stages(layout);
- assert(unlinkat(parent,"fresh-001.dat",AT_REMOVEDIR)==0);close(parent);
+ assert(unlinkat(parent,"fresh-001.dat",AT_REMOVEDIR)==0);verify_migration(parent);disk_slot(2);close(parent);
  for(int pass=0;pass<16;pass++){
   /* Forked instances race to create the same fresh profile. Only one of
    * the two inode links may win; both stages must be cleaned up. */

@@ -76,3 +76,12 @@ static void nvk_format(char *s,int frame,int glass,int variant,int loaded){
  q=number(q,r);q=append(q," span  ");q=number(q,d);q=append(q," impact");
  if(frame){q=append(q,"  CHARGE ");q=number(q,loaded);q=append(q,"/");number(q,nvk_frames[frame].cap+(glass==2?2:0));}
 }
+
+/* The wheel describes the same game tool that will actually fire. Nothing
+ * here reloads, selects a cell, or mutates either wallet or the save. */
+static const char *night_wheel_loadout(char *details){
+ int frame=nvk_frame();if(!frame)return 0;
+ char *q=number(details,nvk_load());q=append(q,"/");q=number(q,nvk_cap());
+ q=append(q,"  +  ");q=number(q,nvk_reserve(nvk_kind()));append(q," SPARE");
+ return nvk_frames[frame].name;
+}

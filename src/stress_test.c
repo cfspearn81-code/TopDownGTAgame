@@ -8,8 +8,8 @@
 static U state=0x8eaf35a1u;
 static U draw(void){state^=state<<13;state^=state>>17;state^=state<<5;return state;}
 static void assert_state(void){
- assert(scene>=0&&scene<=5&&nc>=1&&nc<=LEN(cars)&&nb<=LEN(buildings));assert(p.hp>=0&&p.hp<=100);
- assert(p.car>=-1&&p.car<nc&&p.x>=35&&p.x<=ROOM-36&&p.y>=35&&p.y<=ROOM-36);
+ assert(((scene>=0&&scene<=5)||(scene>=NIGHT_CLUB_SCENE&&scene<=NIGHT_TRAP_SCENE))&&nc>=1&&nc<=LEN(cars)&&nb<=LEN(buildings));assert(p.hp>=0&&p.hp<=100);
+ assert((p.car==-1||street_car_exists(p.car))&&p.x>=35&&p.x<=ROOM-36&&p.y>=35&&p.y<=ROOM-36);
  assert(isfinite(p.heat)&&p.heat>=0&&p.heat<=300);
  assert(valid_sweep_save()&&sv.bank>=0&&sv.cash>=0&&sv.dirty>=0&&sv.units>=0&&sv.armor>=0&&sv.armor<=90);
  if(job.kind>=0){assert(job.kind<LEN(jobNames)&&job.total>0&&job.total<=6&&job.step>=0&&job.step<job.total&&isfinite(job.time));}

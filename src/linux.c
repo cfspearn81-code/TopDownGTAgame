@@ -3,6 +3,7 @@
 #include "linux_save.h"
 #include "sdl2_linux.h"
 #include "radio_motif.h"
+#include "frame_probe.h"
 #include <errno.h>
 #include <signal.h>
 #include <stdint.h>
@@ -11,15 +12,26 @@
 /* On unsupported older SDL installations only the external link is absent. */
 extern int SDL_OpenURL(const char*) __attribute__((weak));
 
-static const char title[]="Dead Channel | Port Vanta Crossroads";
+static const char title[]="Dead Channel | Crossroads Street Life";
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *surface_tex;
 static Uint8 down[SDL_NUM_SCANCODES];
 static U buffered;
-static int focused,redraw,running=1;
+static int focused,redraw,textureLost,running=1;
 static volatile sig_atomic_t stop_signal;
 
+static FrameProbe probe;
+static char probe_csv[FP_BYTES];
+static void frame_key(int code){
+ FPClock n=SDL_GetPerformanceCounter();
+ if(code==SDL_SCANCODE_F9)fp_toggle(&probe,n,probe.frequency);
+ else if(fp_export_allowed(&probe,n)){
+  int ok=linux_export_frame_times(probe_csv,fp_csv(&probe,probe_csv));
+  fp_status(&probe,ok?FP_EXPORTED:FP_FAILED,SDL_GetPerformanceCounter());
+ }
+ redraw=1;
+}
 static const U binding[SDL_NUM_SCANCODES]={
  [SDL_SCANCODE_W]=UP,[SDL_SCANCODE_UP]=UP,[SDL_SCANCODE_S]=DOWN,[SDL_SCANCODE_DOWN]=DOWN,
  [SDL_SCANCODE_A]=LEFT,[SDL_SCANCODE_LEFT]=LEFT,[SDL_SCANCODE_D]=RIGHT,[SDL_SCANCODE_RIGHT]=RIGHT,
@@ -27,7 +39,7 @@ static const U binding[SDL_NUM_SCANCODES]={
  [SDL_SCANCODE_LSHIFT]=BRAKE,[SDL_SCANCODE_RSHIFT]=BRAKE,[SDL_SCANCODE_ESCAPE]=ESC,
  [SDL_SCANCODE_M]=MAP,[SDL_SCANCODE_F5]=SAVE,[SDL_SCANCODE_F6]=ACTIVITIES,[SDL_SCANCODE_RETURN]=ENTER,[SDL_SCANCODE_KP_ENTER]=ENTER,
  [SDL_SCANCODE_F1]=HELP,[SDL_SCANCODE_F2]=GFX,[SDL_SCANCODE_F3]=SLOT,[SDL_SCANCODE_F4]=NEW_SLOT,
- [SDL_SCANCODE_T]=TAXI_NEXT,[SDL_SCANCODE_DELETE]=DELETE_SLOT,[SDL_SCANCODE_P]=PHONE,[SDL_SCANCODE_F7]=PHONE_ALT,
+ [SDL_SCANCODE_T]=TAXI_NEXT,[SDL_SCANCODE_Q]=TAXI_QUOTE,[SDL_SCANCODE_R]=TAXI_RECEIPT,[SDL_SCANCODE_DELETE]=DELETE_SLOT,[SDL_SCANCODE_P]=PHONE,[SDL_SCANCODE_F7]=PHONE_ALT,
  [SDL_SCANCODE_C]=CAMERA,[SDL_SCANCODE_L]=LOADOUT,[SDL_SCANCODE_F8]=ATLAS_WORLD,[SDL_SCANCODE_TAB]=WHEEL,[SDL_SCANCODE_V]=USE_PATCH
 };
 static void stop(int sig){(void)sig;stop_signal=1;}
@@ -71,13 +83,15 @@ static U keys(void){
  for(int i=0;i<SDL_NUM_SCANCODES;i++)if(down[i])k|=binding[i];
  return k;
 }
+static void audio_removed(SDL_AudioDeviceID id);
 static void event(const SDL_Event *e){
  switch(e->type){
- case SDL_QUIT:close_try();break;
+ case SDL_AUDIODEVICEREMOVED:if(!e->adevice.iscapture)audio_removed(e->adevice.which);break;
+ case SDL_RENDER_DEVICE_RESET:textureLost=redraw=1;break;
+ case SDL_RENDER_TARGETS_RESET:redraw=1;break;
  case SDL_WINDOWEVENT:
   switch(e->window.event){
-   case SDL_WINDOWEVENT_CLOSE:close_try();break;
-   case SDL_WINDOWEVENT_FOCUS_LOST:focused=0;clear_keys();pointer_input(-1,-1,0);redraw=1;break;
+   case SDL_WINDOWEVENT_FOCUS_LOST:if(probe.active)fp_stop(&probe,SDL_GetPerformanceCounter());focused=0;clear_keys();pointer_input(-1,-1,0);redraw=1;break;
    case SDL_WINDOWEVENT_FOCUS_GAINED:focused=1;redraw=1;break;
    case SDL_WINDOWEVENT_LEAVE:pointer_input(-1,-1,0);redraw=1;break;
    case SDL_WINDOWEVENT_SIZE_CHANGED:case SDL_WINDOWEVENT_RESIZED:
@@ -88,6 +102,7 @@ static void event(const SDL_Event *e){
    int code=e->key.keysym.scancode;
    if(focused&&(unsigned)code<SDL_NUM_SCANCODES){
     int held=e->type==SDL_KEYDOWN;
+    if(code==SDL_SCANCODE_F9||code==SDL_SCANCODE_F10){if(held&&!e->key.repeat)frame_key(code);break;}
     /* Focus loss discarded the previous press. A resumed OS repeat cannot
      * manufacture a fresh press (notably E) after returning to the window. */
     if(held&&e->key.repeat&&!down[code])break;
@@ -108,7 +123,9 @@ static void event(const SDL_Event *e){
   }
   break;
  case SDL_MOUSEMOTION:
-  if(focused){pointer(e->motion.x,e->motion.y,0);redraw=1;}
+  /* Keep the latest target, but present on the next simulation frame. A
+   * high-polling mouse must not repaint the whole city between ticks. */
+  if(focused)pointer(e->motion.x,e->motion.y,0);
   break;
  case SDL_MOUSEBUTTONDOWN:
   if(focused){
@@ -121,15 +138,27 @@ static void event(const SDL_Event *e){
 /* The video host works even when the audio subsystem or device is absent. */
 static SDL_AudioDeviceID radioDev;
 static int radioActive,radioOneShot,radioUnavailable;
+static Uint32 radioFailedAt;
+static void audio_wait(void){radioUnavailable=1;radioFailedAt=SDL_GetTicks();}
+static void audio_removed(SDL_AudioDeviceID id){
+ if(!radioDev||id!=radioDev)return;
+ SDL_CloseAudioDevice(radioDev);radioDev=0;radioActive=radioOneShot=0;
+ SDL_QuitSubSystem(SDL_INIT_AUDIO);
+}
 static void radio_audio(int oneShot,int station){
  int track=oneShot?oneShot:station;
  if(!radioDev&&!track)return;
- if(radioUnavailable)return;
+ if(radioUnavailable){
+  /* A launch with no output device is not a permanent mute. Check again
+   * only when audio is actually wanted; do not open a device every frame. */
+  if((Uint32)(SDL_GetTicks()-radioFailedAt)<5000)return;
+  radioUnavailable=0;
+ }
  if(!radioDev){
   SDL_AudioSpec want={.freq=RM_RATE,.format=AUDIO_S16LSB,.channels=1,.samples=512};
-  if(SDL_InitSubSystem(SDL_INIT_AUDIO)<0){radioUnavailable=1;return;}
+  if(SDL_InitSubSystem(SDL_INIT_AUDIO)<0){audio_wait();return;}
   radioDev=SDL_OpenAudioDevice(NULL,0,&want,NULL,0);
-  if(!radioDev){SDL_QuitSubSystem(SDL_INIT_AUDIO);radioUnavailable=1;return;}
+  if(!radioDev){SDL_QuitSubSystem(SDL_INIT_AUDIO);audio_wait();return;}
  }
  if(oneShot)radioOneShot=1;
  else if(radioOneShot&&SDL_GetQueuedAudioSize(radioDev))return;
@@ -147,11 +176,26 @@ static int display(void){
  if(SDL_GetRendererOutputSize(renderer,&w,&h)!=0)return 0;
  SDL_Rect v=viewport(w,h);
  if(!v.w||!v.h)return 1;
+ if(textureLost){
+  /* SDL invalidated texture contents/handles but retained the renderer.
+   * Rebuild once for a burst of reset events, without rebooting the game. */
+  if(surface_tex)SDL_DestroyTexture(surface_tex);
+  surface_tex=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB888,SDL_TEXTUREACCESS_STREAMING,W,H);
+  if(!surface_tex)return 0;
+  textureLost=0;
+ }
+ FPClock start=probe.status?SDL_GetPerformanceCounter():0,painted=0,present=0;
+ fp_finish_if_due(&probe,start);
  paint();
+ if(probe.active)painted=SDL_GetPerformanceCounter();
+ if(probe.status)fp_draw(&probe,start);
+ if(probe.active)present=SDL_GetPerformanceCounter();
  if(SDL_UpdateTexture(surface_tex,NULL,pixels,W*(int)sizeof(U))<0||
     SDL_SetRenderDrawColor(renderer,0,0,0,255)<0||SDL_RenderClear(renderer)<0||
     SDL_RenderCopy(renderer,surface_tex,NULL,&v)<0)return 0;
- SDL_RenderPresent(renderer);return 1;
+ SDL_RenderPresent(renderer);
+ if(probe.active)fp_sample(&probe,start,painted,present,SDL_GetPerformanceCounter());
+ return 1;
 }
 static int report(const char *what,const char *detail){
  char message[512];snprintf(message,sizeof message,"%s: %s",what,detail);
@@ -172,7 +216,7 @@ int main(void){
  if(!surface_tex){report("Cannot create framebuffer",SDL_GetError());goto done;}
  if(!linux_disk_init()){report("Cannot open the DeadChannel data directory",strerror(errno));goto done;}
  if(!linux_disk_lock()){
-  report("Could not acquire the career lock",errno==EWOULDBLOCK?"Another Afterhours window already has these saves open.":strerror(errno));goto done;
+  report("Could not acquire the career lock",errno==EWOULDBLOCK?"Another Dead Channel window already has these saves open.":strerror(errno));goto done;
  }
 
  struct sigaction action={.sa_handler=stop};
@@ -183,11 +227,19 @@ int main(void){
  focused=!!(SDL_GetWindowFlags(window)&SDL_WINDOW_INPUT_FOCUS);
  Uint64 rate=SDL_GetPerformanceFrequency(),last=SDL_GetPerformanceCounter(),time=0;
  if(!rate){report("Cannot start frame clock","SDL2 returned a zero counter frequency");goto done;}
+ probe.frequency=rate;
  if(!display()){report("Cannot draw window",SDL_GetError());goto done;}
  status=0;
  while(running&&!stop_signal){
-  SDL_Event e;
-  while(running&&SDL_PollEvent(&e))event(&e);
+  SDL_Event e;int closeHandled=0;
+  while(running&&SDL_PollEvent(&e)){
+   /* A close of the final window normally queues both CLOSE and QUIT.
+    * Declining a failed save must dismiss the one gesture, not just its
+    * first notification. A later close remains a fresh save retry. */
+   if(e.type==SDL_QUIT||(e.type==SDL_WINDOWEVENT&&e.window.event==SDL_WINDOWEVENT_CLOSE)){
+    if(!closeHandled){closeHandled=1;close_try();}
+   }else event(&e);
+  }
   if(!running||stop_signal)break;
   Uint64 now=SDL_GetPerformanceCounter(),elapsed=now>=last?now-last:0;
   last=now;

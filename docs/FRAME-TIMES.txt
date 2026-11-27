@@ -1,0 +1,26 @@
+DEAD CHANNEL / OPTIONAL FRAME TIMING
+Off by default. Press F9 to start; the top banner shows the latest
+frame interval and sample count. The trace stops automatically at five
+seconds or 300 rows, whichever comes first. Press F9 again to stop early.
+Losing window focus also stops the trace rather than including idle time.
+The banner hides itself; your last sample remains in memory until you
+start a new trace or quit.
+
+After the trace stops, press F10 to export it. This writes or replaces
+one local file named frame-times.csv in the game's data folder:
+
+  Windows: %LOCALAPPDATA%\DeadChannel\frame-times.csv
+  Linux:   ${XDG_DATA_HOME:-$HOME/.local/share}/DeadChannel/frame-times.csv
+
+The CSV has just four columns: sample number; microseconds between
+consecutive frames; game CPU drawing time; and time spent in host calls to
+submit the image. Simulation, event handling, pacing and OS scheduling
+can affect the interval outside the two measured phases. Submission time
+is not a GPU or physical monitor scan-out measurement. Collecting a trace
+adds a few timing calls and renders the sample banner while enabled.
+
+No player details, inputs, screenshots, timestamps, network requests or
+save data are collected or sent. If you want someone to inspect it, send
+the CSV yourself. Export failure preserves the in-memory trace so you
+can retry with F10. This is a performance diagnostic, not a benchmark or
+guarantee about a particular e.g. GPU, refresh rate, or frame cap.

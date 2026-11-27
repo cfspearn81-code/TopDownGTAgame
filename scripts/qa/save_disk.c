@@ -101,8 +101,29 @@ static void race(int slot,int newCareer,int failPeer){
  int status;assert(waitpid(child,&status,0)==child&&WIFEXITED(status)&&!WEXITSTATUS(status));
  expect(newCareer&&!failPeer?two:one);assert(files()==1&&disk_delete()&&!files());
 }
+static void backup_failure_test(void){
+ unsigned char raw[304]={0},next[1044]={0},out[1044];
+ uint32_t magic=0x44433131u,rev=11;
+ memcpy(raw,&magic,4);memcpy(raw+4,&rev,4);raw[267]=2;
+ uint32_t h=disk_hash(raw,300);memcpy(raw+300,&h,4);
+ memcpy(next,raw,304);next[971]=0x80;next[687]=0x80;
+ uint32_t ext=disk_hash(next,1040);memcpy(next+1040,&ext,4);
+ disk_slot(0);assert(disk_create(raw,sizeof raw));
+ char back[128];snprintf(back,sizeof back,"DeadChannel/pre-career.dat-%08x.bak",h);
+ int fd=open(back,O_WRONLY|O_CREAT|O_EXCL,0600);assert(fd>=0&&write(fd,"conflict",8)==8&&!close(fd));
+ assert(!disk_write(next,sizeof next)&&disk_read(out,sizeof raw)&&!memcmp(out,raw,sizeof raw));
+ char bad[8];fd=open(back,O_RDONLY);assert(fd>=0&&read(fd,bad,8)==8&&!memcmp(bad,"conflict",8)&&!close(fd));assert(!unlink(back));
+ fault=SHORT_WRITE;assert(!disk_write(next,sizeof next));fault=NONE;
+ assert(disk_read(out,sizeof raw)&&!memcmp(out,raw,sizeof raw)&&access(back,F_OK)!=0&&files()==1);
+ assert(disk_write(next,sizeof next)&&disk_read(out,sizeof next)&&!memcmp(out,next,sizeof next));
+ fd=open(back,O_RDONLY);assert(fd>=0&&read(fd,out,sizeof out)==sizeof raw&&!memcmp(out,raw,sizeof raw)&&!close(fd));
+ assert(disk_write(next,sizeof next)&&files()==2);
+ assert(disk_delete()&&!unlink(back)&&!files());
+ puts("Win32 disk model: first expanded save preserves exact compact bytes; a different same-name backup or short write leaves the previous career intact.");
+}
 int main(void){
  alarm(40);char cwd[]="/tmp/dead-channel-disk-XXXXXX";assert(mkdtemp(cwd)&&!chdir(cwd));directories();
+ backup_failure_test();
  assert(!disk_present()&&disk_create(prior,sizeof prior));expect(prior);
  char buf[16];assert(!disk_read(buf,sizeof prior-1)&&!disk_read(buf,sizeof prior+1));
  assert(!disk_create(one,sizeof one)&&files()==1);expect(prior);

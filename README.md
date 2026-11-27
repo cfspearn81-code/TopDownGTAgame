@@ -1,11 +1,15 @@
-# Dead Channel | Port Vanta Crossroads
+# Dead Channel | Crossroads Street Life
+
+**Latest: Street Life Stability Update.** See [the merged QA report](docs/STABILITY-UPDATE.md) for the six one-hour playtests, verified fixes and remaining ideas.
+
+**Street Life update:** The nine follow-ups from the [Crossroads QA verdict](docs/CROSSROADS-QA.md) are in this build. See [what changed and how to use it](docs/STREET-LIFE.md).
 
 An original top-down PC action and driving game. Crossroads combines the
 published Conversation Hold Hotfix with the expanded Outer Loop and
-Base Village. Both native launchers read **Dead Channel | Port Vanta Crossroads**.
+Base Village. The Street Life launchers read **Dead Channel | Crossroads Street Life**.
 
-- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Port-Vanta-Crossroads-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
-- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Port-Vanta-Crossroads-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2 runtime.
+- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Street-Life-Stability-Update-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
+- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Street-Life-Stability-Update-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2 runtime.
 - [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt) · [Compatibility and testing](docs/CROSSROADS.txt).
 
 **Base Village:** Leave Apartment 4 and walk straight left to the pink
@@ -96,6 +100,6 @@ the target saves before copying between platforms. No automatic sync.
 Linux automated testing runs the exact ELF using SDL's software renderer and
 dummy video driver. Windows automated testing runs the exact PE with simulated
 Win32 on Linux. Interactive desktop/physical Windows testing remains open.
-Package the verified builds with `python3 scripts/package-crossroads.py`.
+Package the verified builds with `python3 scripts/package-street-life-stability.py`. The archived copies of these documents reflect the original direct handoff.
 Before publishing another build, update [HANDOFF.md](HANDOFF.md) for the next
 maintainer and verify the matching archives/checksums.

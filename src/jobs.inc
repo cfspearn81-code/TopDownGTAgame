@@ -180,17 +180,17 @@ static void beginJob(int kind){
 static void advanceJob(void){
  if(job.kind<0||++job.step<job.total)return;
  int kind=job.kind,service=job_is_service(job.kind),unpaid=job.unpaid||service;
- int tip=kind==JOB_TAXI?taxi_tip_amount(job.price,taxi.crashes,taxi.damage,taxi.rough):0;
+ int tip=kind==JOB_TAXI?taxi_current_tip():0;
  int bonus=kind==JOB_TAXI?taxi_detour_bonus():kind==JOB_COURIER&&sv.intro==2?25:0;
  char race[80];const char *result=jobNames[kind];
  if(kind<JOB_VAULT){
-  sv.legal++;
-  if(kind==JOB_TAXI)sv.taxiFares++;
+  if(sv.legal<SAVE_COUNTER_LIMIT)sv.legal++;
+  if(kind==JOB_TAXI&&sv.taxiFares<~0u)sv.taxiFares++;
   if(!unpaid){
-   if(sv.intro<3){sv.intro=3;result="First paycheck. Your first car is $125 at Nightglass.";}
+   if(kind==JOB_COURIER&&sv.intro==2){sv.intro=3;result="First paycheck. Your first car is $125 at Nightglass.";}
    else if(sv.intro==3)sv.intro=4;
   }
- }else sv.crime++;
+ }else if(sv.crime<SAVE_COUNTER_LIMIT)sv.crime++;
  if(kind==JOB_SPRINT){
   int time=max(1,(int)((95.f-job.time)*10+.5f));
   int record=!sprintBest||time<sprintBest;
@@ -213,7 +213,11 @@ static void advanceJob(void){
   noticeInk=GOLD;
  }else if(unpaid){
   tell("Unpaid shift completed. Your case is already closed. Shift paid $0.");noticeInk=GOLD;
- }else gain(kind<JOB_VAULT,job.price+tip+bonus,result);
+ }else{
+  int before=sv.cash;
+  gain(kind<JOB_VAULT,job.price+tip+bonus,result);
+  if(kind==JOB_TAXI)taxi_record_ride(job.price,tip,bonus,sv.cash-before,taxi.crashes+taxi.pedHits);
+ }
  end_job();request_save();
 }
 static int interior_job_drop(int venue){

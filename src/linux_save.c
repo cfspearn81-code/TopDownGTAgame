@@ -101,8 +101,8 @@ int disk_read(void *bytes,unsigned size){
  if(close(fd)<0)ok=0;
  return ok;
 }
-static int write_slot(const void *bytes,unsigned size,int replace){
- if(dirfd<0||!save_name[0])return 0;
+static int write_local(const char *name,const void *bytes,unsigned size,int replace){
+ if(dirfd<0||!name[0])return 0;
  char stage[64];int fd=-1;
  for(int retry=0;retry<64;retry++){
   snprintf(stage,sizeof stage,".stage-%ld-%08x",(long)getpid(),++stage_sequence);
@@ -123,16 +123,45 @@ static int write_slot(const void *bytes,unsigned size,int replace){
  if(ok){
   /* Atomic no-replace for new careers: only a newly created directory
    * link can win. Existing saves replace atomically within the same dir. */
-  if(replace)ok=renameat(dirfd,stage,dirfd,save_name)==0;
-  else ok=linkat(dirfd,stage,dirfd,save_name,0)==0;
+  if(replace)ok=renameat(dirfd,stage,dirfd,name)==0;
+  else ok=linkat(dirfd,stage,dirfd,name,0)==0;
  }
  if(!ok||!replace)(void)unlinkat(dirfd,stage,0);
  if(ok)(void)fsync(dirfd);
  return ok;
 }
+static int write_slot(const void *bytes,unsigned size,int replace){
+ return write_local(save_name,bytes,size,replace);
+}
+int linux_export_frame_times(const void *bytes,unsigned size){
+ return write_local("frame-times.csv",bytes,size,1);
+}
 /* Keep the verified prior-format bytes on the first expanded write. The
  * filename includes the old checksum so a re-used slot never overwrites a
  * previous career's backup. Hidden backups do not enter the slot browser. */
+static int read_exact_fd(int fd, unsigned char *out, size_t size){
+ size_t off=0;
+ while(off<size){
+  ssize_t count=pread(fd,out+off,size-off,(off_t)off);
+  if(count<0&&errno==EINTR)continue;
+  if(count<=0)return 0;
+  off+=(size_t)count;
+ }
+ return 1;
+}
+static int matches_backup(const char *name,const unsigned char *old,size_t n){
+ int fd=openat(dirfd,name,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+ if(fd<0)return 0;
+ unsigned char actual[1044];struct stat st;
+ int ok=n<=sizeof actual&&!fstat(fd,&st)&&S_ISREG(st.st_mode)&&st.st_size==(off_t)n&&
+        read_exact_fd(fd,actual,n)&&!memcmp(actual,old,n);
+ return !close(fd)&&ok;
+}
+static uint32_t migration_hash(const unsigned char *buf,size_t n){
+ uint32_t h=2166136261u;
+ while(n--)h=(h^*buf++)*16777619u;
+ return h;
+}
 int linux_disk_backup_upgrade(int stock_patches){
  if(dirfd<0||!save_name[0])return 0;
  int fd=openat(dirfd,save_name,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
@@ -152,17 +181,26 @@ int linux_disk_backup_upgrade(int stock_patches){
    if(!stock_patches||patches||(hybrid&0x80000000u)){close(fd);return 1;}
   }
  }
- uint32_t header[2],digest;
- int ok=st.st_size>=176&&pread(fd,header,sizeof header,0)==sizeof header&&
-        pread(fd,&digest,sizeof digest,st.st_size-4)==sizeof digest;
- if(close(fd)||!ok||header[0]!=0x44433131u||header[1]<2||header[1]>11||(header[1]==11&&st.st_size!=1044&&st.st_size!=304))return 0;
+ /* Snapshot the actual file once, not the pathname after close. Never
+    replace a conflicting backup left by a failed restore or file copy. */
+ unsigned char old[1044];
+ uint32_t header[2],digest,base_digest;
+ if(st.st_size<176||st.st_size>(off_t)sizeof old){close(fd);return 0;}
+ size_t len=(size_t)st.st_size;
+ int ok=read_exact_fd(fd,old,len);
+ if(close(fd)||!ok)return 0;
+ memcpy(header,old,sizeof header);memcpy(&digest,old+len-4,4);
+ if(header[0]!=0x44433131u||header[1]<2||header[1]>11||
+    (header[1]==11?(len!=1044&&len!=304):len>304)||
+    migration_hash(old,len-4)!=digest)return 0;
+ if(len==1044){memcpy(&base_digest,old+300,4);if(migration_hash(old,300)!=base_digest)return 0;}
  char dest[60];
- const char* label=header[1]!=11?"afterhours":st.st_size==1044&&!(family&0x80000000u)?"outerloop":"crossroads";
+ const char* label=header[1]!=11?"afterhours":len==1044&&!(family&0x80000000u)?"outerloop":"crossroads";
  snprintf(dest,sizeof dest,".pre-%s-%s-r%u-%08x.bak",label,save_name,header[1],digest);
- if(linkat(dirfd,save_name,dirfd,dest,0))return errno==EEXIST;
- /* Failure here must not clobber the old record. */
- if(fsync(dirfd)&&errno!=EINVAL&&errno!=ENOTSUP)return 0;
- return 1;
+ /* A previous backup may legitimately be a distinct inode. Retry only
+    accepts byte-identical, regular files; a conflicting file is untouched. */
+ if(!matches_backup(dest,old,len)&&!write_local(dest,old,(unsigned)len,0)&&!matches_backup(dest,old,len))return 0;
+ return fsync(dirfd)==0||errno==EINVAL||errno==ENOTSUP;
 }
 int linux_disk_backup_legacy(void){return linux_disk_backup_upgrade(0);}
 int disk_write(const void *bytes,unsigned size){return write_slot(bytes,size,1);}

@@ -41,13 +41,13 @@ static void dvStrike(void){
 }
 static int dvOpenSlots(int n){
  if(dvBase>=0)return dvN==n;
- if(nc<1||nc+n>LEN(cars))return 0;
+ if(nc<1||nc+n>STREET_CITY_CAR_LIMIT)return 0;
  dvBase=nc;dvN=n;for(int i=0;i<n;i++)street_stage_car(nc++,(Car){.x=-100,.y=-100});
  return 1;
 }
 static int dvClearSet(const Car*c){
  if(street_hits_wall(c))return 0;
- for(int i=0;i<nc;i++)if((i||sv.owned)&&!dvMine(i)&&street_overlap(c,cars+i))return 0;
+ for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(!dvMine(i)&&street_overlap(c,cars+i))return 0;
  for(int i=0;i<LEN(peds);i++)if(peds[i].hp>0&&street_foot_car_depth(c,peds[i].x,peds[i].y,3)>0)return 0;
  return 1;
 }

@@ -1,3 +1,31 @@
+STREET LIFE STABILITY UPDATE
+
+Protects graded shelf counts and earned payouts. Also repairs stuck
+wreck exits, regional pursuit and shoulder behavior, taxi dispatch and
+minimap display, and host input/audio/rendering edge cases. Read the
+full deduplicated playtest verdict, STABILITY-UPDATE.md.
+
+--- EARLIER STREET LIFE CHANGE LOG ---
+
+DEAD CHANNEL / CROSSROADS STREET LIFE
+
+Nine additions: driveable Outer Loop traffic, police last-seen area,
+Afterimage regulars and show rides, taxi quote and shift receipt, live
+Night Cart, Signal Revenue receipts, district titles, and optional frame
+timing. See STREET-LIFE.md for all controls and FRAME-TIMES.txt for the
+diagnostic. Existing careers still load.
+
+--- CROSSROADS QA AND EARLIER CHANGE LOG ---
+
+DEAD CHANNEL / CROSSROADS QA UPDATE
+
+24 fix groups across driving, taxi jobs, the opening courier mission,
+street conversations, venues, economy, saves, Windows input and Linux
+rendering. See CROSSROADS-QA.md for the deduplicated list and test limits.
+Both native builds retain the original Crossroads career format.
+
+--- PUBLISHED CROSSROADS AND EARLIER CHANGE LOG ---
+
 CONVERSATION HOLD HOTFIX
 
 - The person you selected stops and faces you while the NPC choices

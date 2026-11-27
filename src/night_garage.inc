@@ -34,7 +34,7 @@ static int ng_site_index(void){
  for(int i=0;i<3;i++,a=(a+1)%3)if(!solid(ngSites[a].x,ngSites[a].y,10))return a;
  return 0;
 }
-static struct {int tab,back,idx,model,part,val,route,rival,stake,confirm,choice,event,leg,frames,count,ride,spare,paid,stageType,target,pending,meet,chosen,toastT,site,tokens,targetToken,sorting;float angle,spin,zoom;char toast[140];} ng;
+static struct {int tab,back,idx,model,part,val,route,bookedCourse,rival,stake,confirm,choice,event,leg,frames,count,ride,spare,paid,stageType,target,pending,meet,chosen,toastT,site,tokens,targetToken,sorting,altDock;float angle,spin,zoom;char toast[140];} ng;
 static int ng_read(int i,int hi){U n=nv.garage[i];return n<=(U)hi?(int)n:0;}
 static int ng_mod_slot(int type,int k){return k==6?55+cl(type,0,4):1+cl(type,0,4)*6+k;}
 static int ng_mod_at(int type,int k){return ng_read(ng_mod_slot(type,k),ngParts[k]-1);}
@@ -108,15 +108,15 @@ static int ng_buy_part(void){
 }
 static int ng_route_goal(int*x,int*y){
  if(ng.event==NG_STAGE||ng.event==NG_COUNT||ng.event==NG_RACE){
-  NavPoint g=ngRun[ng.route].gate[ng.event==NG_RACE?ng.leg:0];*x=g.x;*y=g.y;return 1;
+  NavPoint g=ngRun[ng.bookedCourse].gate[ng.event==NG_RACE?ng.leg:0];*x=g.x;*y=g.y;return 1;
  }
  if(ng.event==NG_FETCH&&ng.target>0&&ng.target<nc){*x=(int)cars[ng.target].x;*y=(int)cars[ng.target].y;return 1;}
- if(ng.event==NG_DROP){*x=NG_DOCK_X;*y=NG_DOCK_Y;return 1;}return 0;
+ if(ng.event==NG_DROP){*x=ng.altDock?NG_ALT_DOCK_X:NG_DOCK_X;*y=ng.altDock?NG_ALT_DOCK_Y:NG_DOCK_Y;return 1;}return 0;
 }
 static void ng_clear_event(void){ng.event=NG_IDLE;ng.spare=ng.ride=ng.target=-1;ng.paid=0;ng.frames=0;ng.leg=0;navGoalKind=0;}
 static void ng_stop(const char*why){ng_clear_event();tell(why);}
 static int ng_free(void){
- if(job.kind>=0||vdActive>=0){ng_msg("Finish or abandon your current city job before signing up.");return 0;}
+ if(job.kind>=0||vdActive>=0||ncr_active()){ng_msg("Finish or abandon your current city job before signing up.");return 0;}
  if(ng.event!=NG_IDLE){ng_msg("An event is already on your GPS. Finish it or use Cancel booking.");return 0;}
  return 1;
 }
@@ -131,7 +131,9 @@ static int ng_begin_race(void){
  if(stake==1&&sv.cash<75){ng_msg("Credit class needs $75 clean cash. Exhibition is free.");return 0;}
  if(stake==1)sv.cash-=75;
  if(stake==2){sv.owned&=~(1<<spare);}
- ng.spare=spare;ng.paid=stake;ng.event=NG_STAGE;ng.leg=ng.frames=ng.count=0;ng.ride=-1;
+ /* Once confirmed the course belongs to the booking, not the garage's
+  * browsing cursor. Reopening Time Trials must not relocate paid gates. */
+ ng.bookedCourse=ng.route;ng.spare=spare;ng.paid=stake;ng.event=NG_STAGE;ng.leg=ng.frames=ng.count=0;ng.ride=-1;
  navigation_follow_job();ng_to_street();request_save();tell("Switchyard booking: drive your owned car to the gold start gate.");return 1;
 }
 static int ng_begin_recovery(void){
@@ -151,7 +153,8 @@ static int ng_settle(int keep){
  if(ng.event!=NG_DROP||id<=0||id>=nc||p.car!=id||cars[id].type!=t||cars[id].cond<=0){ng_msg("The recovery car is no longer available.");return 0;}
  if(keep&&(sv.owned&(1<<t))){ng_msg("This model is already registered. Trade it for parts instead.");return 0;}
  int price=specs[t].price*2/3;
- if(keep&&(sv.charges&&price>=240)){ng_msg("Revenue hold: major purchases are frozen.");return 0;}
+ if(!keep&&sv.dirty>WALLET_LIMIT-42){ng_msg("Marked wallet is full. Exit the intake and make room for the $42 fee.");return 0;}
+ if(keep&&(case_blocks_price(price))){ng_msg("Revenue hold: major purchases are frozen.");return 0;}
  if(keep&&sv.cash<price&&sv.dirty<price-sv.cash){ng_msg("Not enough credits for the registration fee.");return 0;}
  if(!street_exit_car()){ng_msg("Driver's door blocked. Move within the ring and stop again.");return 0;}
  if(keep){if(!ng_charge(price)){p.car=id;p.x=cars[id].x;p.y=cars[id].y;return 0;}
@@ -160,9 +163,13 @@ static int ng_settle(int keep){
  }
  /* Existing NPC slot is consumed, never an owned or story vehicle. */
  street_stage_car(id,(Car){.x=-100,.y=-100});lastCar=-1;
- if(!keep){nv.garage[38]=min(20,ng_read(38,20)+3);credit_wallet(0,42);}
+ int added=0;
+ if(!keep){int stock=ng_read(38,20);added=min(3,20-stock);nv.garage[38]=(U)(stock+added);credit_wallet(0,42);}
  ng_clear_event();ng_to_street();request_save();
- tell(keep?"Registered. Your recovered car is stored at Nightglass.":"Dock handoff: +3 salvage credits and $42 marked game money.");return 1;
+ if(keep)tell("Registered. Your recovered car is stored at Nightglass.");
+ else{char out[100];char*q=append(out,"Dock handoff: $42 marked / +");q=number(q,added);
+  append(q,added==1?" salvage credit.":" salvage credits.");tell(out);}
+ return 1;
 }
 static void ng_fit_edition(int r,int saveNow){
  const NgRun*run=ngRun+r;int t=run->type;
@@ -171,8 +178,8 @@ static void ng_fit_edition(int r,int saveNow){
  if(saveNow)request_save();
 }
 static void ng_finish_run(void){
- int ticks=max(1,ng.frames),r=ng.route,win=ticks<=ngRun[r].seconds*60,stake=ng.paid,spare=ng.spare;
- int best=ng_best(r);
+ int ticks=max(1,ng.frames),r=ng.bookedCourse,win=ticks<=ngRun[r].seconds*60,stake=ng.paid,spare=ng.spare;
+ int paid=0,best=ng_best(r);
  if(!ng_read(best,36000)||ticks<ng_read(best,36000))nv.garage[best]=(U)ticks;
  if(win){
   nv.garage[37]=1;nv.garage[40]=(U)min(9999,ng_read(40,9999)+1);
@@ -180,13 +187,23 @@ static void ng_finish_run(void){
    sv.owned|=1<<spare;int t=ngRun[r].type;
    nv.garage[41+r]=1;
    if(!(sv.owned&(1<<t))){sv.owned|=1<<t;vehicle_store_health(t,&(Car){.cond=100});ng_fit_edition(r,0);}
-  }else credit_wallet(1,stake==1?185:42);
+  }else paid=credit_wallet(1,stake==1?185:42);
  }
  char msg[140];char*q=append(msg,win?"FINISH / WIN / ":"FINISH / OVER PACE / ");
  q=number(q,ticks/60);q=append(q,".");q=number(q,(ticks%60)/6);q=append(q," s. ");
- append(q,win?(stake==2?"Spare returned. Rival edition unlocked in Motor Works.":stake==1?"$185 purse + Signal edition paint.":"$42 + Signal edition paint unlocked."):
+ if(win&&stake!=2&&paid!=(stake==1?185:42)){
+  q=append(q,"Wallet limit: $");q=number(q,paid);append(q," credited. Signal edition unlocked.");
+ }else append(q,win?(stake==2?"Spare returned. Rival edition unlocked in Motor Works.":stake==1?"$185 purse + Signal edition paint.":"$42 + Signal edition paint unlocked."):
   (stake==2?"Staked spare lost. Driven car retained.":stake==1?"$75 entry lost.":"Record filed. No stake lost."));
  ng_clear_event();request_save();tell(msg);
+}
+/* Choose once at pickup so HUD/GPS does not flip between two moving targets
+ * at an equidistant junction. Both service desks keep accepting the ride. */
+static int ng_nearer_intake(int x,int y){
+ if(d2(x-NG_ALT_DOCK_X,y-NG_ALT_DOCK_Y)<48*48)return 1;
+ if(d2(x-NG_DOCK_X,y-NG_DOCK_Y)<48*48)return 0;
+ int a=taxi_dispatch_distance(x,y,NG_DOCK_X,NG_DOCK_Y),b=taxi_dispatch_distance(x,y,NG_ALT_DOCK_X,NG_ALT_DOCK_Y);
+ return b>0&&(!a||b<a);
 }
 static void night_garage_street(U tap){
  if(scene!=1||mapOn||menu>=0||p.dead)return;
@@ -201,11 +218,14 @@ static void night_garage_street(U tap){
  }
  if(ng.event==NG_FETCH||ng.event==NG_DROP){
   if(--ng.frames<=0||ng.target<=0||ng.target>=nc||cars[ng.target].cond<=0||cars[ng.target].x<0){ng_stop("Parts call expired. No fee or title changed hands.");return;}
-  if(ng.event==NG_FETCH&&p.car==ng.target){ng.event=NG_DROP;navGoalKind=0;tell("Recovery car acquired. Park at the Motor Works intake; press Enter.");}
+  if(ng.event==NG_FETCH&&p.car==ng.target){
+   ng.altDock=ng_nearer_intake((int)p.x,(int)p.y);ng.event=NG_DROP;navGoalKind=0;
+   tell(ng.altDock?"Nearest intake: Wrecker Yard. Park in the ring and press Enter.":"Nearest intake: Nightglass Motor Works. Park in the ring and press Enter.");
+  }
   if(ng.event==NG_DROP&&(tap&ENTER)&&p.car==ng.target&&absf(cars[p.car].s)<8&&(d2(p.x-NG_DOCK_X,p.y-NG_DOCK_Y)<48*48||d2(p.x-NG_ALT_DOCK_X,p.y-NG_ALT_DOCK_Y)<48*48))ng_enter_panel(NG_RETURN,1);
   return;
  }
- const NgRun*rr=ngRun+ng.route;NavPoint g=rr->gate[ng.event==NG_RACE?ng.leg:0];float dist=d2(p.x-g.x,p.y-g.y);
+ const NgRun*rr=ngRun+ng.bookedCourse;NavPoint g=rr->gate[ng.event==NG_RACE?ng.leg:0];float dist=d2(p.x-g.x,p.y-g.y);
  if(ng.event==NG_STAGE){
   if(p.car==0&&cars[0].owner==1&&dist<39*39&&absf(cars[0].s)<12){ng.event=NG_COUNT;ng.count=180;ng.ride=0;ng.stageType=cars[0].type;tell("Hold the start ring. Three, two, one...");}return;
  }
@@ -227,15 +247,19 @@ static void ng_show(void){
  if(!score){ng_msg("Factory class: install a custom part before showing your car.");return;}
  /* Cooldown per playable 24-minute day, even if the profile clock wraps. */
  U stamp=sv.playedTicks/(DAY_SECONDS*60u)+1;if(nv.garage[36]==stamp){ng_msg("Your build already ran the light line this game day.");return;}
- int takings=25+7*score;credit_wallet(1,takings);nv.garage[36]=stamp;nv.garage[39]=min(9999,ng_read(39,9999)+1);request_save();
+ int takings=25+7*score;
+ if(sv.cash>WALLET_LIMIT-takings){ng_msg("Clean wallet is full. Make room for the showcase fee and return tonight.");return;}
+ credit_wallet(1,takings);nv.garage[36]=stamp;nv.garage[39]=min(9999,ng_read(39,9999)+1);request_save();
  char out[100];char*q=append(out,"Showcase filed / ");q=number(q,score);q=append(q," style points / +$");number(q,takings);ng_msg(out);
 }
 static int ng_guest(int slot){return (slot+ng.site*2)%ng_courses();}
 static int ng_archive(int slot){return ng_read(41+slot,1);}
 static void ng_sort(void){
  if(ng.idx!=ng.targetToken){ng_msg("That card has a different mark. Read the intake slip and try again.");return;}
+ /* The last stamp and the handoff are one operation. A blocked door
+  * or full wallet must not advance the counter beyond the final stamp. */
+ if(ng.tokens>=2){ng_settle(0);return;}
  ng.tokens++;
- if(ng.tokens==3){ng_settle(0);return;}
  ng.targetToken=(ng.stageType+ng.tokens*2)%3;ng_msg("Inventory stamp accepted. Match the next intake slip.");
 }
 static void ng_ask(int action){ng.choice=ng.tab;ng.tab=NG_CONFIRM;ng.confirm=action;ng.idx=0;ng.toastT=0;}
@@ -319,21 +343,32 @@ static void ng_badge(int x,int y,const char*s,U c){int w=textw(s,0)+14;box(x-w/2
 static int ng_ghost_car(Car*g){
  if(ng.event!=NG_RACE)return 0;
  /* Non-colliding pace projection, identical timing in both camera modes. */
- const NgRun*rr=ngRun+ng.route;
+ const NgRun*rr=ngRun+ng.bookedCourse;
  static const NavPoint bluff[]={
   {2690,384},{2598,380},{2530,437},{2460,481},{2388,471},{2332,421},
   {2263,382},{2197,411},{2144,482},{2048,512},{1792,512},{1792,1024}};
  static const NavPoint spur[]={
   {1792,2304},{1792,1792},{1024,1792},{1024,2048},{1024,2144},
   {1136,2265},{1360,2321},{1520,2368},{1592,2464}};
- const NavPoint*path=ng.route==3?bluff:ng.route==4?spur:rr->gate;
- int n=ng.route==3?LEN(bluff):ng.route==4?LEN(spur):LEN(rr->gate);
+ const NavPoint*path=ng.bookedCourse==3?bluff:ng.bookedCourse==4?spur:rr->gate;
+ int n=ng.bookedCourse==3?LEN(bluff):ng.bookedCourse==4?LEN(spur):LEN(rr->gate);
  float distance=0,lens[LEN(bluff)];for(int i=0;i<n-1;i++){lens[i]=sq(d2(path[i+1].x-path[i].x,path[i+1].y-path[i].y));distance+=lens[i];}
  float q=(float)ng.frames/(rr->seconds*60)*distance;int leg=0;while(leg<n-2&&q>lens[leg])q-=lens[leg++];
  float f=q/lens[leg];if(f>1)f=1;NavPoint a=path[leg],b=path[leg+1];
  int dx=b.x-a.x,dy=b.y-a.y;
  float heading=look(dx,dy);
- *g=(Car){a.x+dx*f+sn(heading)*7,a.y+dy*f+cs(heading)*7,heading,0,rr->type,2,100};return 1;
+ /* Blend the direction across the corner, not its timing. An instantaneous
+  * yaw made the lane offset jump at a gate. (-sin, cos) is right of travel
+  * in map coordinates, matching both directions of the physical traffic. */
+ const float ease=16.f,remain=lens[leg]-q;
+ if(leg>0&&q<ease){
+  NavPoint prev=path[leg-1];float old=look(a.x-prev.x,a.y-prev.y);
+  heading=wrap(old+wrap(heading-old)*(.5f+.5f*q/ease));
+ }else if(leg<n-2&&remain<ease){
+  NavPoint next=path[leg+2];float upcoming=look(next.x-b.x,next.y-b.y);
+  heading=wrap(heading+wrap(upcoming-heading)*(.5f-.5f*remain/ease));
+ }
+ *g=(Car){a.x+dx*f-sn(heading)*7,a.y+dy*f+cs(heading)*7,heading,0,rr->type,2,100};return 1;
 }
 static void ng_world(void){
  if(scene!=1||menu>=0||mapOn||p.dead)return;

@@ -10,3 +10,5 @@ b362744cb9650a1b792019ca54f46a836ca0739f8e443df2049a68bdc113fac1  Dead-Channel-P
 04eedfda81ddebfa1da612af08e3d9ed95b509d127939d7617814dfe7dee06c9  Dead-Channel-Conversation-Hold-Hotfix-Linux-x64.tar.gz
 7433db6429bcf009a25187e3e6cf84dec049117a1073c8a6d28cf07a0303a48b  Dead-Channel-Port-Vanta-Crossroads-Windows-11-x64.zip
 f19cdf3dc4294c997e0045e1fa2365ff37f9ddb0433e193c53b96e85e45b9570  Dead-Channel-Port-Vanta-Crossroads-Linux-x64.tar.gz
+b5d1e9188b19c49fd3d1d566a0855ad8a3ed313bee7da228a8119436712a55b1  Dead-Channel-Street-Life-Stability-Update-Linux-x64.tar.gz
+4759647b133a9921efd344b382d50b1afd1f416c1d3f65298c99bcee5fb7ff62  Dead-Channel-Street-Life-Stability-Update-Windows-11-x64.zip

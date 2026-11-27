@@ -87,7 +87,7 @@ int main(void){
  for(int i=0;i<5;i++)vpress(DOWN);vpress(USE);
  assert(sv.stocks[2]==1&&nv.world[NVS_SHELF+5]==1&&sv.cash==97);
  vpress(FIRE);assert(sv.stocks[2]==2&&!nv.world[NVS_SHELF+5]);
- vpress(RIGHT);assert(nvs_tab==1);vpress(MAP);int px,py;if(night_venue_vendor_pos(&px,&py)){assert(navManualLoc==-1&&navManual.x==px&&navManual.y==py);}else assert(navManualLoc==LEN(loc)+nvs_cart_here());vpress(USE);assert(!nv.world[NVS_MOUNT]);
+ vpress(RIGHT);assert(nvs_tab==1);vpress(MAP);int px,py;if(night_venue_vendor_pos(&px,&py)){assert(nav_cart_tracking()&&navManual.x==px&&navManual.y==py);}else assert(navManualLoc==LEN(loc)+nvs_cart_here());vpress(USE);assert(!nv.world[NVS_MOUNT]);
  sv.gear=1;vpress(USE);assert(nv.world[NVS_MOUNT]&&!nv.world[NVS_FINISH]);
  vpress(DOWN);vpress(USE);assert(!nv.world[NVS_FINISH]);
  vpress(RIGHT);float before=sv.dayClock;vpress(DOWN);vpress(USE);assert(sv.dayClock>before+479);

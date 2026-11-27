@@ -1,16 +1,22 @@
 DEAD CHANNEL / PORT VANTA
-Port Vanta Crossroads for Windows 11 x64 and Linux x86-64
+Crossroads Street Life for Windows 11 x64 and Linux x86-64
 
 1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
    Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
    from the extracted Dead-Channel directory. If your extractor did not
    preserve execute permission, run chmod +x DeadChannel first.
-   Look for "Dead Channel | Port Vanta Crossroads" in the window title.
+   Look for "Dead Channel | Crossroads Street Life" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
    to the teal door and press E. Mara's first job at Mercury Dispatch
    introduces the city and pays for your next move.
+
+CROSSROADS STREET LIFE
+See STABILITY-UPDATE.md for the latest repair notes and graded shelf migration.
+See STREET-LIFE.md for all nine additions, controls and test coverage.
+The previous fixes are in CROSSROADS-QA.md.
+Optional diagnostics: F9 samples; F10 exports. See FRAME-TIMES.txt.
 
 IF YOU ARE UPDATING
 Close the older game, extract this build to a new folder and run the new
@@ -135,6 +141,7 @@ a curb away from the door. Stand clear of competing interactions.
 Enter: confirm menus or board a tram at its timetable
 X: punch. Space: fists or equipped weapon
 Shift: sprint / handbrake. T: accept another unlocked taxi fare
+Q: preview a taxi call when parked. R: view or end your taxi shift.
 M: map; left click sets a pin, right click clears it
 F1: field guide, then Esc to return to the same room or map.
 F2: low FX. F5: save. Esc: pause / back
@@ -179,7 +186,23 @@ Courier: hand over both parcels at their counters and return the signed
 manifest to Mara. The first shift pays $140 including the opening bonus,
 enough for the $125 Mote at Nightglass. GPS marks Nightglass until you
 buy a car unless you pin another destination or accept a new job. Later
-manifests rotate the stops.
+manifests rotate the stops. Other legal work still pays, but does not skip
+Mara's opening shift or spend its one-time bonus.
+After your first taxi drop-off, T requests another passenger in a licensed
+car. Park and press Q to preview a Mercury radio offer: pickup, destination,
+estimated road distances and base fare. E or Enter accepts that exact call;
+Esc declines it. T still accepts immediately without a preview.
+
+Press R while parked or on foot for your taxi shift receipt. It totals
+completed trips, base fares, tips, bonuses, clean cash actually credited and
+bumps with a rider aboard. Press Enter on the receipt to end the shift between
+fares, or Esc to keep it running. Every ride still pays as soon as the rider
+is dropped off; ending the shift pays nothing extra. The next completed ride
+starts a fresh receipt. Receipts only last for the current career session.
+
+Call from the Outer Loop for pickups at six signed landmark curbs
+and deliveries across the old city or the expansion. The occupied route
+sets the fare, and smooth driving preserves the tip.
 Taxi riders board an owned or licensed car when you stop at the curb. Harbor Recovery requires restarting the stalled van
 with E, driving it to Dax's marked service bay, stopping and pressing E.
 Start the Glass Mile clock by crossing the line and finish in the same car.
@@ -194,7 +217,11 @@ the freight cache, pick up the consignment and bring it to Vera.
 
 Buy supplies at Ferry Market. Start batches at the grow-room or Cinder
 terminal. Sell stock at Kiosk 09. Sales of 15 or more units can cost three
-from that facility's unsecured inventory. Secure each warehouse at the
+from that facility's unsecured inventory. Highlight a product at the kiosk
+to see the actual payout and any rival stock loss before confirming.
+The kiosk only accepts whole units it
+can pay for. A Cinder distributor holds the finished batch if its payout won't
+fit in dirty cash; it releases it after you make room. Secure each warehouse at the
 property. Hire the operator at the Lantern terminal to see the crew work
 through the batch in the back room. The rear shelf shows one box for
 1–19 Lantern units, two for 20–50, and three starting at 51. Its sign
@@ -226,8 +253,12 @@ Find mint $ icons on the atlas for the Tide Market, East Freight and
 Lantern Ward ATMs. Walk to the front and press E. Up/Down selects
 deposit or withdrawal, Left/Right chooses the amount, Enter or E
 confirms, and Esc closes the terminal. Use clean cash only. The bank
-is shared between all three terminals and is safe during a Revenue
-seizure. Cash must be withdrawn first to spend it or pay a fine.
+is shared between all three terminals. Even with a small balance, each arrow
+press selects the next different transfer amount (or stops at its limit).
+Bank money is safe during a Revenue
+seizure. Cash must be withdrawn first to spend it or pay a fine. If a checkout
+crosses the daily limit but leaves nothing to seize, you still get a case;
+the warning says no funds were taken.
 
 YOUR EXISTING SAVES
 Linux loads from the same XDG data location described above. Existing

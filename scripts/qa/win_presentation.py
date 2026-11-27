@@ -12,7 +12,9 @@ assert mode in ('verify','observe')
 with tempfile.TemporaryDirectory(prefix="dc-win-present-") as d:
  d=Path(d)
  sp.run(['cc','-O2',r/'scripts/check_pe.c','-o',d/'pe'],check=True)
- sp.run(['cc','-O2','-I',r/'src',r/'scripts/qa/wheel_buy_plan.c','-o',d/'fixture'],check=True)
+ # The helper only emits a deterministic disposable save and input tape;
+ # optimizing its embedded copy of the entire city for every run is wasted work.
+ sp.run(['cc','-O0','-I',r/'src',r/'scripts/qa/wheel_buy_plan.c','-o',d/'fixture'],check=True)
  sp.run([d/'fixture',d/'start.dat'],stdout=sp.DEVNULL,check=True)
  keys=[0]*75;keys[1]=1024;keys[10:17]=[16777216]*7;keys[68]=512
  tape=(f'{len(keys)} 0\n'+''.join(f'{len(list(g))} {k}\n' for k,g in groupby(keys))).encode()

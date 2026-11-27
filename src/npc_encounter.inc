@@ -10,6 +10,7 @@ typedef struct{
  U coat;
  const char*name;
 } NpcRef;
+static int outer_person_ref(int id,NpcRef*r,int*step);
 typedef struct{
  NpcRef actor;
  int phase,room,ticks,prize,hp,surrender;
@@ -51,6 +52,7 @@ static int npc_spot(NpcRef*r,int id,int kind,const char*name,float x,float y,flo
 }
 static int npc_raw_ref(int id,NpcRef*r){
  if(scene==1){
+  if(id>=N_ACT_OUTER&&id<N_ACT_MAX)return outer_person_ref(id,r,0);
   if(id>=N_ACT_STREET&&id<N_ACT_STREET+LEN(peds)){
    int i=id-N_ACT_STREET;Ped*q=peds+i;if(q->hp<=0)return 0;
    U coat=q->role==1?0x668df0:q->role==2?PINK:(i%2)?0x92b7b4:0xca8c71;
@@ -199,7 +201,7 @@ static int npc_near_ref(NpcRef*out,int context){
  float a=scene==3?interior_a:p.a;
  for(int id=0;id<N_ACT_MAX;id++){
   if(scene==3&&id<N_ACT_FRONT)continue;
-  if(scene==1&&id>=N_ACT_FRONT&&id!=N_ACT_CROSS)continue;
+  if(scene==1&&id>=N_ACT_FRONT&&id!=N_ACT_CROSS&&id<N_ACT_OUTER)continue;
   NpcRef r;if(npc_replaces(id)||!npc_ref(id,&r))continue;
   float dx=r.x-x,dy=r.y-y,d=d2(dx,dy);
   int touch=d<NPC_NEAR*NPC_NEAR&&npc_clear(x,y,r.x,r.y);
@@ -270,7 +272,9 @@ static void npc_hello(NpcRef r){
 static int npc_stage(NpcRef *r,float x,float y,float *angle){
  PulseRoomSolid collision=scene==3?int_solid:0;
  float heading=look(r->x-x,r->y-y);
- if(d2(r->x-x,r->y-y)>=18*18&&npc_clear(x,y,r->x,r->y)&&
+ /* The existing compact pose supports close actors; only true sprite
+    overlap lacks a useful facing. Preserve wall and counter guards. */
+ if(d2(r->x-x,r->y-y)>3*3&&npc_clear(x,y,r->x,r->y)&&
     !pulse_cover(x,y,pulse_aim(x,y,heading,0,0),1.f,collision)){
   *angle=heading;return 1;
  }
@@ -299,7 +303,11 @@ static int npc_begin(NpcRef r){
  wheelFists=0;
  if(scene==3)interior_cache_loc=-2;
  if(scene==1)p.a=a;else interior_a=a;
- tell("You draw your pistol. Nothing fires automatically.");
+ /* End only this rider's active booking. Other contacts remain available
+    and a greeting or failed draw must not void a legitimate fare. */
+ if(scene==1&&job.kind==JOB_TAXI&&r.id==N_ACT_RIDER+taxi.rider){
+  end_job();taxi.linger=0;tell("The rider cancels the fare as you draw. No fare will be paid.");
+ }else tell("You draw your pistol. Nothing fires automatically.");
  return 1;
 }
 static int npc_live_talk(NpcRef*r){
@@ -310,6 +318,11 @@ static int npc_live_talk(NpcRef*r){
 }
 static U npc_filter_keys(U keys,U *tap){
  npcSuppressed&=keys;keys&=~npcSuppressed;*tap&=~npcSuppressed;
+ /* Signal, field guide and career catalog are modal views, not physical
+    exits. Keep the confrontation, its remaining drop and rejoining actors
+    suspended. An actual profile change/respawn explicitly calls npc_reset;
+    real building changes and entering a car are still handled below. */
+ if(!p.dead&&(scene==2||scene==NIGHT_PHONE_SCENE||((scene==0||scene==5)&&profileReturn)))return keys;
  for(int i=0;i<LEN(npcRejoin);i++)if(npcRejoin[i].room&&npcRejoin[i].room!=npc_room_key())npcRejoin[i].room=0;
  if(npcEnc.phase!=NPC_IDLE&&(npcEnc.room!=npc_room_key()||p.dead||p.car>=0))npc_forget_encounter();
  if(!npcTalkOn){
@@ -392,6 +405,7 @@ static int npc_attack(U keys,float x,float y,float a){
   if(scene==1&&r->id>=N_ACT_STREET&&r->id<N_ACT_STREET+LEN(peds)){
    Ped *q=peds+r->id-N_ACT_STREET;q->x=r->x;q->y=r->y;q->hp=0;q->life=12;q->s=0;
   }
+  if(scene==1&&r->id>=N_ACT_OUTER&&r->id<N_ACT_MAX)outer_injure(r->id,3,r->x,r->y);
   tell("They dropped their cash. Walk over it to collect it.");
  }
  return 1;

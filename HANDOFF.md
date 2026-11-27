@@ -1,3 +1,113 @@
+# Dead Channel | Street Life Stability Update
+
+This build is based on the verified released Street Life source (the
+original Windows archive SHA-256 starts with `111bf028a6d4`). It preserves
+the existing save layouts. See [STABILITY-UPDATE.md](docs/STABILITY-UPDATE.md)
+for the independently merged playtest findings, test exposure, and open items.
+This is the release handoff for GitHub main, based on published Crossroads
+`a545bd8fd6720bef690ee1410fb70ba97a2d15dd`. Downloads are the exact
+previously delivered archives, without re-compression or executable changes:
+[Windows 11 x64](downloads/Dead-Channel-Street-Life-Stability-Update-Windows-11-x64.zip) and [Linux x64](downloads/Dead-Channel-Street-Life-Stability-Update-Linux-x64.tar.gz).
+See [SHA-256 checksums](downloads/SHA256SUMS.txt). Earlier archives are unchanged.
+
+Verified: six measured one-hour test lanes and independent consolidation;
+both extracted builds passed the 3,664-frame opening courier/taxi replay
+(`a6727845`); the combined instrumented engine passed 1.2 million ticks, and
+final replays checked shelf preservation, regional pursuit, traffic, taxi
+and frame diagnostics. Linux was native SDL; Win64 PE used simulated Win32
+on Linux, not physical Windows. Scope and remaining work are in
+[STABILITY-UPDATE.md](docs/STABILITY-UPDATE.md).
+
+The highest-risk defect was two features writing the same save word:
+Bryn's pending fee and the Echo Bloom House C, Select B and Top Shelf A
+counts in the Private Quarters graded shelf. The repaired build keeps
+those bits independent. The satchel and production stockroom are separate. Old ambiguous values are preserved
+until the player explicitly chooses their meaning; never guess or claim
+that already-erased counts can be reconstructed. An intact earlier copy
+is required to recover old erased quantities.
+
+Build with `bash scripts/build-linux.sh` and `bash scripts/build.sh`.
+Use `python3 scripts/package-street-life-stability.py` to regenerate the
+direct-download archives. If asked to publish, first compare actual
+GitHub main and stage source and documents against it; preserve earlier
+downloads and the checksums. Never package local test saves, traces or logs.
+
+---
+
+# Dead Channel | Crossroads Street Life
+
+Local follow-up to Crossroads QA `ba094c93a047cc857c3a2eb847c4752099396dda`
+and published Crossroads `a545bd8fd6720bef690ee1410fb70ba97a2d15dd`.
+All nine improvements listed in the old QA report are now implemented; the
+report itself is historical. See [STREET-LIFE.md](docs/STREET-LIFE.md) for
+controls and verification. Both launcher titles identify this build.
+
+- Outer Loop actors have seven separate ordinary chassis slots (outside the
+  city/job range) and share render, collision and E-entry behavior. Ownership,
+  licensed taxi requirements and save layout are not changed.
+- Last-seen police feedback uses real officer sight, not live officer dots
+  or unseen player positions. The cart follow is an opt-in map objective,
+  not a stale snapshot, and district titles debounce outside.
+- Afterimage has three named recurring NPCs and an optional staffed ride
+  contract separate from the original Dispatch or Vault 39 loops. The job,
+  taxi quote/shift, cart tracking and pursuit indicator are session-only.
+  The Afterimage fee only persists when earned and waiting for wallet space.
+- Revenue stores latest purchase/seizure in validated unused Rev11 garage
+  words; the promoter uses spare world word 23. No format revision or layout
+  change. Existing compact/expanded reads and migration backups remain valid.
+- F9/F10 collect/export at most five seconds of local relative frame data.
+  Nothing is collected by default or automatically sent. Do not confuse
+  presentation-call duration with physical render/monitor time.
+
+Integrated checks include original a6727845 tour parity, exact-host
+traffic/taxi/show/Signal/Cart/district replays, the frame export suite
+and 1.2 million sanitized simulated ticks. Windows verification uses
+the actual PE under simulated Win32, not a physical Windows test.
+
+Build both hosts with `bash scripts/build-linux.sh` and
+`bash scripts/build.sh`. Use `python3 scripts/package-crossroads-street-life.py`
+after verification. Archives were prepared for direct delivery, not pushed to
+GitHub. If asked to publish, compare live main first, preserve previous
+downloads, and update this handoff, README links and SHA-256 records for the
+exact artifacts. Do not publish test saves or diagnostics.
+
+---
+
+# Dead Channel | Crossroads QA update
+
+This follow-up starts from GitHub main `a545bd8fd6720bef690ee1410fb70ba97a2d15dd`.
+The QA archives are a new downloadable build, not a replacement for the
+Crossroads archives on GitHub. The executable window title is unchanged.
+
+Six independent reviewer passes and a separate deduplication pass found
+24 distinct fix groups. See [CROSSROADS-QA.md](docs/CROSSROADS-QA.md) for
+the full findings, coverage and open ideas. Highlights: correct Mara
+progression and expansion taxi fares; road-closure-aware GPS, true regional
+shortcuts and stable paid race bookings; interactive expansion pedestrians;
+unblocked shop/handoff E priority and a time-correct Night Cart; unified
+Revenue purchase holds, franchise balances and calendar rewards; Windows
+save backups, close-failure warning and quick taps; Linux input coalescing.
+
+No save layout change. Rev2–10 and the compact and expanded Rev11
+layouts still load. Windows now copies an eligible predecessor on the
+first relevant upgrade to the expanded format; it can't recreate a save
+already overwritten by the original Crossroads. Do not test with real
+player careers; install folders still share the platform save directory.
+
+Integrated validation: both launchers compiled and replayed the original
+3,664-frame tour (`a6727845`), expansion taxi and Parkway conversation.
+Targeted host edge tests were rerun after merging. Sanitized engine stress:
+1,200,000 ticks and 14,496 renders across 48 seeds. The Windows executable
+was run with simulated Win32, not on physical Windows. See the verdict
+for coverage and the exact executable checksums.
+
+Build with `bash scripts/build.sh` and `bash scripts/build-linux.sh`.
+The QA-specific packager is `python3 scripts/package-crossroads-qa.py`.
+Keep historic downloads/checksums when publishing. Update this handoff and
+the README links for the exact tested build before any public upload.
+
+---
+
 # Dead Channel | Port Vanta Crossroads
 
 Integrated from published main `6e45643551538dcfcde018035619352c17ba0729`

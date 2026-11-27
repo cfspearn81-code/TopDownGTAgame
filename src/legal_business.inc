@@ -108,7 +108,10 @@ static int legal_opt(int action,int*currentMenu){
  if(!b->owned){tell("Buy this franchise before using its account desk.");return 1;}
  if(action==LEGAL_CLAIM_FIRST+i){
   if(b->pending<=0||b->cooldown>0.f){tell("No settled deposit to collect at this desk.");return 1;}
-  cashNote("Account collected.",credit_wallet(1,b->pending));b->pending=0;b->cooldown=0.f;
+  int paid=credit_wallet(1,b->pending);
+  if(!paid){tell("Clean wallet full. Your account balance stays at this desk.");return 1;}
+  b->pending-=paid;b->cooldown=0.f;
+  cashNote(b->pending?"Partial collection; the rest stays at this desk.":"Account collected.",paid);
   request_save();
   return 1;
  }
@@ -133,12 +136,16 @@ static float legal_advance(float elapsed,float dt){
 }
 /* The game clock does not advance offline. Rather than letting a floating
  * countdown drift away from closing, peg it to the same day boundary. */
-static int legal_tick(float dt){
+/* Preserve the predecessor's numeric stamps so saves still round-trip.
+ * Civil midnight, including sleep, controls both daily rewards. A playtime
+ * boundary which is *not* midnight carries today's claims forward. */
+static int daily_rewards_tick(int closed,float dt);
+static int legal_tick_mode(float dt,int active_work){
  if(!(dt>0.f))return 0;
  const float previousEnd=DAY_SECONDS-sv.dayClock,clock=legal_advance(sv.dayClock,dt);
  const int closed=(int)(clock/DAY_SECONDS);
  sv.dayClock=clock-closed*DAY_SECONDS;
- int reset=closed&&sv.dirtySpent>0;
+ int reset=daily_rewards_tick(closed,dt)||(closed&&sv.dirtySpent>0);
  if(closed)sv.dirtySpent=0;
  int income=0,ready=0;
  for(int i=0;i<LEN(legal_specs);i++){
@@ -149,6 +156,9 @@ static int legal_tick(float dt){
    if(closed>=closings){b->cooldown=0.f;ready++;}
    else b->cooldown=(closings-closed)*DAY_SECONDS-sv.dayClock;
   }
+  /* Civil midnight still matures a deposit while the owner sleeps. But
+   * franchises promise income for active play, not for repeated naps. */
+  if(!active_work)continue;
   b->elapsed=legal_advance(b->elapsed,dt);
   if(b->elapsed>=LEGAL_INTERVAL){
    int periods=(int)(b->elapsed/LEGAL_INTERVAL);
@@ -163,3 +173,5 @@ static int legal_tick(float dt){
  }
  return income>0||ready>0||reset;
 }
+
+static int legal_tick(float dt){return legal_tick_mode(dt,1);}

@@ -21,7 +21,7 @@ static const struct{int code;U mask;} binding[]={
  {SDL_SCANCODE_E,USE},{SDL_SCANCODE_SPACE,FIRE},{SDL_SCANCODE_LSHIFT,BRAKE},
  {SDL_SCANCODE_ESCAPE,ESC},{SDL_SCANCODE_M,MAP},{SDL_SCANCODE_F6,ACTIVITIES},{SDL_SCANCODE_P,PHONE},{SDL_SCANCODE_F7,PHONE_ALT},{SDL_SCANCODE_C,CAMERA},{SDL_SCANCODE_L,LOADOUT},{SDL_SCANCODE_F8,ATLAS_WORLD},{SDL_SCANCODE_F5,SAVE},{SDL_SCANCODE_RETURN,ENTER},
  {SDL_SCANCODE_F1,HELP},{SDL_SCANCODE_F2,GFX},{SDL_SCANCODE_F3,SLOT},{SDL_SCANCODE_F4,NEW_SLOT},
- {SDL_SCANCODE_TAB,WHEEL},{SDL_SCANCODE_V,USE_PATCH},{SDL_SCANCODE_X,PUNCH},{SDL_SCANCODE_T,TAXI_NEXT},{SDL_SCANCODE_DELETE,DELETE_SLOT}
+ {SDL_SCANCODE_TAB,WHEEL},{SDL_SCANCODE_V,USE_PATCH},{SDL_SCANCODE_X,PUNCH},{SDL_SCANCODE_T,TAXI_NEXT},{SDL_SCANCODE_Q,TAXI_QUOTE},{SDL_SCANCODE_R,TAXI_RECEIPT},{SDL_SCANCODE_DELETE,DELETE_SLOT}
 };
 static void emit(SDL_Event e){assert(SDL_PushEvent(&e)==1);}
 static int host(void *ret){
@@ -171,8 +171,9 @@ void SDL_RenderPresent(SDL_Renderer *renderer){
   if(snapshot){
    const char* data=getenv("XDG_DATA_HOME");char name[1024];
    assert(data&&snprintf(name,sizeof name,"%s/DeadChannel/career.dat",data)<(int)sizeof name);
-   FILE* f=fopen(name,"rb");uint8_t bytes[304];assert(f&&fread(bytes,sizeof bytes,1,f)==1);
-   assert(fclose(f)==0);f=fopen(snapshot,"wb");assert(f&&fwrite(bytes,sizeof bytes,1,f)==1);
+   FILE* f=fopen(name,"rb");uint8_t bytes[1045];assert(f);
+   size_t n=fread(bytes,1,sizeof bytes,f);assert(!ferror(f)&&(n==304||n==1044));
+   assert(fclose(f)==0);f=fopen(snapshot,"wb");assert(f&&fwrite(bytes,n,1,f)==1);
    assert(fclose(f)==0);
   }
   emit((SDL_Event){.type=SDL_QUIT});return;

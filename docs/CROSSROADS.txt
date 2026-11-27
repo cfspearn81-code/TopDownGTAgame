@@ -23,8 +23,13 @@ Save compatibility:
   into an install folder or started over.
 - Keep a backup before moving this save to an older edition. Linux
   automatically retains the original in a hidden compatibility backup
-  for the first relevant format change. Windows uses its established
-  atomic slot replacement but has no automatic downgrade backup.
+  for the first relevant format change. In the QA update, Windows also
+  keeps the exact preceding record on a relevant expanded-format write:
+  pre-<slot>-<checksum>.bak under %LOCALAPPDATA%\DeadChannel. A backup
+  never appears as a playable slot. To go back, close both editions,
+  copy the whole folder somewhere safe, then restore a copy of the
+  desired backup to the matching .dat name. This cannot recover a
+  predecessor that was already overwritten by an earlier build.
 
 Both platforms come from this same source tree: run
   bash scripts/build-linux.sh
@@ -55,7 +60,7 @@ TEST RESULTS AND LIMITS
 - See scripts/test-base-village.sh, scripts/test.sh --tour,
   scripts/qa/crossroads_saves.py and dual-host replay tests.
 
-Release executable SHA-256:
+Original published Crossroads executable SHA-256 (not the QA update):
 a50ae41f84f020c02bcefdfaf4ee959aec628890ffb09ed776092b64186c6623  build/DeadChannel
 9ef9aa9094d5e5c53957b93fa2ca22c70ad5916b753cb20477bbfbe6bab2fa3c  build/DeadChannel.exe
 

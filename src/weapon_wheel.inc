@@ -1,5 +1,10 @@
 /* Shared fixed-coordinate radial selector. It owns neither a separate host
  * cursor nor a simulated weapon: links point to the native gear and wallet. */
+#if __has_include("night_venues.inc")
+static const char *night_wheel_loadout(char *details);
+#else
+static const char *night_wheel_loadout(char *details){(void)details;return 0;}
+#endif
 enum {
  WW_CX=W/2,WW_CY=267,WW_IN=102,WW_OUT=202,WW_DIST=155,
  /* Reference: center (239, 267.5), R210.5; parachute (413, 441).
@@ -98,6 +103,7 @@ static void wheel_med_utility(void){
 }
 static void wheel_paint(void){
  int selected=wheelPreviewFists?WW_BOTTOM:WW_TOP;
+ char cells[52];const char *frame=sv.gear>=0?night_wheel_loadout(cells):0;
  U picked=0x63d7cf;
  for(int i=0;i<W*H;i++)pixels[i]=((pixels[i]>>1)&0x007f7f7f)+0x05080e;
  for(int y=-WW_OUT;y<=WW_OUT;y++)for(int x=-WW_OUT;x<=WW_OUT;x++){
@@ -112,13 +118,15 @@ static void wheel_paint(void){
   pixels[at]=col;
  }
  int top=WW_CY-WW_DIST,bottom=WW_CY+WW_DIST;
- if(sv.gear>=0){wheel_icon_pistol(WW_CX,top-7,selected==WW_TOP?PAPER:0xb8c5ca);center(WW_CX,top+14,"PULSE PISTOL",selected==WW_TOP?PAPER:MUTED,0);}
+ if(sv.gear>=0){wheel_icon_pistol(WW_CX,top-7,selected==WW_TOP?PAPER:0xb8c5ca);center(WW_CX,top+14,frame?frame:"PULSE PISTOL",selected==WW_TOP?PAPER:MUTED,0);}
  else{box(WW_CX-9,top-9,19,13,0x75838e,0x4f5c68);rect(WW_CX-6,top-14,13,5,0x75838e);rect(WW_CX-3,top-12,7,4,0x34444f);center(WW_CX,top+12,"EMPTY",MUTED,0);}
  wheel_icon_fists(WW_CX,bottom-8,selected==WW_BOTTOM?0xf2c5a0:0xcaa88b);
  center(WW_CX,bottom+14,"FISTS",selected==WW_BOTTOM?PAPER:MUTED,0);
  center(WW_CX,WW_CY-61,"LOADOUT",MUTED,0);
- center(WW_CX,WW_CY-37,selected==WW_TOP?"PISTOL":"FISTS",PAPER,1);
- center(WW_CX,WW_CY+10,selected==WW_TOP?(sv.gear>0?"AMPLIFIED":"OWNED WEAPON"):"UNARMED",picked,0);
+ const char *title=selected==WW_TOP?(frame?frame:"PISTOL"):"FISTS";
+ int big=textw(title,1)<=180;
+ center(WW_CX,WW_CY-(big?37:27),title,PAPER,big);
+ center(WW_CX,WW_CY+10,selected==WW_TOP?(frame?cells:sv.gear>0?"AMPLIFIED":"OWNED WEAPON"):"UNARMED",picked,0);
  center(WW_CX,WW_CY+37,"RELEASE TAB",PAPER,0);
  int x=27,y=WW_CY-64;
  box(x,y,233,127,0x13252c,0x465d67);textat(x+15,y+9,"HOLD TAB / WEAPONS",picked,0);

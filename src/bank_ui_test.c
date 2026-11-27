@@ -29,6 +29,7 @@ static void discover(void){
   assert(nav_same(navGoal,door));
   if(!i)frame("build/atm-atlas.ppm");
  }
+ press(FIRE);assert(navSelected==NAV_TRAP); /* Bell Lane follows the last ATM. */
  press(FIRE);assert(navSelected==0);
  for(int i=1;i<=LEN(loc);i++)press(FIRE);
  assert(navSelected==NAV_ATM_BASE);
@@ -54,6 +55,21 @@ static void terminals(void){
   frame("build/atm-window.ppm");
   press(ESC);assert(atmOpen<0&&!mapOn&&menu<0);
  }
+}
+static void truthful_case_alert(void){
+ int opened=revenueCrossed;RevenueReceipt prevReceipt=revenueReceipt;
+ Save previous=sv;NightSave prevNight=nv;
+ sv.charges=0;sv.cash=0;sv.dirty=45;sv.dirtySpent=500;
+ assert(canDirtyPurchase(45));finish_purchase();RevenueReceipt r=revenue_seizure_notice();
+ assert(r.kind==REVENUE_THRESHOLD&&!r.dirty&&!r.pending&&!strcmp(bank_alert_title(r),"REVENUE NOTICE"));
+ assert(strstr(notice,"No funds seized."));
+ revenue_close_case();sv.dirty=49;sv.dirtySpent=500;sv.pending=39;
+ sv.legit[0]=(LegalBusiness){.owned=1,.pending=75};
+ assert(canDirtyPurchase(45));finish_purchase();r=revenue_seizure_notice();
+ assert(r.dirty==4&&r.pending==114&&!strcmp(bank_alert_title(r),"ASSETS SEIZED"));
+ assert(strstr(notice,"Funds seized."));
+ assert(textw("DIRTY -$2147483647  /  PENDING -$1001440",0)<482);
+ sv=previous;nv=prevNight;revenueCrossed=opened;revenueReceipt=prevReceipt;
 }
 static void seizure(void){
  sv.cash=0;sv.dirty=1000;sv.dirtySpent=REVENUE_DIRTY_LIMIT-45;scene=1;
@@ -82,6 +98,6 @@ static void seizure(void){
  profiles_init();assert(atmOpen<0&&!assetAlert);
 }
 int main(void){
- init_city();discover();terminals();seizure();
+ init_city();discover();terminals();truthful_case_alert();seizure();
  puts("Passed: all three walk-up ATMs and atlas routes, exact keyboard transfers, real seizure popup and timeout, low FX, and continued clean ATM access.");
 }

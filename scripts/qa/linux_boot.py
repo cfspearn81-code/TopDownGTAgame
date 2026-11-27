@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix="deadchannel-linux-qa-") as path:
                DC_LINUX_REPLAY="")
     snapshot = tmp/"explicit-save.dat"
     subprocess.run([app], input=tour, env=dict(env, DC_LINUX_SNAPSHOT=str(snapshot)),
-                   check=True, timeout=45)
+                   check=True, timeout=90)  # 3,664 rendered frames: tolerate contention in parallel QA.
     exact, shut = snapshot.read_bytes(), career.read_bytes()
     assert valid(exact) and valid(shut)
     assert struct.unpack_from("<I", exact, 300)[0] == digest  # the Windows fixture

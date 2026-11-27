@@ -8,12 +8,34 @@ typedef struct{
  float atPost,down;
 } DispatchUnit;
 static DispatchUnit dispatchUnits[DISPATCH_UNITS];
+enum{D_ROUTE_CAP=241}; /* up to three curb points per 80 atlas vertices */
+typedef struct{DispatchPoint at[D_ROUTE_CAP],goal,detour[3];int count,next,used,closure,ds,dn;float refresh,stall;} RegionalBeat;
+static RegionalBeat dispatchRoute[DISPATCH_UNITS];
+static int dispatch_regional_plan(DispatchPoint from,DispatchPoint to,DispatchPoint *points,int cap);
+
 static int dispatchCase,dispatchSaw,dispatchReported,dispatchLost,dispatchLevel;
 static float dispatchWait,dispatchCooldown,dispatchQuiet,dispatchSightAge,dispatchLastHeat,dispatchStrike;
-static DispatchPoint dispatchCall;
+static DispatchPoint dispatchCall,dispatchPublicLast;
+static float dispatchPublicAge;
+static int dispatchPublicValid;
+/* The investigation may receive an incident call; the public atlas may
+ * only present where an actually responding officer saw the player. */
+static int dispatch_public_area(int *x,int *y){
+ if(!dispatchPublicValid||p.dead||p.heat<=0.f||dispatchPublicAge<1.4f||dispatchPublicAge>=10.f)return 0;
+ /* Show a neighborhood search circle, not a pixel-perfect fix. */
+ *x=((int)dispatchPublicLast.x/96)*96+48;
+ *y=((int)dispatchPublicLast.y/96)*96+48;
+ return dispatchPublicAge<4.5f?6:dispatchPublicAge<7.5f?4:2;
+}
 
 /* A sidewalk address lies on one face of a block. Either end of that
  * face leads to the corner network used by civilian walkers. */
+/* Once a search has started its purely visual cue keeps fading while the
+ * atlas is up. Opening a frozen atlas cannot create a new loss of contact. */
+static void dispatch_public_atlas_tick(float dt){
+ if(dispatchPublicValid&&dispatchPublicAge>=1.4f&&dispatchPublicAge<10.f)dispatchPublicAge+=dt;
+}
+
 typedef struct{DispatchPoint point,ends[2];} DispatchAddress;
 static DispatchAddress dispatch_address(float x,float y){
  int left=cl((int)x/256,0,7)*256,top=cl((int)y/256,0,7)*256;
@@ -30,7 +52,7 @@ static DispatchAddress dispatch_address(float x,float y){
 static float dispatch_distance(DispatchPoint a,DispatchPoint b){
  return absf(a.x-b.x)+absf(a.y-b.y);
 }
-static int dispatch_walk_to(int i,DispatchPoint target,float dt,float speed){
+static int dispatch_walk_base(int i,DispatchPoint target,float dt,float speed){
  Ped*q=peds+DISPATCH_FIRST+i;StreetWalk*w=streetWalks+DISPATCH_FIRST+i;
  q->s=0;
  if(w->pause>0){w->pause-=dt;return 0;}
@@ -63,6 +85,72 @@ static int dispatch_walk_to(int i,DispatchPoint target,float dt,float speed){
  street_walk_step(q,w,dt,w->cross&&speed<62.f?62.f:speed);
  return 0;
 }
+/* A stationary car sometimes spans a curb waypoint. Check a short
+   dogleg entirely against solid bodies and physical road closures. Never
+   teleport a unit or shove the player/traffic aside to "unstick" it. */
+static int dispatch_detour_leg(DispatchPoint a,DispatchPoint b){
+ return street_reach_open(a.x,a.y,b.x,b.y,4,-1)&&!night_phone_lane_stop(a.x,a.y,b.x,b.y,4);
+}
+static int dispatch_detour(RegionalBeat*r,DispatchPoint from,int bias){
+ int idx=r->next;if(idx>=r->count)return 0;
+ while(idx+1<r->count&&!street_foot_car_clear(r->at[idx].x,r->at[idx].y,-1,4))idx++;
+ DispatchPoint k=r->at[idx];float dx=k.x-from.x,dy=k.y-from.y,dist=sq(d2(dx,dy));
+ if(dist<1)return 0;
+ float u=dx/dist,v=dy/dist;
+ for(int width=16;width<=48;width+=8)for(int sign=0;sign<2;sign++){
+  float side=((bias^sign)&1)?-width:width;
+  for(int back=0;back<=12;back+=6){
+   DispatchPoint a={from.x-v*side-u*back,from.y+u*side-v*back};
+   if(!dispatch_detour_leg(from,a))continue;
+   for(int lead=54;lead>=24;lead-=10){
+    float f=dist<lead?dist:(float)lead;
+    DispatchPoint c={from.x+u*f,from.y+v*f},b={c.x-v*side,c.y+u*side};
+    if(!dispatch_detour_leg(a,b)||!dispatch_detour_leg(b,c))continue;
+    r->detour[0]=a;r->detour[1]=b;r->detour[2]=c;r->ds=0;r->dn=3;r->next=idx;r->stall=0;return 1;
+   }
+  }
+ }
+ return 0;
+}
+/* The downtown crosswalk graph only covers eight blocks on each axis.
+   Once a call actually crosses that edge, use the surveyed corridor out
+   and back. Units still travel from their assigned posts; dispatch never
+   hands them a location more current than the incident/last sighting. */
+static int dispatch_walk_to(int i,DispatchPoint target,float dt,float speed){
+ RegionalBeat*r=dispatchRoute+i;Ped*q=peds+DISPATCH_FIRST+i;
+ if(!r->used&&!outer_is_new(q->x,q->y)&&!outer_is_new(target.x,target.y))return dispatch_walk_base(i,target,dt,speed);
+ q->s=0;r->refresh-=dt;
+ if(!r->used||r->closure!=np_closed()||
+    (r->refresh<=0&&(d2(r->goal.x-target.x,r->goal.y-target.y)>30.f*30.f||r->count==0||r->stall>.85f))){
+  r->used=1;r->closure=np_closed();r->refresh=1.8f+(i%3)*.22f;r->stall=0;
+  r->goal=target;r->next=r->dn=r->ds=0;r->count=dispatch_regional_plan((DispatchPoint){q->x,q->y},target,r->at,D_ROUTE_CAP);
+ }
+ if(!r->count)return 0; /* Route work is throttled if a corridor is closed. */
+ while(r->next<r->count&&d2(r->at[r->next].x-q->x,r->at[r->next].y-q->y)<1.0f)r->next++;
+ if(r->next==r->count){
+  if(d2(q->x-target.x,q->y-target.y)>6.f*6.f){r->count=0;return 0;}
+  if(!outer_is_new(target.x,target.y)){
+   *r=(RegionalBeat){0};
+   streetWalks[DISPATCH_FIRST+i]=(StreetWalk){.mx=q->x,.my=q->y};
+  }
+  return 1;
+ }
+ while(r->ds<r->dn&&d2(r->detour[r->ds].x-q->x,r->detour[r->ds].y-q->y)<1.f)r->ds++;
+ if(r->ds>=r->dn)r->dn=r->ds=0;
+ DispatchPoint k=r->dn?r->detour[r->ds]:r->at[r->next];float dx=k.x-q->x,dy=k.y-q->y,len=sq(d2(dx,dy)),v=speed*FOOT_PACE*dt;
+ if(v>len)v=len;float ax=dx*v/len,ay=dy*v/len,ox=q->x,oy=q->y;
+ if(!night_phone_lane_stop(ox,oy,ox+ax,oy+ay,4))street_actor_move(q,ax,ay,4);
+ if(d2(q->x-ox,q->y-oy)>.01f){q->a=look(q->x-ox,q->y-oy);q->s=speed*FOOT_PACE;r->stall=0;}
+ else{
+  float old=r->stall;r->stall+=dt;
+  /* Do not run geometry searches every frame on a temporarily blocked
+     crossing. At most two probes before the ordinary route refresh. */
+  if((old<.18f&&r->stall>=.18f)||(old<.61f&&r->stall>=.61f)){
+   r->dn=r->ds=0;dispatch_detour(r,(DispatchPoint){q->x,q->y},i);
+  }
+ }
+ return 0;
+}
 static int dispatch_engaged(void){
  int live=0;for(int i=0;i<DISPATCH_UNITS;i++)if((dispatchUnits[i].state==D_RESPONSE||dispatchUnits[i].state==D_SEARCH)&&peds[DISPATCH_FIRST+i].hp>0)live++;return live;
 }
@@ -88,21 +176,24 @@ static void dispatch_reset(void){
   streetWalks[DISPATCH_FIRST+i]=(StreetWalk){.mx=u->home.x,.my=u->home.y};
   u->atPost=1.f+i*.53f;peds[DISPATCH_FIRST+i]=(Ped){u->home.x,u->home.y,i<6?1.57f:-1.57f,0,i<4?2:3,1,0,0,0};
  }
+ z(dispatchRoute,sizeof dispatchRoute);
  dispatchCase=dispatchSaw=dispatchReported=dispatchLost=dispatchLevel=0;
  dispatchWait=dispatchCooldown=dispatchQuiet=dispatchLastHeat=dispatchStrike=0;
  dispatchSightAge=99.f;
+ dispatchPublicValid=0;dispatchPublicAge=0.f;
 }
 static void dispatch_tick(float dt){
  static const float speeds[]={63.f,86.f,110.f,124.f};
  const int wanted=(p.heat>15.f)+(p.heat>80.f)+(p.heat>150.f);
  int wasSeen=dispatchSaw;
  dispatchSaw=0;dispatchCooldown-=dt;dispatchStrike-=dt;dispatchSightAge+=dt;
+ if(dispatchPublicValid&&dispatchPublicAge<10.f)dispatchPublicAge+=dt;
  if(wanted){
-  if(!dispatchCase||dispatchQuiet>0.f){dispatchCase=1;dispatchWait=.82f;dispatchLevel=0;dispatchReported=dispatchLost=0;dispatchSightAge=99.f;dispatchCall=(DispatchPoint){p.x,p.y};}
+  if(!dispatchCase||dispatchQuiet>0.f){dispatchPublicValid=0;dispatchCase=1;dispatchWait=.82f;dispatchLevel=0;dispatchReported=dispatchLost=0;dispatchSightAge=99.f;dispatchCall=(DispatchPoint){p.x,p.y};}
   if(p.heat>dispatchLastHeat+.15f){dispatchCall=(DispatchPoint){p.x,p.y};dispatchSightAge=0;}
   dispatchQuiet=0;dispatchWait-=dt;
  }else if(p.heat<=0){
-  dispatchQuiet+=dt;
+  dispatchPublicValid=0;dispatchQuiet+=dt;
   if(dispatchQuiet>=3.0f){dispatchCase=dispatchLevel=0;dispatchReported=dispatchLost=0;}
  }else dispatchQuiet=0;
  dispatchLastHeat=p.heat;
@@ -111,10 +202,13 @@ static void dispatch_tick(float dt){
  for(int i=0;i<DISPATCH_UNITS;i++){
   DispatchUnit*u=dispatchUnits+i;Ped*q=peds+DISPATCH_FIRST+i;
   if(npc_replaces(N_ACT_STREET+DISPATCH_FIRST+i)||npc_holds(N_ACT_STREET+DISPATCH_FIRST+i))continue;
-  if(q->hp<=0){if(u->state!=D_DOWN){u->state=D_DOWN;u->down=24.f;}continue;}
+  if(q->hp<=0){if(u->state!=D_DOWN){u->state=D_DOWN;u->down=24.f;dispatchRoute[i]=(RegionalBeat){0};}continue;}
   if(wanted&&u->state!=D_RETURN&&d2(p.x-q->x,p.y-q->y)<177.f*177.f&&street_line_open(q->x,q->y,p.x,p.y,2)){
    dispatchCall=(DispatchPoint){p.x,p.y};dispatchSightAge=0;
-   if(u->state==D_RESPONSE||u->state==D_SEARCH){dispatchSaw=1;u->state=D_RESPONSE;}
+   if(u->state==D_RESPONSE||u->state==D_SEARCH){
+    dispatchSaw=1;u->state=D_RESPONSE;
+    dispatchPublicLast=(DispatchPoint){p.x,p.y};dispatchPublicAge=0.f;dispatchPublicValid=1;
+   }
   }
  }
  if(wanted&&dispatchCooldown<=0&&dispatchWait<=0&&dispatch_engaged()<wanted*2){
@@ -151,7 +245,9 @@ static void dispatch_tick(float dt){
    }}continue;
   }
   q->cool-=dt;
-  if((u->state==D_RESPONSE||u->state==D_SEARCH)&&p.heat<=0){u->state=D_RETURN;}
+  if((u->state==D_RESPONSE||u->state==D_SEARCH)&&p.heat<=0){
+   u->state=D_RETURN;if(dispatchRoute[i].used){dispatchRoute[i].count=0;dispatchRoute[i].refresh=0;}
+  }
   if(u->state==D_POST||u->state==D_RETURN){
    DispatchPoint dest=u->state==D_RETURN||!u->turn?u->home:u->beat;
    if(dispatch_walk_to(i,dest,dt,u->state==D_RETURN?96.f:37.f)){
@@ -173,7 +269,7 @@ static void dispatch_tick(float dt){
     * coordinates. Make responders visibly sweep before going off the call. */
    static const int search[4][2]={{-84,0},{0,-84},{84,0},{0,84}};
    int a=((int)(dispatchSightAge*.55f)+i)%4;
-   dest.x=cl((int)dest.x+search[a][0],48,2000);dest.y=cl((int)dest.y+search[a][1],48,2000);
+   dest.x=cl((int)dest.x+search[a][0],48,ROOM-48);dest.y=cl((int)dest.y+search[a][1],48,ROOM-48);
    if(!open_space(dest.x,dest.y))dest=dispatchCall;
   }
   if(eyes){dest=(DispatchPoint){p.x,p.y};u->state=D_RESPONSE;}

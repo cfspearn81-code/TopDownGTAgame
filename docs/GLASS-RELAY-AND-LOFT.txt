@@ -17,7 +17,9 @@ Mara's note or talks to Reed. Use left/right arrows to select a station.
   different harbor view. At its Residence station, E buys a one-time $180
   renovation: living reef wall, lit flooring, and improved recovery.
 - Bunk: short nap (2h), full sleep (8h), or wait out weather (4h). Rest
-  advances city time. Waiting guarantees a short clear interval. The bunk
+  advances city time, crops and promised account closing times, not your
+  active-play franchise wages or five-minute Revenue sweep timer.
+  Waiting guarantees a short clear interval. The bunk
   is unavailable during a job or pursuit and resets refreshments.
 - Refreshments: Sunline has gold highlights, a brisk stride and a
   bright jingle. Night Bell is a $5 virtual cocktail with cool edges, a mellow arpeggio
@@ -29,7 +31,8 @@ Mara's note or talks to Reed. Use left/right arrows to select a station.
   Low FX suppresses particles, not the timer. Audio hardware is optional.
 - Display case: Up/down selects a cosmetic finish. E mounts a snapshot
   of your active pulse frame, attachment, and cell hue; Space clears it.
-  M pins the Night Cart while it is open, or the cosmetic gallery when closed.
+  M follows the Night Cart's rotating stops while it is open, or
+  pins the cosmetic gallery when closed.
 
 THE GLASS RELAY
 Locker M pins the nearest aquarium. E enters its lobby. Enter opens the
@@ -43,6 +46,9 @@ Ordinary lobby lights and photo assignments still work with E.
   6. At the opened Shoal Walk, Space enters the promenade. Walk left/right
      and use E at all four stops, including conversations with the keeper,
      for a one-time $30 steward's stipend.
+If clean-wallet space runs out, Inez keeps the full grant and/or stipend.
+Deposit cash at an ATM and press E at Shoal Walk to collect. Story progress
+and these uncollected receipts survive restarting.
 Each completed restoration step is saved. Esc backs out of your current task.
 
 SIGNAL CART / FICTIONAL ARCADE PULSE EQUIPMENT
