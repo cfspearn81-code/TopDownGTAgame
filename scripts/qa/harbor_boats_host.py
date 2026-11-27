@@ -6,8 +6,10 @@ import subprocess
 import sys
 import tempfile
 
-elf, interposer, fixture, seen = (Path(p).resolve() for p in sys.argv[1:])
+perspective = "--3d" in sys.argv[1:]
+elf, interposer, fixture, seen = (Path(p).resolve() for p in sys.argv[1:] if p != "--3d")
 seen.mkdir(parents=True, exist_ok=True)
+CAMERA = 1 << 21
 UP, DOWN, LEFT, RIGHT, USE, BRAKE, ESC = 1, 2, 4, 8, 16, 64, 128
 MAP, SAVE, ENTER, HELP, PHONE = 256, 512, 1024, 2048, 524288
 
@@ -50,6 +52,9 @@ with tempfile.TemporaryDirectory(prefix="dc-native-harbor-") as t:
     tape = [(3,0),(1,ENTER),(6,0),(1,USE),(5,0),(82,UP),(23,UP|RIGHT),(23,UP|LEFT),
             (65,BRAKE),(1,HELP),(7,0),(1,ESC),(5,0),(1,PHONE),(7,0),(1,PHONE),(5,0),
             (1,MAP),(7,0),(1,MAP),(5,0),(1,SAVE),(9,0)]
+    if perspective:
+        # Physical C key on foot; no preselected camera bit in the fixture.
+        tape[2:3] = [(1,0),(1,CAMERA),(4,0)]
     captures = [9,15,96,120,143,208,214,228,242,258]
     subprocess.run([str(elf)], input=plan(tape),check=True,timeout=45,
                    env=env|dict(DC_LINUX_SHOW=str(files),DC_LINUX_CAPTURE_FRAMES=",".join(map(str,captures))))
@@ -62,6 +67,8 @@ with tempfile.TemporaryDirectory(prefix="dc-native-harbor-") as t:
     for t0 in (214,228,242):
         assert contains(image(files,t0),hud)<25, f"Expected global modal at tick {t0}"
     xdg_inspect(slot,(2948,2206))
+    if perspective:
+        assert struct.unpack_from("<I",slot.read_bytes(),304+4*(32+60))[0]==1
     files = seen / "reload"
     files.mkdir(exist_ok=True)
     subprocess.run([str(elf)],input=plan([(3,0),(1,ENTER),(7,0),(1,USE),(3,0),(1,USE),(7,0)]),
@@ -70,4 +77,20 @@ with tempfile.TemporaryDirectory(prefix="dc-native-harbor-") as t:
     assert contains(image(files,14),hud)>25
     assert contains(image(files,20),wharf)>25 and contains(image(files,20),hud)<15
     xdg_inspect(slot,(2948,2206))
-    print("Native ELF: public apron reload, E, sustained thrust and both steering directions, F1/Signal/Atlas, safe F5 while afloat, dock reload and re-usable boat passed.")
+    if perspective:
+        files=seen/"switch"
+        files.mkdir(exist_ok=True)
+        # Restored at a safe wharf in C mode. Press C twice afloat: the berth,
+        # heading, HUD and eligibility for E to moor remain unchanged.
+        subprocess.run([elf],input=plan([(3,0),(1,ENTER),(6,0),(1,USE),(5,0),
+                       (1,CAMERA),(5,0),(1,CAMERA),(5,0),(1,USE),(5,0)]),
+                       check=True, timeout=45,
+                       env=env|dict(DC_LINUX_SHOW=str(files),DC_LINUX_CAPTURE_FRAMES="15,21,27,33"))
+        for n in (15,21,27): assert contains(image(files,n),hud)>25
+        assert contains(image(files,33),wharf)>25
+        assert struct.unpack_from("<I",slot.read_bytes(),304+4*(32+60))[0]==1
+        def upper_world(n):
+            im=image(files,n);return im[100*1152*3:210*1152*3]
+        assert sum(a!=b for a,b in zip(upper_world(15),upper_world(21)))>18000,"C did not switch the world image"
+        assert sum(a!=b for a,b in zip(upper_world(21),upper_world(27)))>18000,"C did not restore projection"
+    print("Native ELF:" + (" 3D on foot + helm and reversible C," if perspective else "") + " public apron reload, E, sustained thrust and both steering directions, F1/Signal/Atlas, safe F5 while afloat, dock reload and re-usable boat passed.")

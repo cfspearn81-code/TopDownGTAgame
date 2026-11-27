@@ -2,7 +2,8 @@
 from pathlib import Path
 import os, struct, subprocess, sys, tempfile
 
-exe, interposer, fixture = (Path(v).resolve() for v in sys.argv[1:])
+perspective = "--3d" in sys.argv[1:]
+exe, interposer, fixture = (Path(v).resolve() for v in sys.argv[1:] if v != "--3d")
 UP, DOWN, RIGHT, E, ESC, MAP, F5, ENTER, PHONE = 1, 2, 8, 16, 128, 256, 512, 1024, 524288
 OFF = 304 + (32 + 64) * 4
 def tape(*inputs):
@@ -18,13 +19,20 @@ def play(seed, callback):
         subprocess.run([fixture,"--seed",seed],env={k:v for k,v in env.items() if k!="LD_PRELOAD"},check=True,timeout=35)
         env.update(LD_PRELOAD=str(interposer), DC_LINUX_REPLAY="")
         file=Path(d)/"DeadChannel"/"career.dat"
+        first=True
         def run(*mask):
+            nonlocal first
+            if perspective and first:
+                # After entering the save, toggle using the real C binding.
+                mask=mask[:1]+(1<<21,)+mask[1:]
+            first=False
             subprocess.run([exe],env=env,input=tape(*mask),check=True,timeout=70)
             data=file.read_bytes()
             assert len(data)==1044 and struct.unpack_from("<II",data)==(0x44433131,11)
             h=2166136261
             for c in data[:-4]: h=((h^c)*16777619)&0xffffffff
             assert struct.unpack_from("<I",data,len(data)-4)[0]==h
+            if perspective: assert struct.unpack_from("<I",data,304+4*(32+60))[0]==1
             return struct.unpack_from("<i",data,8)[0],struct.unpack_from("<64I",data,OFF)
         callback(run)
 def office(run):

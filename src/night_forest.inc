@@ -262,8 +262,9 @@ static void wf_trail_wallpaper(void){
  for(int i=0;i<56;i++){int x=(i*277+19)%W,y=(i*143+11)%H;if((x>143&&x<817)||y<63)continue;
   int r=4+i%10;tri(x,y-r*2,x-r,y+r,x+r,y+r,i%2?0x294845:0x233c3e);rect(x-1,y+r,2,3,0x365752);}
 }
+static int wl_journal_backdrop(void);
 static void woodline_paint(void){
- wf_trail_wallpaper();
+ if(!wl_journal_backdrop())wf_trail_wallpaper();
  int plant=wf_mode==WF_PLANTER;U accent=plant?0xa9d793:0xf1c478;char s[110];const char*msg=wf_note;
  box(147,57,666,428,0x142630,0x567778);rect(148,58,664,3,accent);
  textat(170,73,plant?(wf_shop==0?"LANTERN GROW LOFT / COMMUNITY BEDS":"KIOSK 09 / COMMUNITY BEDS"):"WOODLINE / RANGER DISTRICT",accent,0);

@@ -862,8 +862,8 @@ static void night_club_paint(void){
  int key=ncRoom*3+nc_get(NC_DECOR);
  if(ncCache!=key){U*old=surface;surface=ncBackdrop;nc_static_floor(ncRoom,nc_get(NC_DECOR));surface=old;ncCache=key;}
  /* The two aligned arrays are disjoint. A simple word copy vectorizes on both targets. */
- for(int i=0;i<W*H;i++)pixels[i]=ncBackdrop[i];
- nc_dynamics();nc_draw_status();
+ if(ch_mode_active())ir_club();else{for(int i=0;i<W*H;i++)pixels[i]=ncBackdrop[i];nc_dynamics();}
+ nc_draw_status();
  if(ncPanel==NC_DANCE_PLAY)nc_dance_paint();else if(ncPanel)nc_panel_draw();
  if(menu>=0&&scene!=2)paint_active_menu();
 }

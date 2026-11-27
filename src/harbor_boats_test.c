@@ -100,7 +100,25 @@ static void shore_and_traffic(void){
  assert(civilians>5000&&patrol>100&&moved[HB_AMBIENT-1]>25.f);
  puts("All three docks, actual water boundary collision/tow bailout, several distinct compliant ambient boats, occasional moving patrol: passed.");
 }
+static void far_south_helm(void){
+ /* The public channel connects to open southern water well west of port.
+  * Leaving the harbor traffic update rectangle must not erase the helm. */
+ prep(0);press(USE);assert(hb.active);
+ assert(hb_lane_open(hb.hull.x,hb.hull.y,hb.hull.x,2920.f));
+ assert(hb_lane_open(hb.hull.x,2920.f,1540.f,2920.f));
+ p.x=hb.hull.x=1540; p.y=hb.hull.y=2920; p.a=hb.hull.a=3.14f;
+ sv.dayClock=750;menu=-1;mapOn=0;fastGfx=0;tick(0);paint();
+ int n=0;for(int i=0;i<W*H;i++)if(pixels[i]==0x7de8d3)n++;
+ assert(n>2);
+ press(CAMERA);paint();assert(chProjected);
+ ChVec pilot=ch_local((ChVec){hb.hull.x-2.65f*cs(hb.hull.a),hb.hull.y-2.65f*sn(hb.hull.a),9});
+ ChPlot mark=ch_screen(pilot);
+ assert(mark.x>1&&mark.y>1&&mark.x<W-1&&mark.y<H-1);
+ int depth=0;for(int y=mark.y-1;y<=mark.y+1;y++)for(int x=mark.x-1;x<=mark.x+1;x++)depth=max(depth,chZ[y*W+x]);
+ assert(depth>(int)(CH_ZS/(pilot.z+3.4f)));
+ puts("Southern open-water channel stays visible outside the port, overhead and in C view.");
+}
 int main(int argc,char**argv){
  if(argc==3){fixture(argv[2]);return 0;}
- physical_course(argc>1?argv[1]:0);shore_and_traffic();return 0;
+ physical_course(argc>1?argv[1]:0);shore_and_traffic();far_south_helm();return 0;
 }

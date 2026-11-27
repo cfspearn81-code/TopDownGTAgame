@@ -238,16 +238,19 @@ static void walkin_paint(void){
  if(walkin_active<0||walkin_active>=nb)return;
  const WiRole*r=wiRoles+wi_role;
  /* Tight copy compiles to vector stores; the heavy scenery bakes once per visit. */
+ if(ch_mode_active())ir_shop();else{
  for(int i=0;i<W*H;i++)pixels[i]=wi_back[i];
  player_in_room(wi_x,wi_y,0,0,0x56baae,walking?(int)(sn(footcycle)*4):0,wi_angle,1,wi_solid);
+ }
  char ad[72];char*q=number(ad,101+walkin_active*7);q=append(q," / ");q=append(q,venue_address(walkin_active));q=append(q,"   /   ");append(q,r->section);
  draw_day_clock(5);textat(DAY_BADGE_LABEL_X,9,ad,MUTED,0);wi_title(walkin_name(walkin_active),r->accent);draw_wallet(W-291,10,270);
  const InteriorProp*f=wi_f;int sx=f->x+f->w/2,sy=f->y-10;
  const char *task=job_room_action(walkin_active);
+ if(ch_mode_active()){ir_location(&sx,&sy,33);}
  U marker=task?PINK:r->accent;
  if(wi_at_station()){disc(sx,sy,10,0x23343d);center(sx,sy-10,"E",marker,0);}
  else{disc(sx,sy,4,DARK);disc(sx,sy,2,marker);}
- if(tram_hall(walkin_active)){
+ if(tram_hall(walkin_active)&&(!ch_mode_active()||wi_at_station())){
   int to=tram_destination(walkin_active);const char*blocked=tram_block();char card[147];
   char*end=append(card,walkin_name(walkin_active));end=append(end,"  >  ");append(end,walkin_name(to));
   box(19,132,730,68,0x16242b,0x837b60);textat(30,133,card,GOLD,0);

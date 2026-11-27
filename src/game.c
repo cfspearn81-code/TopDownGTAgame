@@ -88,6 +88,10 @@ static void open_interior(int loc_index);
 static void interior_tick(U keys,U tap);
 static int lantern_terminal(void);
 static void interior_paint(void);
+static int ch_mode_active(void);
+static int irCardPass;
+static void ir_named(void),ir_shop(void),ir_club(void),ir_trap(void),ir_aqua(void);
+static void ir_location(int*,int*,float);
 typedef struct{int x,y;const char *label,*npc,*note;U tint;int kind;} Place;
 static const Place originalLoc[]={
 {256,512,"MERCURY DISPATCH","Mara Finch","Legal work: delivery routes and taxi fares.",TEAL,0},
@@ -188,7 +192,9 @@ static U night_hash(const void *bytes,unsigned n){
 static int night_club_open(int),night_garage_open(int),night_venues_open(int);
 static int ng_power(const Car*),ng_grip(const Car*),ng_route_goal(int*,int*);
 static void ch_motion(float,float),ch_project(int*,int*),ch_badge(void),ng_schedule_tick(void);
-static int ch_draw(void),ch_pref(void),chProjected;
+static int ch_draw(void),ch_pref(void),chProjected,ch_mode_active(void),ch_world_input_allowed(void);
+static void ch_fixed_step(void),ch_reset_spring(void);
+static int ch_record_label(int,int,const char*,U),ch_record_actor(int,int,U,int,float,int,int);
 static void night_club_tick(U,U),night_garage_tick(U,U),night_phone_tick(U,U),night_venues_tick(U,U);
 static void night_club_paint(void),night_garage_paint(void),night_phone_paint(void),night_venues_paint(void);
 static void night_phone_open(void),night_phone_world_tick(float);
@@ -304,7 +310,7 @@ static float anim,footcycle,punchFlash,pedHit[LEN(peds)],shelterT;static int wal
 static float cameraLeadX,cameraLeadY;
 static float ngCamAngle,ngCamRoll,ngCamZoom,ngCamSpeed,ngCamBurst;
 static int ngCamRide=-1;
-static void ng_cam_reset(void){ngCamAngle=ngCamRoll=ngCamZoom=ngCamSpeed=ngCamBurst=0;ngCamRide=-1;cameraLeadX=cameraLeadY=0;}
+static void ng_cam_reset(void){ch_reset_spring();ngCamAngle=ngCamRoll=ngCamZoom=ngCamSpeed=ngCamBurst=0;ngCamRide=-1;cameraLeadX=cameraLeadY=0;}
 static void update_camera_lead(void){
  float vx=0,vy=0,zoom=0,roll=0;
  if(street_car_exists(p.car)){
@@ -328,7 +334,7 @@ static void update_camera_lead(void){
   }
  }
  ngCamRide=p.car;ngCamRoll+=(roll-ngCamRoll)*.14f;ngCamZoom+=(zoom-ngCamZoom)*.07f;
- cameraLeadX+=(vx-cameraLeadX)*.055f;cameraLeadY+=(vy-cameraLeadY)*.055f;
+ cameraLeadX+=(vx-cameraLeadX)*.055f;cameraLeadY+=(vy-cameraLeadY)*.055f;ch_fixed_step();
 }
 static float ng_cam_scale(void){
  float zoom=1+ngCamZoom,minz=1.f+absf(ngCamRoll)*1.85f;
@@ -1393,6 +1399,11 @@ void tick(U keys){
    night_world_tick(dt);night_phone_world_tick(dt);night_trap_world_tick(dt);woodline_world_tick(dt);night_club_business_tick();night_venues_world_tick();ng_schedule_tick();outer_life_tick(dt);
  }
  if(tap&SAVE)request_save();
+ if((tap&CAMERA)&&ch_world_input_allowed()){
+  nv.garage[60]=!ch_pref();ch_reset_spring();
+  tell(ch_pref()?(fastGfx?"3D selected. Turn off F2 Low FX to see it.":"3D view / C for overhead."):"Overhead view / C for 3D.");
+  request_save();
+ }
  if(scene==3&&menu!=PAUSE_MENU&&shelterT>0&&(shelterT-=dt)<=0)finish_shelter_rest();
  bank_warning_tick();
  if(scene==NIGHT_CLUB_SCENE){night_club_tick(keys,tap);return;}
@@ -1423,11 +1434,6 @@ void tick(U keys){
  if(tap&HELP){helpBack=1;scene=2;return;}
  if((tap&MAP)&&menu<0){mapOn=!mapOn;if(mapOn)navigation_input(tap);return;}
  if(mapOn){if(tap&ESC)mapOn=0;else{dispatch_public_atlas_tick(dt);navigation_input(tap);}return;}
- if((tap&CAMERA)&&p.car>=0&&menu<0){
-  nv.garage[60]=!ch_pref();
-  tell(ch_pref()?(fastGfx?"Chase view selected. Turn off F2 Low FX to use it.":"Chase view / C for overhead."):"Overhead view / C for chase.");
-  request_save();
- }
  if(tap&GFX){fastGfx=!fastGfx;tell(fastGfx?"Low FX on: rain and dynamic glows off.":"Full FX on.");}
  if(menu<0&&!harbor_boat_active()){
   if(taxi_occupied()&&taxi.phase==TAXI_RIDING&&(taxi.copper==CAB_OFFER||taxi.copper==CAB_VIA))
@@ -1713,7 +1719,7 @@ static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,
   if(face==6){dot(hx-3,hy+1,0xffdc8e);dot(hx+3,hy+1,0xffdc8e);}
  }
  if(gun&&!gunBehind)pulse_pistol_paint(gun);
- if(hero&&!gun){
+ if(hero&&!gun&&!irCardPass){
     /* Keep the direction arrow at the existing world size and offset.
        The highest hairstyle still needs clearance when facing north. */
     const int start=max(17,(int)(13.f-22.f*si));
@@ -1727,7 +1733,7 @@ static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,
 static void figure(int x,int y,U jacket,int step,float a,int style,int hue,const Look*look){
  figure_held(x,y,jacket,step,a,style,hue,look,0);
 }
-static void person(int x,int y,U jacket,int step,float a,int style,int hue){figure(x,y,jacket,step,a,style,hue,style==MODEL_PLAYER?&sv.look:0);}
+static void person(int x,int y,U jacket,int step,float a,int style,int hue){if(ch_record_actor(x,y,jacket,step,a,style,hue))return;figure(x,y,jacket,step,a,style,hue,style==MODEL_PLAYER?&sv.look:0);}
 static PulsePose npc_room_pulse(float x,float y,float a,int step,PulseRoomSolid room);
 static void player_in_room(float x,float y,int dx,int dy,U jacket,int step,float a,int hue,int (*solid_room)(float,float)){
  if(pistol_equipped()&&p.car<0&&!p.dead){
@@ -1985,7 +1991,7 @@ static const GuideBinding guideStreet[]={
  {"E","Use / talk / board"},{"ENTER","Confirm / ride tram"},
  {"HOLD E","Brake to exit at speed"},{"X / SPACE","Punch / attack"},
  {"T / Q / R","Call / quote / receipt"},{"TAB / V","Wheel / med patch"},
- {"SHIFT + E","Talk at shared prompt"},{"C","Switch driving view"}
+ {"SHIFT + E","Talk at shared prompt"},{"C","2D / 3D world view"}
 },guideCareer[]={
  {"M","Open / close atlas"},{"F8","City / region in atlas"},
  {"LMB / RMB","Set / clear GPS pin"},{"P / F7","Signal (assigned key)"},
@@ -2157,7 +2163,7 @@ static void paint_world(int view){
  if(mapOn){minimap();return;}
  cx=camera_left();cy=camera_top();
  int introVenue=job.kind<0&&vdActive<0&&!ncr_active()?nav_intro_venue():-1;
- if(ch_draw())goto street_objectives;
+ if(ch_draw()){atm_kiosk_hint();if(scene==1&&menu<0&&atmOpen<0)night_venues_fx();goto street_objectives;}
  typedef U V4 __attribute__((vector_size(16),aligned(1),may_alias));
  for(int y=0;y<H;y++){const V4 *q=(const V4*)(city+(cy+y)*ROOM+cx);V4 *r=(V4*)(pixels+y*W);for(int x=0;x<W/4;x++)r[x]=q[x];}
  roadFX_paint(cx,cy);
@@ -2191,14 +2197,14 @@ static void paint_world(int view){
  ng_cam_compose();
  street_objectives:;
  for(int i=0;i<LEN(loc);i++){const Place*l=loc+i;int x=sx(l->x),y=sy(l->y);ng_cam_point(&x,&y);if(x<-110||y<-25||x>W+110||y>H+25)continue;
-  if(i==by||i==introVenue){
+  if((i==by||i==introVenue)&&(!chProjected||y>=158)){
     int w=textw(l->label,0)+16;box(x-w/2,y-40,w,23,DARK,mix(l->tint,DARK,3));center(x,y-40,l->label,l->tint,0);
   }
  }
  /* Use map-sized type over the physical marquee, so it is legible even from
     the player's first position outside Apartment 4. */
  if(ncFrontId>=0&&p.car<0&&p.x<550&&absf(p.y-ordinaryDoorY[ncFrontId])<215){
-  int x=sx(ordinaryDoorX[ncFrontId]),y=sy(ordinaryDoorY[ncFrontId])+74;
+  int x=sx(ordinaryDoorX[ncFrontId]),y=sy(ordinaryDoorY[ncFrontId])+74;ng_cam_point(&x,&y);
   const char*label="STRIP CLUB / THE AFTERIMAGE";int w=textw(label,0)+18;
   if(x>=w/2+4&&x<=W-w/2-4&&y>=169&&y<=H-90){
    box(x-w/2,y-25,w,24,0x271b30,0xd68eb2);center(x,y-24,label,0xffc5e0,0);
@@ -2266,6 +2272,7 @@ static void paint_world(int view){
 }
 #include "weapon_wheel.inc"
 void paint(void){
+ chProjected=0;
  if(scene==0||scene==5){profiles_paint();return;}
  if(scene==NIGHT_PHONE_SCENE){night_phone_paint();return;}
  if(scene==2){paint_world(helpBack);field_guide();return;}
@@ -2397,6 +2404,8 @@ int exit_save_ok(void){
 #include "chase_view.inc"
 #include "harbor_boats.inc"
 #include "harbor_jobs.inc"
+#include "chase_maritime.inc"
+#include "chase_rooms.inc"
 
 /* Optional platform timing signpost. The regular paint path never calls
  * this, and the host draws it only while the player has opted in. */

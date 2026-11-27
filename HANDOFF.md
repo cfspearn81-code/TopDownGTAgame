@@ -1,3 +1,25 @@
+# Dead Channel | All-Area 3D
+
+This GitHub release starts from the published Woodline & Lantern Quay
+Stability commit `57dd97bbe83f4aa5d0245446582126eb84003a99`. Six independent
+GPT-6.2 Astra Ultra lanes developed and tested the changes. The new
+perspective is selectable on foot, in walkable rooms, on roads and at a
+boat helm; unchanged logic drives the game in both views. UI-only
+screens keep their readable layouts. Existing career formats are retained.
+
+See [ALL-AREA-3D.md](docs/ALL-AREA-3D.md) for controls, visual changes and
+verified coverage. The original 3,664-frame courier/taxi case keeps
+`a6727845`; paired view toggles preserve state, and side-by-side tests
+use native SDL and simulated Win32 (not physical Windows). Build both launchers, then run
+`python3 scripts/package-all-area-3d.py`. The latest downloads on main are the original
+verified archives: [Windows 11 x64](downloads/Dead-Channel-All-Area-3D-Windows-11-x64.zip) and
+[Linux x64](downloads/Dead-Channel-All-Area-3D-Linux-x64.tar.gz). Their bytes were not rebuilt or altered for
+GitHub. See [SHA-256 checksums](downloads/SHA256SUMS.txt); historical builds
+stay intact. Do not include test saves,
+trace files, frame dumps or personal files in any future publication.
+
+---
+
 # Dead Channel | Woodline & Lantern Quay Stability
 
 This local dual-architecture release starts from the published Crossroads

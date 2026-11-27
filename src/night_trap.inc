@@ -193,7 +193,7 @@ static void nt_panel_paint(void){
  textat(229,414,"ENTER / E  ACT        ARROWS  CHOOSE        ESC  BACK",0x9db0b8,0);
 }
 static void night_trap_paint(void){
- nt_show_floor();textat(67,42,"TRAP HOUSE",PAPER,1);textat(70,86,"BELL LANE ANNEX  /  TIDE MARKET",nt_amber,0);
+ if(ch_mode_active())ir_trap();else nt_show_floor();textat(67,42,"TRAP HOUSE",PAPER,1);textat(70,86,"BELL LANE ANNEX  /  TIDE MARKET",nt_amber,0);
  char b[68];number(append(b,"CLEAN CASH  $"),sv.cash);textat(883-textw(b,0),86,b,nt_mint,0);
  if(nt_pane>=0)nt_panel_paint();
  else{

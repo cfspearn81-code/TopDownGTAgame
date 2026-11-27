@@ -122,7 +122,8 @@ static void atm_kiosk(int x,int y){
 }
 static void atm_kiosk_hint(void){
  int i=atm_near();if(i<0||atmOpen>=0||menu>=0)return;
- const BankAtm*a=bankAtms+i;int x=a->x-cx,y=a->y-cy;
+ const BankAtm*a=bankAtms+i;int x=a->x-cx,y=a->y-cy;if(chProjected)ch_project(&x,&y);
+ if((unsigned)x>=W||(unsigned)y>=H)return;
  box(x-21,y-50,43,23,0x1b3640,ATM_MINT);
  center(x,y-49,"ATM",ATM_MINT,0);
 }

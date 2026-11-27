@@ -326,7 +326,7 @@ static void hb_wakes_paint(void){
  }
 }
 static void harbor_boats_paint(void){
- if(p.x<2020.f||p.y<1800.f)return;
+ if(!hb.active&&(p.x<2020.f||p.y<1800.f))return;
  hb_wakes_paint();
  for(int i=0;i<HB_AMBIENT;i++)if(hbTraffic[i].live)hb_hull_paint(&hbTraffic[i].hull);
  if(hb.active)hb_hull_paint(&hb.hull);

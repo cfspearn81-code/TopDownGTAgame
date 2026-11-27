@@ -53,9 +53,12 @@ with tempfile.TemporaryDirectory(prefix="dc-light-host-") as temp:
         right = counts(frame, 327,351,416,365)
         assert left>160 and right>160 and center<10, (frame,left,center,right)
     for frame in ("frame-24.ppm","frame-44.ppm"):
-        left = counts(frame, 498,306,539,366)
-        center = counts(frame, 548,306,564,366)
-        right = counts(frame, 570,306,620,366)
-        assert left>18 and right>60 and center<9, (frame,left,center,right)
+        # The fixture's car is off screen center: its two pools straddle x=575.
+        # Sample the shared, unobstructed patch just ahead of its hood; the old
+        # x=548..563 "center" box clipped the left pool after camera reprojection.
+        left = counts(frame, 515,345,559,376)
+        center = counts(frame, 559,345,591,376)
+        right = counts(frame, 591,345,635,376)
+        assert left>140 and right>140 and center<5, (frame,left,center,right)
     assert counts("frame-34.ppm", 327,323,416,365)<20
     print("Native SDL2: E boards the car; C changes camera, F2 suppresses the twin beams, F2 restores them and C returns overhead.")

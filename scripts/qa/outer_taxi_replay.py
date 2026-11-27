@@ -10,6 +10,7 @@ import argparse
 r=Path(__file__).resolve().parents[2]
 cc=os.environ.get("CC","cc")
 args=argparse.ArgumentParser()
+args.add_argument("--3d",dest="perspective",action="store_true",help="drive the same real inputs with C camera instead of F2 Low FX")
 args.add_argument("--radio",action="store_true")
 args.add_argument("--outbound",nargs="?",const=1,type=int,choices=range(6),
                   help="test downtown to region 0..5 (default: Parkway Overlook)")
@@ -26,6 +27,9 @@ with tempfile.TemporaryDirectory(prefix="outer-taxi-") as tmp:
     radio=outbound or options.radio
     run(d/"plan",prefix,*([str(stop)] if outbound else ["radio"] if radio else []))
     tape=prefix.with_suffix(".plan").read_bytes();fixture=prefix.with_suffix(".dat")
+    if options.perspective:
+        assert b"1 4096\n" in tape,"missing expected opening F2 edge"
+        tape=tape.replace(b"1 4096\n",b"1 2097152\n",1)
     run(cc,"-O2",r/"scripts/check_pe.c","-o",d/"pe")
     run(cc,"-O2","-fPIC","-shared",r/"scripts/qa/linux_replay.c","-ldl","-o",d/"sdl.so")
     env=dict(os.environ,DC_TRIP_SEED=str(seeds[stop]) if outbound else "136")
@@ -35,5 +39,6 @@ with tempfile.TemporaryDirectory(prefix="outer-taxi-") as tmp:
     b=(d/"pe.dat").read_bytes()
     fee=pay[stop] if outbound else 147
     assert b==(d/"elf.dat").read_bytes() and struct.unpack_from("<I",b,8)[0]==50+fee and struct.unpack_from("<I",b,196)[0]==2
+    if options.perspective: assert struct.unpack_from("<I",b,304+(32+60)*4)[0]==1
     route=f"Wrecker Yard to {stops[stop]}" if outbound else "Parkway Overlook to Wrecker Yard"
     print(f"PASS: {tape.split()[0].decode()} keyboard frames. {route}: both launchers paid ${fee} once; identical career bytes. Radio/receipt: {radio}.")

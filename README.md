@@ -1,11 +1,14 @@
-# Dead Channel | Woodline & Lantern Quay Stability
+# Dead Channel | All-Area 3D
+
+**Latest: All-Area 3D.** C toggles perspective on foot, in rooms, cars and boats. See [the controls and test notes](docs/ALL-AREA-3D.md).
+
 
 The latest native build combines [Street Life Stability](docs/STABILITY-UPDATE.md)
 with [Greyreed Wood](docs/WOODLINE.txt) and the [Lantern Quay harbor](docs/LANTERN-QUAY.txt).
 See [integration and save compatibility](docs/WOODLINE-STABILITY.md).
 
-- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Woodline-Lantern-Quay-Stability-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
-- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Woodline-Lantern-Quay-Stability-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2.
+- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-All-Area-3D-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
+- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-All-Area-3D-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires glibc 2.34+ and SDL2.
 - [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt).
 
 Use **M**, then **F8**, for Greyreed Wood and Lantern Quay. Use Signal
@@ -20,9 +23,9 @@ own nightclub with Mika's bar and Ivo's contracts. **P** opens Signal
 (**F7** if rebound); use Night Wire to pin the buyable, upgradable Trap
 House at Bell Lane. **Enter** at its side door.
 
-**Drive the Outer Loop:** **C** switches to the optional behind-car chase
-view, **M** opens the atlas and **F8** expands it to new coastal, hill and
-highway roads. Cars take one-third less collision damage at the same
+**Drive the Outer Loop:** **C** toggles the 3D view on foot, in walkable
+rooms, in cars, and at the helm. **M** opens the atlas and **F8** expands
+it to the coastal, hill and highway roads. Cars take one-third less collision damage at the same
 0–100 condition scale. Visit Nightglass Motor Works for parts and races.
 The original street-lamp look is restored; rain, fog and wet roads remain.
 
@@ -102,6 +105,6 @@ the target saves before copying between platforms. No automatic sync.
 Linux automated testing runs the exact ELF using SDL's software renderer and
 dummy video driver. Windows automated testing runs the exact PE with simulated
 Win32 on Linux. Interactive desktop/physical Windows testing remains open.
-Package verified builds with `python3 scripts/package-woodline-stability.py`.
+Package verified builds with `python3 scripts/package-all-area-3d.py`.
 Before publishing another build, update [HANDOFF.md](HANDOFF.md) for the next
 maintainer and verify the matching archives/checksums.

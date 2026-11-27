@@ -1,11 +1,11 @@
 DEAD CHANNEL / PORT VANTA
-Woodline & Lantern Quay Stability for Windows 11 x64 and Linux x86-64
+All-Area 3D for Windows 11 x64 and Linux x86-64
 
 1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
    Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
    from the extracted Dead-Channel directory. If your extractor did not
    preserve execute permission, run chmod +x DeadChannel first.
-   Look for "Dead Channel | Woodline & Lantern Quay Stability" in the window title.
+   Look for "Dead Channel | All-Area 3D" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
@@ -41,9 +41,12 @@ first job. This is a different club from Vault 39. At Bell Lane, Enter
 on foot at the signed side door to preview or buy the Trap House. Signal
 (P or F7) has both pins in Night Wire. The full property, upgrade and
 storage controls are in TRAP-HOUSE.txt and BASE-VILLAGE.txt.
-On a car, C switches to the optional behind-car view. M opens the atlas
-and F8 shows the complete road network. L loads reserve cells for the
-selected fictional Pulse frame on foot. See OUTER-LOOP.txt.
+C switches between 3D and overhead across walkable streets and rooms, cars
+and boats. Your selection carries between them. The map, phone and menu
+screens still use readable panels. F2 Low FX temporarily draws overhead
+without changing your C selection. M opens the atlas; F8 shows the whole
+road network. On foot, L loads reserve cells for your fitted Pulse frame.
+See ALL-AREA-3D.md for controls, coverage and testing limits.
 
 PEOPLE IN PORT VANTA
 Walk close to someone and press E. Up/Down picks Say Hello, Say Nothing,

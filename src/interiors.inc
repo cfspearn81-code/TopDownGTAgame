@@ -47,7 +47,7 @@ static float grow_pack_left;
 enum{GROW_GATE_X=W/2,GROW_GATE_Y=153,CHIEF_X=247,CHIEF_Y=242,CUSTODY_X=709,CUSTODY_Y=305};
 static float interior_x,interior_y,interior_a,interior_cam_x,interior_cam_y;
 static InteriorProp interior_props[32];
-static U interior_back[W*H];
+static U interior_back[W*H],irNamedFloor[W*H];
 static const InteriorTheme *interior_theme(int k){
  if(interior_subroom){
   int li=legal_index_for_kind(k);
@@ -762,6 +762,8 @@ static void int_static(void){
   for(int y=145;y<433;y++)for(int x=venue_limit(y,0);x<venue_limit(y,1);x++)dot(x,y,ns_floor_pixel(x,y,finish));
   ns_wall(venue_shell_id);int_facility_floor(k,a);ns_ground(venue_shell_id);ns_fixed_details(venue_shell_id);
  }
+ /* Actors and furniture live above the separate perspective floor. */
+ for(int i=0;i<W*H;i++)irNamedFloor[i]=interior_back[i];
  if(k==15){
   if(!npc_replaces(N_ACT_CHIEF))person(CHIEF_X,175,0x8593ad,0,1.570796f,1,1);
   if(!npc_replaces(N_ACT_HQ1))person(418,162,0x75879f,0,1.570796f,1,2);
@@ -847,6 +849,8 @@ static void interior_paint(void){
  int n=interior_active_loc;
  if(n<0||n>=LEN(loc)){rect(0,0,W,H,DARK);return;}
  int_static();
+ int k=loc[n].kind,li=legal_index_for_kind(k);const InteriorTheme*t=interior_theme(k);U a=t->neon;
+ if(ch_mode_active()){ir_named();goto interior_hud;}
  typedef U IV4 __attribute__((vector_size(16),aligned(1),may_alias));
  int dx=(int)interior_cam_x,dy=(int)interior_cam_y;
  int left=max(0,-dx),right=min(W,W-dx),fast=left+(right-left)/4*4;
@@ -858,7 +862,6 @@ static void interior_paint(void){
   for(;x<right;x++)d[x]=s[x+dx];
   for(;x<W;x++)d[x]=0x13202a;
  }
- int k=loc[n].kind,li=legal_index_for_kind(k);const InteriorTheme*t=interior_theme(k);U a=t->neon;
  if(!fastGfx){
   for(int i=0;i<32;i++){int x=(i*197+(int)(anim*27))%W,y=84+(i*121+(int)(anim*106))%372;
     if(x<interior_left-dx-2||x>interior_right-dx+5)line(x,y,x-2,y+5,0x29424c);}
@@ -908,6 +911,7 @@ static void interior_paint(void){
  npc_body_paint(dx,dy);
  player_in_room(interior_x,interior_y,dx,dy,0xc6d979,player_gait(),interior_a,3,int_solid);
  npc_room_trace(dx,dy);
+ interior_hud:;
  rect(0,0,W,81,0x111e28);rect(0,78,W,1,0x42616d);
  draw_day_clock(5);textat(DAY_BADGE_LABEL_X,10,t->line,a,0);int big=textw(t->banner,1)<610;textat(26,29,t->banner,PAPER,big);
  char v[84];

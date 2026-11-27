@@ -58,7 +58,7 @@ static void hj_harbor_walk(NavPoint goal,int radius){
  for(int i=steps-1;i>=0;i--){int a=queue[i];hj_auto_walk((NavPoint){X0+STEP*(a%NX),Y0+STEP*(a/NX)},3);}
  assert(hj_near(goal,radius));
 }
-static void hj_to_dock(int dock){NavPoint d=hj_dock_walk(dock*2);hj_stand(d);hj_key(USE);assert(harbor_boat_active());}
+static void hj_to_dock(int dock){NavPoint d=hj_dock_walk(dock*2);hj_stand(d);hj_key(USE);assert(harbor_boat_active());if(getenv("DC_HARBOR_3D")){paint();assert(chProjected);}}
 static void hj_helm(NavPoint q,int still,int radius){
  assert(harbor_boat_active());
  for(int i=0;i<1850;i++){
@@ -157,10 +157,13 @@ int main(int argc,char**argv){
  if(argc==2&&!strcmp(argv[1],"--bump-base")){
   hj_play_bump(0);linux_disk_shutdown();puts("PASS optional harbor chip can be skipped, only base payout granted.");return 0;
  }
+ if(getenv("DC_HARBOR_3D")){hj_key(CAMERA);paint();assert(ch_pref()&&chProjected);}
  hj_map_points();
  hj_stand((NavPoint){loc[12].x,loc[12].y});hj_hold(0,20);
  assert(nv.phone[HJ_PHASE]==0&&nv.phone[HJ_DONE]==0&&nv.phone[HJ_FLOAT]==0);
- request_save();assert(disk_read(&sv,sizeof sv));
+ request_save();
+ if(getenv("DC_HARBOR_3D")){Save11 full;assert(disk_read(&full,sizeof full)&&full.night.garage[60]==1);}
+ else assert(disk_read(&sv,sizeof sv));
  hj_stand(hj_office);hj_key(USE);assert(harbor_jobs_panel_active());
  hj_capture(argc>1?argv[1]:NULL);hj_key(ESC);
  nv.phone[NP_BAG+2]=7;

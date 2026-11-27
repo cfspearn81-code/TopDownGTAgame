@@ -10,6 +10,7 @@ static int sw_at(int x,int y,int r){
  return scene==1&&p.car<0&&d2(p.x-x,p.y-y)<r*r&&street_line_open(p.x,p.y,x,y,2);
 }
 static void sw_label(int wx,int wy,const char*s,U col){
+ if(ch_record_label(wx,wy,s,col))return;
  int x=sx(wx),y=sy(wy),w=textw(s,0)+12;
  if(x < -w||x > W+w||y < -30||y > H+30)return;
  box(x-w/2,y-22,w,20,0x111e27,col);center(x,y-24,s,col,0);

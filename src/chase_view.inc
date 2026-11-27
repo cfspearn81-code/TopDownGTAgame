@@ -11,13 +11,13 @@ static int chZ[W*H];
 static float chSin=.249f,chCos=.9685f;
 static float chFit;
 static int ch_pref(void){return nv.garage[60]==1u;}
-static int ch_enabled(void){return ch_pref()&&!fastGfx&&street_car_exists(p.car)&&!p.dead;}
+#include "chase_rig.inc"
 static void ch_motion(float speed,float err){
  float unit=speed/205.f;if(unit>1)unit=1;
  float bend=absf(err);if(bend>.8f)bend=.8f;
  float wanted=79.f+18*unit+30*ngCamBurst-20*bend;
  float high=38.f+5*unit+11*bend;
- if(ch.ride!=p.car||ch.range<1){ch.range=79;ch.height=38;}
+ if(ch.ride!=p.car||ngCamRide!=p.car||ch.range<1){ch.range=79;ch.height=38;}
  ch.ride=p.car;ch.range+=(wanted-ch.range)*.073f;ch.height+=(high-ch.height)*.071f;
 }
 static ChVec ch_local(ChVec q){
@@ -73,7 +73,15 @@ static void ch_face(const ChVec *p0,int n,U c,int shade){
  for(int j=1;j<m-1;j++)ch_triangle(p[0],p[j],p[j+1],c);
 }
 static void ch_quad(ChVec a,ChVec b,ChVec c,ChVec d,U k,int shade){ChVec q[]={a,b,c,d};ch_face(q,4,k,shade);}
+#include "chase_asphalt.inc"
+#include "chase_sea_edge.inc"
+/* Solve ray=(b*sin(pitch)-height*cos(pitch))/(b*cos(pitch)+height*sin(pitch)).
+ * Use the same orthonormal camera frame as the 3D models; otherwise the
+ * road slides visibly under tires and ground-anchored contacts at steep pitch. */
+static inline float ch_floor_run(float ray,float denom){return ch.h*(chCos+ray*chSin)/denom;}
+static int chDecals;static inline U ch_decal_pixel(U,unsigned,unsigned);
 static void ch_ground(void){
+ cf_road_prepare();
  const U seam=chDark>.5f?0x343c52:0x9cb0af;
  int wet=(int)(cl((int)(nwWet*100.f)-11,0,80)*.75f);
  for(int y=0;y<H;y++){
@@ -83,13 +91,16 @@ static void ch_ground(void){
    U sky=nw_blend(chDark>.5f?0x11182d:0x486b84,seam,k);
    for(int j=y*W;j<y*W+W;j++){pixels[j]=sky;chZ[j]=0;}continue;
   }
-  float f=ch.h*(chCos-ray*chSin)/v,depth=f*chCos+ch.h*chSin,du=depth/CH_F;
+  float f=ch_floor_run(ray,v),depth=f*chCos+ch.h*chSin,du=depth/CH_F;
   int xx=(int)(65536*(ch.x+f*ch.co+W*.5f*du*ch.si)),yy=(int)(65536*(ch.y+f*ch.si-W*.5f*du*ch.co));
   int ux=(int)(-65536*du*ch.si),uy=(int)(65536*du*ch.co),z0=(int)(CH_ZS/depth);
   unsigned tint=(unsigned)(100*chDark),fog=(unsigned)cl((int)(depth*(.14f+.29f*chFog)),0,227);
   for(int k=y*W;k<y*W+W;k++,xx+=ux,yy+=uy){
    unsigned x=(unsigned)(xx>>16),j=(unsigned)(yy>>16);
    U c=x<ROOM&&j<ROOM?city[j*ROOM+x]:0x203540;
+   if(x>=ROOM-72||j>=ROOM-72)c=wl_ocean_edge(c,x,j);
+   if(x>=35&&x<BASE_ROOM-26&&j>=35&&j<BASE_ROOM-26)c=cf_road_sample(c,x,j);
+   if(chDecals)c=ch_decal_pixel(c,x,j);
    if(tint)c=nw_blend(c,0x141d30,tint);
    /* Small elongated lamp reflections remain on the pavement after the
     * rain particles stop. Use ground coordinates, not screen noise. */
@@ -114,84 +125,8 @@ static void ch_ground(void){
   }
  }
 }
-static void ch_facade(float x,float y,float xx,float yy,float ht,U c,int id,int side,int detail){
- ch_quad((ChVec){x,y,0},(ChVec){xx,yy,0},(ChVec){xx,yy,ht},(ChVec){x,y,ht},c,1);
- float dx=xx-x,dy=yy-y,l=sq(d2(dx,dy));
- if(!detail||l<11)return;
- int spans=cl((int)(l/19),1,8),floors=cl((int)(ht/19),1,5);
- float ox=dy/l*.8f,oy=-dx/l*.8f; /* winding has exterior on its right */
- x+=ox;y+=oy;
- for(int k=0;k<spans;k++){
-  float t=((float)k+.23f)/spans,tt=((float)k+.74f)/spans;
-  float sx0=x+dx*t,sy0=y+dy*t,tx=x+dx*tt,ty=y+dy*tt;
-  for(int j=0;j<floors;j++){
-   float lo=6.f+j*17.f,hi=lo+7.f;if(hi>=ht-2)continue;
-   U win=chDark>.35f&&((id*19+side*17+k*11+j*3)&7)<3?((k+j)%3==0?0x96d1ce:0xe5bb88):0x344c59;
-   ch_quad((ChVec){sx0,sy0,lo},(ChVec){tx,ty,lo},(ChVec){tx,ty,hi},(ChVec){sx0,sy0,hi},win,1);
-  }
- }
- ch_quad((ChVec){x,y,ht-3},(ChVec){xx+ox,yy+oy,ht-3},(ChVec){xx+ox,yy+oy,ht},(ChVec){x,y,ht},mix(c,PAPER,2),1);
-}
-static void ch_buildings(void){
- for(int i=0;i<nb;i++){
-  const Building*b=buildings+i;StreetBounds f=building_bounds(b);
-  float l=f.x,r=f.x+f.w,t=f.y,bt=f.y+f.h,dx=(l+r)*.5f-ch.x,dy=(t+bt)*.5f-ch.y;
-  float dd=d2(dx,dy);if(dd>1010.f*1010.f||dx*ch.co+dy*ch.si< -102)continue;
-  float ht=22.f+1.55f*b->ht+(i%11==6?19:0);
-  int detail=dd<480.f*480.f;
-  if(ch.y<t)ch_facade(l,t,r,t,ht,mix(b->roof,0x202b38,4),i,0,detail);
-  if(ch.x>r)ch_facade(r,t,r,bt,ht,mix(b->roof,0x35465b,3),i,1,detail);
-  if(ch.y>bt)ch_facade(r,bt,l,bt,ht,mix(b->roof,0x8c92a0,2),i,2,detail);
-  if(ch.x<l)ch_facade(l,bt,l,t,ht,mix(b->roof,0x31475b,3),i,3,detail);
-  ch_quad((ChVec){l,t,ht},(ChVec){r,t,ht},(ChVec){r,bt,ht},(ChVec){l,bt,ht},b->roof,1);
-  if(detail){
-   float x=l+(r-l)*.72f,y=t+(bt-t)*.39f;
-   ch_quad((ChVec){x-6,y-4,ht+2},(ChVec){x+6,y-4,ht+2},(ChVec){x+6,y+4,ht+2},(ChVec){x-6,y+4,ht+2},0x788987,1);
-  }
- }
-}
-static ChVec ch_v(const Car*c,float u,float v,float z0){
- float co=cs(c->a),si=sn(c->a);return (ChVec){c->x+u*co-v*si,c->y+u*si+v*co,z0};
-}
-static void ch_strip(const Car*c,float u,float v,float w,float wi,float z0,float zz,U color,int shade){
- ch_quad(ch_v(c,u,-w,z0),ch_v(c,v,-wi,zz),ch_v(c,v,wi,zz),ch_v(c,u,w,z0),color,shade);
-}
-static void ch_end(const Car*c,float u,float left,float right,float lower,float upper,U color,int shade){
- ch_quad(ch_v(c,u,left,lower),ch_v(c,u,right,lower),ch_v(c,u,right,upper),ch_v(c,u,left,upper),color,shade);
-}
-static void ch_car(const Car*c,int hero){
- int t=cl(c->type,0,4);const NgShape*s=ngShape+t;
- float rear=s->tail,front=s->nose,w=s->width,h=s->hood+.65f;
- NgMods m=c==cars&&c->owner==1?ng_installed(t):(NgMods){0};
- U paint=hero<0?0x8bdbd0:c->cond?(m.paint?ngPaint[m.paint]:specs[t].c):0x45535b,side=mix(paint,0x131e2c,4);
- float rt=s->roofTail,rn=s->roofNose,z0=s->roofHeight+.65f,wa=w-1.65f;
- ch_strip(c,rear-2,front+2,w+2,w+2,.35f,.35f,0x161d25,1);
- for(int sgn=-1;sgn<=1;sgn+=2){
-  for(int axle=0;axle<2;axle++){
-   float u=axle?front-5:rear+5,v=sgn*(w-.2f);
-   ch_quad(ch_v(c,u-3.0f,v,.9f),ch_v(c,u+3.0f,v,.9f),ch_v(c,u+3.0f,v,5.7f),ch_v(c,u-3.0f,v,5.7f),0x121922,1);
-   if(hero)ch_quad(ch_v(c,u-1.7f,v+.6f*sgn,2),ch_v(c,u+1.7f,v+.6f*sgn,2),ch_v(c,u+1.7f,v+.6f*sgn,4.5f),ch_v(c,u-1.7f,v+.6f*sgn,4.5f),ngRims[m.rim],0);
-  }
-  ch_quad(ch_v(c,rear,sgn*(w-1.0f),2.3f),ch_v(c,front,sgn*(w-1.5f),2.3f),ch_v(c,front,sgn*(w-1.5f),h),ch_v(c,rear,sgn*(w-1.0f),h),side,1);
-  ch_quad(ch_v(c,s->trunk,sgn*(w-1.1f),h),ch_v(c,s->wind,sgn*(w-1.1f),h),ch_v(c,rn,sgn*wa,z0),ch_v(c,rt,sgn*wa,z0),0x223d51,hero?0:1);
- }
- ch_strip(c,rear,front,w-1.f,w-1.5f,h,h,paint,1);
- ch_strip(c,s->trunk,rt,w-1.1f,wa,h,z0,0x36596b,hero?0:1);
- ch_strip(c,rn,s->wind,wa,w-1.1f,z0,h,0x587c84,hero?0:1);
- ch_strip(c,rt,rn,wa,wa,z0,z0,mix(paint,PAPER,2),1);
- if(t==3||m.paint==7)ch_strip(c,rt+.1f,rn-.1f,.55f,.55f,z0+.07f,z0+.07f,0xf7ddb6,0);
- ch_end(c,rear,w*-1.f+1,w-1.f,2.35f,h,side,1);
- ch_end(c,front,w*-1.f+1.5f,w-1.5f,2.35f,h,mix(paint,0x182c39,4),1);
- ch_end(c,rear-.15f,-w+1.1f,w-1.1f,1.8f,2.9f,0x263541,1);
- ch_end(c,rear-.23f,-1.65f,1.65f,2.7f,3.8f,ngTags[m.tag],0);
- if(m.kit)ch_strip(c,rear-.7f,rear+1,w+1,w+1,h+(m.kit==2?2:1),h+(m.kit==2?2:1),side,1);
- int bulbs=road_lamps(c);
- if(c->cond)for(int i=-1;i<=1;i+=2){
-  ch_end(c,front+.15f,i*(w-1.6f),i*(w-4.0f),h-1.0f,h-.1f,0xffe4a2,0);
-  ch_end(c,rear-.21f,i*(w-1.0f),i*(w-3.8f),h-1.0f,h-.1f,bulbs&1?0xff5148:0xc84b44,0);
-  if(bulbs&2)ch_end(c,rear-.23f,i*(w-4.3f),i*(w-5.1f),h-1.0f,h-.1f,0xe2faff,0);
- }
-}
+#include "chase_city.inc"
+#include "chase_coachwork.inc"
 static void ch_upright(float x,float y,float w,float bottom,float top,U ink){
  float u=ch.si*w,v=-ch.co*w;
  ch_quad((ChVec){x-u,y-v,bottom},(ChVec){x+u,y+v,bottom},(ChVec){x+u,y+v,top},(ChVec){x-u,y-v,top},ink,1);
@@ -206,6 +141,8 @@ static void ch_lamp(const StreetLamp*s){
  ch_upright(x,y,s->poleW*.5f,0,foot,s->pole);
  ch_upright(x,y,s->lensW*.5f,foot,foot+cap,s->lens);
 }
+#include "chase_landscape.inc"
+#include "chase_trail.inc"
 static void ch_props(void){
  StreetPerson actor;
  for(int i=0;i<LEN(peds);i++)if(street_ped_pose(i,&actor))ch_character(&actor);
@@ -220,24 +157,13 @@ static void ch_props(void){
       (ChVec){x+u,y+v,16.5f},0xf18acb,0);
   }
  }
- for(int i=0;i<LEN(scenery);i++){
-  const BlockScenery*b=scenery+i;for(int j=b->treesFrom;j<b->count;j++){
-   const StreetBounds*t=b->walls+j;
-   float x=t->x+t->w*.5f,y=t->y+t->h*.5f;
-   if(d2(x-ch.x,y-ch.y)>710.f*710.f)continue;
-   ch_upright(x,y,1.7f,0,18,0x54514b);
-   ch_upright(x,y,7,12,20,0x294540);
-   ch_upright(x,y,9,19,26,0x34544b);
-   ch_upright(x,y,6,25,32,0x446057);
-  }
- }
+ wl_city_trees();
  StreetLamp fixture;
  for(int j=1;j<BASE_ROOM/256;j++)for(int i=1;i<BASE_ROOM/256;i++)
   for(int k=0;k<2;k++)if(street_lamp_legacy(i,j,k,&fixture))ch_lamp(&fixture);
  for(int i=0;i<LEN(outerNodes);i+=2)if(street_lamp_outer(i,&fixture))ch_lamp(&fixture);
  for(int i=0;i<HARBOR_LAMPS;i++)if(street_lamp_harbor(i,&fixture))ch_lamp(&fixture);
- for(int i=0;i<LEN(fx);i++)if(fx[i].t>0&&d2(fx[i].x-ch.x,fx[i].y-ch.y)<580.f*580.f)
-  ch_upright(fx[i].x,fx[i].y,1.2f,3.f,5.5f,fx[i].c);
+ ch_field_sparks();
 }
 static void ch_road_glyph(float x,float y,U color){
  float w=12,h=30;
@@ -277,59 +203,20 @@ static void ch_outer(void){
   ch_upright(x,y,7.5f,13.5f,20.5f,outerStops[i].tint);
   ch_upright(x,y,4.7f,16.9f,17.8f,0x204453);
  }
- const U forest[]={0x476954,0x546e50,0x648060,0x4a725b,0x435f58,0x657b55};
- for(int j=0;j<woodPropN;j++){
-  const WoodProp*p=woodProps+j;float x=p->x,y=p->y,h=p->height,r=p->radius;
-  if(d2(x-ch.x,y-ch.y)>575.f*575.f||p->kind==WOOD_UNDERGROWTH)continue;
-  ChVec a=ch_local((ChVec){x,y,h*.4f});if(a.z<2||absf(a.x)>a.z*1.40f+56.f)continue;
-  if(p->kind==WOOD_TREE){
-   if(a.z<28.f)continue; /* keep a nearby crown from clipping through the camera */
-   U leaves=forest[p->grade%6];
-   ch_upright(x,y,1.5f,0.f,h*.65f,0x695a45);
-   for(int k=0;k<3;k++){
-    float foot=h*(.30f+k*.18f),head=foot+h*.32f,w=h*(.24f-k*.05f),dx=ch.si*w,dy=-ch.co*w;
-    ChVec q[]={{x-dx,y-dy,foot},{x+dx,y+dy,foot},{x,y,head}};
-    ch_face(q,3,mix(leaves,0x254437,2-k),1);
-   }
-  }else if(p->kind==WOOD_ROCK){
-   float dx=ch.si*r,dy=-ch.co*r;
-   ChVec q[]={{x-dx,y-dy,0},{x+dx,y+dy,0},{x+dx*.65f,y+dy*.65f,h*.50f},{x-dx*.45f,y-dy*.45f,h*.69f}};
-   ch_face(q,4,0x65756d,1);
-  }else if(p->kind==WOOD_POST){ch_upright(x,y,1,0,21,0x786d53);ch_upright(x,y,5.5f,15,20,0xa38b61);}
-  else if(p->kind==WOOD_HUT){ch_upright(x,y,r,0,25,0x696a52);ch_upright(x,y,r*.85f,25,30,0x465b4b);}
-  else ch_upright(x,y,r,0,h*.7f,0x756149);
- }
+ wl_wood();wl_shore_grass();wl_field();wl_life();
 #endif
 }
 #include "harbor_chase.inc"
+#include "chase_jobs.inc"
 static int ch_draw(void){
  chProjected=0;if(!ch_enabled())return 0;
- const Car*c=cars+p.car;
- float a=ngCamRide==p.car?ngCamAngle:c->a;
- ch.co=cs(a);ch.si=sn(a);
- /* Wall sweep trims the boom as the rear swings toward masonry. If there
-  * is no space, pivot close and rise; the target never disappears into a
-  * wall even after full steering or reversing near a roof edge. */
- float dist=ch.ride==p.car&&ch.range>1?ch.range:79,high=ch.ride==p.car&&ch.height>1?ch.height:38;
- float fit=dist;
- for(float q=19;q<=dist;q+=5.f){
-  float xx=c->x-q*ch.co,yy=c->y-q*ch.si;
-  if(solid(xx,yy,4)){fit=q-5.f;break;}
- }
- /* Keep steering visible as the boom shortens. Pitch down just enough to
-  * retain the car at its normal screen anchor, instead of clipping it at
-  * the bottom when backing into the wall next to a driveway. */
- if(fit<34.f)high+=min(24,(int)(34.f-fit))*1.10f;
- chFit=fit;
- float hAim=high-4,diag=sq(fit*fit+hAim*hAim),target=.303f;
- chSin=(hAim*.953f-fit*target)/diag;
- chCos=(fit*.953f+hAim*target)/diag;
- ch.x=c->x-fit*ch.co;ch.y=c->y-fit*ch.si;ch.h=high;
+ ch_frame_rig();
  chDark=nw_dark();chFog=nwFog;chProjected=1;
  headlamps_build(1,(int)ch.x-620,(int)ch.y-620,(int)ch.x+621,(int)ch.y+621);
- ch_ground();ch_buildings();ch_outer();ch_harbor_props();ch_props();
+ ch_collect_jobs();ch_ground();ch_buildings();ch_outer();ch_harbor_props();ch_props();
  for(int i=street_next_car(-1);i<LEN(cars);i=street_next_car(i))if(cars[i].x>=0&&d2(cars[i].x-ch.x,cars[i].y-ch.y)<755.f*755.f)
   ch_car(cars+i,i==p.car);
+ ch_chalk_pixel_actor();ch_street_encounter();if(ch_subject()==CH_FOOT)ch_player_character();
  Car ghost;if(ng_ghost_car(&ghost)&&d2(ghost.x-ch.x,ghost.y-ch.y)<730.f*730.f)ch_car(&ghost,-1);
  int x,y,meet;
  if(ng_route_goal(&x,&y)){if(d2(x-ch.x,y-ch.y)<645.f*645.f)ch_road_glyph(x,y,GOLD);}
@@ -348,11 +235,12 @@ static int ch_draw(void){
    line(x,y,x-2,y+6+i%3,mix(pixels[y*W+x],0x9db4ca,2));
   }
  }
+ ch_job_labels();
  return 1;
 }
 static void ch_badge(void){
  if(!chProjected||scene!=1||menu>=0)return;
- box(467,16,164,23,0x101d25,0x425864);center(549,17,"CHASE VIEW / C",0xa6c5c4,0);
+ box(467,16,164,23,0x101d25,0x425864);center(549,17,ch_subject()==CH_FOOT?"STREET 3D / C":ch_subject()==CH_HELM?"HELM 3D / C":"CHASE VIEW / C",0xa6c5c4,0);
  int x,y;if(ng.event==NG_IDLE&&job.kind<0&&vdActive<0&&night_garage_meet_site(&x,&y)>=0&&d2(p.x-x,p.y-y)<58*58){
   box(352,448,256,26,0x132931,TEAL);center(W/2,451,"NIGHT MEET / STOP + ENTER",TEAL,0);
  }

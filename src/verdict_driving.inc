@@ -62,6 +62,7 @@ static int dvCanRestart(void){
 }
 static void dvBoard(int id){if(street_near_car()==id)vehicle_use(id);}
 static void dvBadge(float x,float y,const char*t,U c){
+ if(ch_record_label((int)x,(int)y,t,c))return;
  int xx=sx(x),yy=sy(y),w=textw(t,0)+10;if(xx<-w||xx>W+w||yy<-21||yy>=H)return;
  box(xx-w/2,yy,w,20,0x13222b,c);center(xx,yy-1,t,c,0);
 }

@@ -688,6 +688,7 @@ static void nvs_aqua_paint(void){
  nvs_head("PORT AUTHORITY   /   UNDERGLASS CONSERVATION","The Glass Relay");
  nvs_tank(nvs_tab,stage);nvs_tabs(nvs_exhibit,4,nvs_tab);
  if(nvs_mode==4){
+  if(ch_mode_active())ir_aqua();else{
   nvs_grad(42,284,876,62,0x455c5b,0x34464a);
   rect(42,283,876,3,0x9ca988);
   static const char*const stops[]={"Inez","Lightwell","Nursery","East bench"};
@@ -695,6 +696,7 @@ static void nvs_aqua_paint(void){
    box(xx-48,291,101,23,0x18313a,nvs_bonus&(1<<i)?TEAL:GOLD);center(xx+2,291,stops[i],PAPER,0);}
   person(151,329,0xbcb98a,0,3.14f,MODEL_STAFF,1);
   person(nvs_position,335,0x51948b,nvs_rail_walk?(int)(nvs_frames%16)/4:0,nvs_rail_dir<0?3.14159f:0.f,MODEL_PLAYER,1);
+  }
   nvs_tail("WALK THE EAST WING","Four marked stops: E to meet Inez or inspect the viewing station by your feet.",
    "The reopened promenade is visible here and remains available after restarting.",
    "LEFT / RIGHT: walk the rail     E / Inspect stop     ESC / Back to gallery");
