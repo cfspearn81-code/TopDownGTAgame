@@ -62,7 +62,7 @@ static void survey_edges(void){
     The nine new working quays intentionally end beside water; their
     independent fixture tests all hull directions and the foot decks. */
  int counts[5]={0},scanned=0,actual=0,sea=0;
- const int oldRoads=LEN(outerRoads)-9;
+ const int oldRoads=OUT_ROADS_ORIGINAL;
  for(int i=0;i<oldRoads;i++){
   const OuterRoad*r=outerRoads+i;OuterPoint a=outerNodes[r->a],b=outerNodes[r->b];
   float dx=b.x-a.x,dy=b.y-a.y,len=sq(d2(dx,dy)),xx=-dy/len,yy=dx/len;

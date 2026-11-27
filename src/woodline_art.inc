@@ -50,8 +50,8 @@ static void woodline_draw_prop(const WoodProp*p,int x,int y){
   disc(x+r,y+2,5,0x9b8061);disc(x+r,y+2,2,0x6f604c);break;
  case WOOD_HUT:
   box(x-18,y-24,37,29,0x55544b,0x827960);rect(x-14,y-13,9,8,0xa3aa87);
-  box(x+3,y-12,8,16,0x2e433f,0x736a56);rect(x-17,y-22,35,2,0x8f7d64);
+  rect(x-17,y-22,35,2,0x8f7d64);
   tri(x-22,y-20,x+22,y-20,x,y-34,0x374840);line(x-22,y-20,x,y-34,0x7f8c6b);
-  rect(x-18,y+5,35,2,0x8d8065);break;
+  rect(x-18,y+5,35,2,0x8d8065);oc_paint_exterior_door(oc_placed_door(OC_WOOD,(int)(p-woodProps)),cx,cy);break;
  }
 }

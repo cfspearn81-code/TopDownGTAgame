@@ -1,3 +1,108 @@
+# Dead Channel | Open City: Street Contact
+
+Merged the exact public Street Contact Update
+`3a6536f4f513c2d824c491752501b30993db6d5b` with the complete,
+previously delivered Open City `07e99b9813823a765c83ddc2035412123c0ac409`.
+They share the released All-Area 3D `223bf999494088d3a5eafcaad64a044143cbeaf6`.
+See [the combined guide](docs/OPEN-CITY-STREET-CONTACT.md).
+
+- Both views retain all 93 address paths, ten Northpoint road links,
+  wide dry shoulders, the East Channel and its directional-hull Atlas
+  path. The 107 Street Contact pole catalog entries remain represented,
+  plus four Northpoint bases. Widened outer shoulders move some old
+  outer fixtures; downtown and pier anchors stay intact. Solid bases
+  stay clear of entrances and travel lanes; the broad light pools
+  never become collision surfaces.
+- The updated 3D gait, camera, surfaces and physically present NPC
+  cast coexist with Open City's hats, wardrobes, Shade Supply, and
+  new Afterimage art and opaque cabaret costumes. Jobs and advertised
+  entrances use their existing keys, and Shift+E selects a person.
+  The Afterimage's physical performers retain contact and injury poses;
+  their venue clock, camera and animation pause together.
+- The boats' simulation, damage, mooring, and saved shore fallback are
+  untouched. Hull/beacon/wake details and the new helm remain visible.
+  Compact/Rev11 saves retain the same layouts, slot/medication/receipt
+  data and existing controls. If the ground has become occupied, reload
+  tries an actual clear position nearby rather than spawning inside it.
+
+The current opening is the 3,682-frame solid-lamp replay, digest
+`7dfa7bce`. Keep the earlier 3,664-frame All-Area tape as historical
+evidence, not a test target for the new lamp geometry. Testing uses
+native Linux SDL2 and the exact Windows PE in simulated Win32. The
+hardware Windows host was not exercised. The all-address census, lamp
+impact persistence, live contact/held state, costume preview/application,
+authentic predecessor saves, and dry-berth motion are in the regression
+set. Compare shared source and docs byte-for-byte across both archives.
+
+Build both with `bash scripts/build-linux.sh` and `bash scripts/build.sh`.
+Run `DC_QA_BUILT=1 bash scripts/test-street-contact.sh` and
+`DC_QA_BUILT=1 bash scripts/test-open-city.sh`. Package via
+`python3 scripts/package-open-contact.py downloads`; verify the exact
+extracted launchers with `python3 scripts/qa/verify_open_contact_archives.py downloads`.
+
+- [Linux x86-64](downloads/Dead-Channel-Open-City-Street-Contact-Linux-x64.tar.gz)
+- [Windows 11 x64](downloads/Dead-Channel-Open-City-Street-Contact-Windows-11-x64.zip)
+- [SHA-256 checksums](downloads/SHA256SUMS.txt)
+
+Keep the older archives and manifest lines intact. Do not add local
+career files, private screenshots, built scratch trees, or logs.
+
+---
+
+# Dead Channel | Open City
+
+Private dual-platform update based on All-Area 3D
+`223bf999494088d3a5eafcaad64a044143cbeaf6`. See [OPEN-CITY.md](docs/OPEN-CITY.md)
+and [the new map/address guide](docs/OPEN-CITY-MAP.md).
+No historical package or GitHub main is changed by this private build.
+
+- Northpoint expands the playable northeast inside the existing coordinate
+  grid, with ten road links and two connections to Glass Bluff. The existing
+  road centers remain; the non-maritime outer shoulders gain three units
+  per side, and the legacy curb paint extends by two pixels. Quay geometry
+  and all three boarding pairs are retained. The exposed coast is navigable
+  where its shared terrain is tidal, with a waypoint route using the same
+  directional hull clearance; inland Mirror Tarn is not seawater.
+- All 93 physical buildings have fully accessible address paths in both
+  cameras (79 existing, 14 newly opened: ten Northpoint, three quay shells
+  and the Ranger Hut). Machinery, containers, and furnishings aren't
+  buildings. New furnished rooms have individually named fixtures, not
+  independent stories or shops at every address. Existing gate logic stays.
+- Style Lab adds hair, face, apparel and accessory choices, including
+  nine new headwear shapes plus None and independent colors. Pause >
+  Wardrobe can edit a saved character; New Career shares the editor.
+  Shade Supply is accessible at Saltmarsh's signed side door or via the
+  Signal Settings pin. Its three items affect only the fictional game.
+- The Afterimage's stage, office, lounge, bar and costumes have new materials
+  and fixtures in 2D and 3D. Other venues' textures remain untouched. The
+  boat refresh adds fittings, navigational lights, wakes and helm displays.
+  Boats retain the exact original simulation functions for throttle, steering,
+  momentum, docking, traffic and durability.
+- Compact saves and 1,044-byte Rev11 still load. The optional Wardrobe and
+  Shade bits preserve the neighboring penthouse/Pulse data and med patches.
+  If a saved outdoor position is now occupied, reload tries nearby dry
+  ground. Existing legal positions remain exact. Geometry ID additions
+  are append-only; old quest and shop IDs retain their meaning.
+
+Build with `bash scripts/build-linux.sh` and `bash scripts/build.sh`. See
+`scripts/test-open-city.sh` for the new acceptance suite. It covers all
+93 doors, 1,010 Northpoint roadway hull samples, old regional routes,
+wardrobe and gear persistence, Afterimage art/controls, and three working
+dock pairs. The original native SDL and simulated Win32 opening replay is
+3,664 frames, digest `a6727845`. Same-water helm/traffic comparisons
+use exact 32-bit float state; chart corrections tested separately.
+Native SDL and the exact Windows PE in a simulated Win32 host were used;
+there was no physical Windows OS test.
+
+Package both with `python3 scripts/package-open-city.py <release-directory>`.
+Run `python3 scripts/qa/verify_open_city_archives.py <release-directory>`
+to check the manifest and launch the exact extracted ELF/PE. Deliver the
+two named Open City archives and their adjacent SHA-256 manifest. Keep older
+archive hashes and don't include private careers, temporary files or traces.
+
+
+---
+
 # Dead Channel | Street Contact Update
 
 Street Contact includes the intervening 3D Detail and 3D Street Motion

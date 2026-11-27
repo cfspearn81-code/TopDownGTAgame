@@ -1,21 +1,20 @@
-# Dead Channel | Street Contact Update
+# Dead Channel | Open City: Street Contact
 
-**Latest: Street Contact Update.** All 107 lamppost bases are solid, additional
-street and venue NPCs can be talked to or hit, and the Street Motion and 3D
-Detail changes are included. See the [controls and test notes](docs/STREET-CONTACT.md).
+This release combines [Open City](docs/OPEN-CITY.md) and the
+[Street Contact Update](docs/STREET-CONTACT.md): the new Northpoint coast,
+93 accessible buildings, Style Lab and Shade Supply, The Afterimage's
+new interiors, a redesigned helm, and solid lamp bases plus live city
+and indoor interactions. **C** changes perspective, not the rules.
 
-- **Linux:** [Linux x86-64 archive](downloads/Dead-Channel-Street-Contact-Update-Linux-x64.tar.gz); extract and run `./DeadChannel`. Requires SDL2 and glibc 2.34+.
-- **Windows:** [Windows 11 x64 ZIP](downloads/Dead-Channel-Street-Contact-Update-Windows-11-x64.zip); extract and run `DeadChannel.exe`.
-- [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Player guide](docs/START-HERE.txt) · [Previous builds](downloads/).
+- **Linux x86-64:** [Download the archive](downloads/Dead-Channel-Open-City-Street-Contact-Linux-x64.tar.gz), extract, and run `./DeadChannel` (SDL2 and glibc 2.34+).
+- **Windows 11 x64:** [Download the ZIP](downloads/Dead-Channel-Open-City-Street-Contact-Windows-11-x64.zip), extract, and open `DeadChannel.exe`.
+- [SHA-256 checksums](downloads/SHA256SUMS.txt) · [Combined guide](docs/OPEN-CITY-STREET-CONTACT.md) · [Start here](docs/START-HERE.txt) · [Historical archives](downloads/).
 
-Earlier updates: [3D Street Motion](docs/3D-STREET-MOTION.md),
-[3D Detail](docs/3D-DETAIL-UPDATE.md), and [All-Area 3D](docs/ALL-AREA-3D.md).
-
-Use **M**, then **F8**, for Greyreed Wood and Lantern Quay. Use Signal
-(**P** or **F7**) to open Night Wire commissions. **E** boards at a dock;
-**Shift** slows the launch. Existing Street Life, Crossroads and other
-[releases remain in downloads](downloads/).
-
+Open the atlas with **M**, then **F8**. **E** enters signed doors or
+operates the current job/counter; **Shift+E** chooses a nearby person.
+Near a boat berth, **E** boards, **Shift** slows, and **E** moors.
+Existing careers still load; install into a fresh directory and resume
+the original save without copying files.
 
 **Base Village:** Leave Apartment 4 and walk straight left to the pink
 Afterimage marquee. Press **E** to enter directly. Vault 39 is still its

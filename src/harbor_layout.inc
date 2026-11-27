@@ -50,9 +50,9 @@ static int harbor_paint_class(int x,int y){
  return -1;
 }
 static int harbor_ocean_cell(float x,float y){
- if(!(x>=35.f&&y>=2010.f&&x<=ROOM-36.f&&y<=ROOM-36.f))return 0;
+ if(!(x>=35.f&&y>=35.f&&x<=ROOM-36.f&&y<=ROOM-36.f))return 0;
  int ix=(int)x,iy=(int)y,i=iy*ROOM+ix;
- return outerLand[i]==TILE_TIDE&&!outerLane[i];
+ return outer_is_new(ix,iy)&&outerLand[i]==TILE_TIDE&&!outerLane[i];
 }
 static int harbor_nav_water(float x,float y,int radius){
  if(radius<0||radius>96||!harbor_ocean_cell(x,y))return 0;

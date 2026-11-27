@@ -258,38 +258,7 @@ static void ir_club_prop(int l,int t,int r,int b,int h,U c){
  ir_box(l,t,r-l,b-t,0,h,c,1);
  ir_front(l+1,r-1,b+.2f,h-2,h,mix(c,ncRose,3),0,0,0,0,0);
 }
-static void ir_club(void){
- float time=nc_motion();ir_begin(ncX,ncY,78,455,ncBackdrop);
- ir_shell(2,155,435,74,887,55,0x46324b,ncRose,ncBackdrop);
- id_club_lighting();
- if(ncRoom==NC_FLOOR){
-  id_club_stage(time);
-  id_club_counter(78,158,234,263,0x65586e,0);id_club_counter(733,158,885,260,0x875762,1);
-  for(int i=0;i<2;i++){
-   int x=i?721:143;id_sofa(x,305,96,40,0x80516a,3);x=i?836:82;
-   id_door(x+21,339,39,27,i?ncGold:ncIce,1);
-  }
-  for(int id=NAR_STAGE;id<NAR_SUITE;id++)ir_club_actor(id);
-  for(int i=0;i<7;i++)ir_box(300+i*60,222,7,2,20,1,(sn(time*2+i)>.2f)?ncIce:ncGold,0);
-  ir_marker(160,354,ncRose);ir_marker(793,354,ncGold);
- }else if(ncRoom==NC_SUITE){
-  for(int i=0;i<3;i++){
-   int x=210+i*266;ir_box(x-106,154,198,94,0,4,mix(ncBoothUph[i],0x4d454e,4),1);
-   id_sofa(x-103,155,193,62,ncBoothUph[i],5);
-   ir_box(x-101,155,188,3,25,3,mix(ncBoothInk[i],ncBoothUph[i],5),0);
-   for(int j=0;j<2;j++)ir_club_actor(NAR_SUITE+i*2+j);
-   ir_box(x-25,217,50,16,9,2,0x766060,0);ir_box(x-2,222,4,6,4,5,0x776867,0);
-   id_round(x-10,223,2.7f,2.7f,11,4,.4f,ncBoothInk[i]);
-   if(nc_get(NC_SHOWCASE)&(1<<i))id_round(x+9,221,3,3,11,5,1,ncBoothInk[i]);
-  }
-  id_sofa(80,304,130,68,0x7a546c,3);
-  const InteriorProp stock={743,307,141,56,INT_LOCKER,0x947785};id_fixture(&stock,ncGold,-1,1);
- }else{
-  id_club_office();
-  ir_club_actor(NAR_OFFICE);
- }
- ir_room_actors();ir_marker(480,418,ncIce);ir_hero(ncX,ncY,ncAngle,7);if(npcTraceTicks>0)ir_trace();
-}
+#include "club_perspective.inc"
 static void ir_trap(void){
  /* Authored pixel art is the material atlas. Actors and service labels from
     the overhead pass aren't baked into the playable floor. */

@@ -353,7 +353,7 @@ static U npc_filter_keys(U keys,U *tap){
     exits. Keep the confrontation, its remaining drop and rejoining actors
     suspended. An actual profile change/respawn explicitly calls npc_reset;
     real building changes and entering a car are still handled below. */
- if(!p.dead&&(scene==2||scene==NIGHT_PHONE_SCENE||((scene==0||scene==5)&&profileReturn)))return keys;
+ if(!p.dead&&(scene==2||scene==NIGHT_PHONE_SCENE||scene==OPEN_CITY_WARDROBE_SCENE||((scene==0||scene==5)&&profileReturn)))return keys;
  for(int i=0;i<LEN(npcRejoin);i++)if(npcRejoin[i].room&&npcRejoin[i].room!=npc_room_key())npcRejoin[i].room=0;
  if(npcEnc.phase!=NPC_IDLE&&(npcEnc.room!=npc_room_key()||p.dead||p.car>=0))npc_forget_encounter();
  if(!npcTalkOn){

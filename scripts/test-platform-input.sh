@@ -16,6 +16,6 @@ mkdir -p "$tmp/close/DeadChannel"; cp "$tmp/seed" "$tmp/close/DeadChannel/career
 SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software SDL_AUDIODRIVER=dummy XDG_DATA_HOME="$tmp/close" LD_PRELOAD="$tmp/close.so" build/DeadChannel
 DC_CLOSE_TEST=1 "$tmp/pe" build/DeadChannel.exe "$tmp/seed"
 DC_CLOSE_TEST=2 "$tmp/pe" build/DeadChannel.exe "$tmp/seed"
-gzip -dc scripts/qa/curb-access-tour.txt.gz | DC_TAP_REPLAY=1 "$tmp/pe" build/DeadChannel.exe --tour
+gzip -dc "${DC_OPENING_TOUR:-scripts/qa/curb-lamp-tour.txt.gz}" | DC_TAP_REPLAY=1 "$tmp/pe" build/DeadChannel.exe --tour
 python3 scripts/qa/win_presentation.py
 python3 scripts/qa/linux_audio_reconnect.py

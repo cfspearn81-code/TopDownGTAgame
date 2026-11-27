@@ -122,7 +122,8 @@ static void city_rhythm_test(void){
   }
  }
  assert(trees>0);
- for(int i=0;i<nb;i++){
+ // These historic roof and block probes apply to the original city grid.
+ for(int i=0;i<ocLegacyCount;i++){
   const Building*b=buildings+i;if(!b->w)continue;
   int roofY=max(b->y/256*256+42,b->y-b->ht);
   int east=min(b->x/256*256+213,b->x+b->w+b->ht/2-1);
@@ -130,7 +131,7 @@ static void city_rhythm_test(void){
   assert(solid(east,b->y+b->h/2,0));
   assert(street_hits_wall(&(Car){.x=east+2,.y=b->y+b->h/2,.a=.78f}));
  }
- for(int i=0;i<nb;i++)if(ordinaryDoorY[i]){
+ for(int i=0;i<ocLegacyCount;i++)if(ordinaryDoorY[i]){
   shops++;p.x=ordinaryDoorX[i];p.y=ordinaryDoorY[i];assert(open_space(p.x,p.y));
   NavPoint door=nav_door(LEN(loc)+i);mapOn=1;
   navigation_pointer(NAV_MAP_X+door.x*NAV_MAP_SIZE/nav_span(),NAV_MAP_Y+door.y*NAV_MAP_SIZE/nav_span(),0);
@@ -326,7 +327,8 @@ int main(void){
  assert(count_ink(CASH_RED,650,30,944,55)>40);
  press(ESC);leave();
  int shells=0,portals=0;
- for(int i=0;i<nb;i++){
+ /* Open City outer shells get both-view tests in open_city_test.c. */
+ for(int i=0;i<ocLegacyCount;i++){
   Building *b=buildings+i;if(!b->w||!b->h)continue;shells++;
   if(zone_is_building(i))continue;
   assert(ordinaryDoorY[i]&&open_space(ordinaryDoorX[i],ordinaryDoorY[i]));

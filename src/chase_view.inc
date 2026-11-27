@@ -205,7 +205,7 @@ static int ch_draw(void){
    line(x,y,x-2,y+6+i%3,mix(pixels[y*W+x],0x9db4ca,2));
   }
  }
- ch_job_labels();
+ ch_job_labels();night_gear_sign_chase();
  return 1;
 }
 static void ch_badge(void){

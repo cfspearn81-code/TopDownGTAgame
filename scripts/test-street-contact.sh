@@ -3,6 +3,7 @@ set -eu
 cd "$(dirname "$0")/.."
 mkdir -p build/contact-qa
 out=build/contact-qa
+build_required=${DC_QA_BUILT:-0}
 export DC_OPENING_TOUR="$PWD/scripts/qa/curb-lamp-tour.txt.gz" ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 DC_QA_BUILT=1
 pids=()
 tag() {
@@ -11,9 +12,11 @@ tag() {
   pids+=("$!")
 }
 join() { local bad=0; for p in "${pids[@]}"; do wait "$p" || bad=1; done; pids=(); return "$bad"; }
-tag linux-build bash scripts/build-linux.sh
-tag windows-build bash scripts/build.sh
-join
+if [[ $build_required != 1 ]]; then
+  tag linux-build bash scripts/build-linux.sh
+  tag windows-build bash scripts/build.sh
+  join
+fi
 sha256sum build/DeadChannel{,.exe}
 tag opening-linux bash scripts/test-linux.sh
 tag opening-windows bash -c 'cc -O2 scripts/check_pe.c -o build/contact-qa/pe && gzip -dc "$DC_OPENING_TOUR" | build/contact-qa/pe build/DeadChannel.exe --tour'

@@ -49,7 +49,8 @@ static void turns(void){
 static void atlas_sweep(void){
  int renders=0,walkins=0;
  scene=1;sv.intro=4;job.kind=-1;mapOn=1;
- for(int i=0;i<LEN(loc)+nb;i++){
+ /* Historical atlas crop and old headers only; Open City runs its own census. */
+ for(int i=0;i<LEN(loc)+ocLegacyCount;i++){
   if(i>=LEN(loc)&&!ordinaryDoorY[i-LEN(loc)])continue;
   navSelected=i;navHover=navKeyboard=1;navManual=nav_door(i);navManualLoc=i;navHasManual=1;
   for(int car=-1;car<=0;car++){p.car=car;paint();renders++;}

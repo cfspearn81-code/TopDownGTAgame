@@ -335,7 +335,7 @@ int main(int argc,char**argv){
  if(argc==2){outdir=argv[1];char fn[800];int n=snprintf(fn,sizeof fn,"%s/rooms.tsv",outdir);ck(n>0&&(size_t)n<sizeof fn,"capture path too long");manifest=fopen(fn,"w");ck(manifest!=NULL,"cannot create manifest; create capture directory first");}
  init_city();scene=1;sv.intro=4;sv.legal=1;p.car=-1;job.kind=-1;mapOn=0;menu=-1;
  for(int i=0;i<LEN(loc);i++)visit_named(i);
- for(int i=0;i<nb;i++){
+ for(int i=0;i<ocLegacyCount;i++){
   if(buildings[i].w<=0||buildings[i].h<=0)continue;
   if(zone_is_building(i)){ck(zone_idx[zone_id[i]-1]==i,"named building entrance mapping invalid");continue;}
   ck(ordinaryDoorY[i]>0,"physical building lacks a street entrance");

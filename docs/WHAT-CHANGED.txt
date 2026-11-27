@@ -1,3 +1,25 @@
+DEAD CHANNEL / OPEN CITY: STREET CONTACT
+
+The complete Open City now runs with Street Contact's physical lamp
+bases, talkable passers, indoor contact, and richer 3D motion. Read
+OPEN-CITY.md, OPEN-CITY-MAP.md, and STREET-CONTACT.md. Save layouts and
+boat handling stay unchanged.
+
+--- PREDECESSOR UPDATES ---
+
+DEAD CHANNEL / OPEN CITY
+
+Northpoint expands the coastal city with ten road links, a larger dry
+headland and a continuous eastern sea channel. All 93 physical building
+addresses have doors, including 14 newly opened rooms. Boats get a clearer
+helm, updated hull fittings, lights and wake effects without changing the
+original controls or simulation. Style Lab adds hats, more hair and face
+options, accessories and outerwear. Visit Shade Supply at the Glass Mile
+side porch for its fictional wearables. The Afterimage alone gets the
+new interior texture, stage lighting and adult cabaret costumes.
+Existing career files, vehicle controls, boat handling and camera choices
+remain supported. Details: OPEN-CITY.md, OPEN-CITY-MAP.md, CHARACTER-WARDROBE.txt.
+
 3D DETAIL UPDATE
 
 The indoor player and cast now use real 3D models instead of enlarged

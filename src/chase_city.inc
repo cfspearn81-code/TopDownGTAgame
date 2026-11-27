@@ -25,9 +25,16 @@ static CfAddress cf_address(int i){
   CF_FLATS,CF_MARKET,CF_CIVIC};
  static const U clay[]={0xa37861,0x958a75,0xad887b,0x71888d,0x9d8a7d,0x8b838a,0x719289};
  int w=wi_index(i);
- return(CfAddress){wiRoles[w].noun,mix(clay[(i*7+i/3)%LEN(clay)],b->roof,2),wiRoles[w].accent,plan[w],ordinaryDoorX[i]};
+ return(CfAddress){oc_kind(i)==OC_NEIGHBOR?walkin_name(i):wiRoles[w].noun,mix(clay[(i*7+i/3)%LEN(clay)],b->roof,2),wiRoles[w].accent,plan[w],ordinaryDoorX[i]};
 }
-static int cf_door_u(int i,const CfAddress *a){StreetBounds b=building_bounds(buildings+i);return cl((a->door-b.x)*CF_W/max(1,b.w),7,120);}
+static int cf_door_u(int i,const CfAddress *a){
+ StreetBounds b=building_bounds(buildings+i);const OcDoor*d=oc_entry(i);
+ if(d&&d->family==OC_NEIGHBOR){
+  int side=d->face,u=side==OC_LEFT?d->ay-b.y:side==OC_RIGHT?b.y+b.h-d->ay:side==OC_BACK?b.x+b.w-d->ax:d->ax-b.x;
+  return cl(u*CF_W/max(1,side%2?b.h:b.w),7,120);
+ }
+ return cl((a->door-b.x)*CF_W/max(1,b.w),7,120);
+}
 typedef struct{unsigned char t[CF_PITCH],ready;} CfSheet;
 static CfSheet cfSheets[LEN(buildings)][4];
 static void cf_fill(unsigned char*t,int x,int y,int w,int h,int c){
@@ -86,7 +93,7 @@ static void cf_mip(const unsigned char *s,unsigned char *dst,int w,int h){
 static CfSheet *cf_bake(int id,int side,const CfAddress *a){
  CfSheet*sheet=&cfSheets[id][side];if(sheet->ready)return sheet;
  sheet->ready=1;unsigned char*t=sheet->t;int form=a->style;
- int front=side==2,profile=front?form:form==CF_MARKET?CF_FLATS:form,seed=id*17+side*11;
+ int front=side==(oc_kind(id)==OC_NEIGHBOR?ocDoor[id].face:2),profile=front?form:form==CF_MARKET?CF_FLATS:form,seed=id*17+side*11;
  /* Quiet, structural mortar; individual details are subordinate to entries. */
  for(int y=0;y<64;y++)for(int x=0;x<128;x++){
   int val=CF_STONE;
@@ -320,6 +327,7 @@ static void cf_city_fixtures(void){
 #include "chase_city_trim.inc"
 static void ch_buildings(void){
  for(int i=0;i<nb;i++){
+  int family=oc_kind(i);if(family==OC_QUAY||family==OC_WOOD)continue;
   const Building*b=buildings+i;if(b->w<=0||b->h<=0)continue;
   StreetBounds f=building_bounds(b);float l=f.x,r=l+f.w,t=f.y,bt=t+f.h;
   float x=(l+r)*.5f,y=(t+bt)*.5f,dd=d2(x-ch.x,y-ch.y);
@@ -331,8 +339,24 @@ static void ch_buildings(void){
   if(ch.y>bt)cf_draw_side(i,2,&a,(ChVec){l,bt,0},(ChVec){r,bt,0},ht);
   if(ch.x<l)cf_draw_side(i,3,&a,(ChVec){l,t,0},(ChVec){l,bt,0},ht);
   cf_roof(i,&a,f,ht,dd);
-  if(dd<310.f*310.f)cf_service_wall(i,&a,f,ht);
-  if(ch.y>bt-.3f)cf_front_architecture(i,&a,f,ht);
+  int serviceSide=i%3!=0?OC_RIGHT:OC_LEFT;
+  if(dd<310.f*310.f&&(family==OC_NONE||ocDoor[i].face!=serviceSide))cf_service_wall(i,&a,f,ht);
+  if(ch.y>bt-.3f&&(family==OC_NONE||ocDoor[i].face==OC_FRONT))cf_front_architecture(i,&a,f,ht);
  }
  cf_city_fixtures();
+}
+
+/* Both facade sides use exact door anchor from the registered footprint. */
+static void ch_oc_small_door(int id,float maxh){
+ const OcDoor*d=oc_entry(id);if(!d)return;
+ float x=d->ax,y=d->ay,dx=d->face==OC_LEFT?-.45f:d->face==OC_RIGHT?.45f:0,dy=d->face==OC_BACK?-.45f:d->face==OC_FRONT?.45f:0;
+ float u=dy!=0?1.f:0.f,v=dx!=0?1.f:0.f;
+ x+=dx;y+=dy;
+ for(int i=0;i<3;i++){
+  float w=6.f-i*1.f,z=0.12f+i*.12f,h=maxh-i*.56f;U ink=i==0?0xbca986:i==1?0x4a6569:0x21343c;
+  float a=x+dx*i*.16f,b=y+dy*i*.16f;
+  ch_quad((ChVec){a-u*w,b-v*w,z},(ChVec){a+u*w,b+v*w,z},(ChVec){a+u*w,b+v*w,h},(ChVec){a-u*w,b-v*w,h},ink,1);
+ }
+ float a=x+dx*.61f,b=y+dy*.61f;
+ ch_quad((ChVec){a-u*2,b-v*2,maxh*.52f},(ChVec){a+u*2,b+v*2,maxh*.52f},(ChVec){a+u*2,b+v*2,maxh*.74f},(ChVec){a-u*2,b-v*2,maxh*.74f},0x7caa9c,1);
 }

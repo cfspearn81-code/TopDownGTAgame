@@ -29,7 +29,7 @@ if [[ "${1:-}" == --soak || "${1:-}" == --extended ]]; then
   ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 ./build/stress_test "${soak_args[@]}"
 fi
 if [[ "${1:-}" == --tour ]]; then
-  gzip -dc scripts/qa/curb-access-tour.txt.gz | build/check_pe build/DeadChannel.exe --tour
+  gzip -dc "${DC_OPENING_TOUR:-scripts/qa/curb-lamp-tour.txt.gz}" | build/check_pe build/DeadChannel.exe --tour
 fi
 if [[ "${1:-}" == --historical-tour ]]; then
   # Play the archived recording against the executable it was designed for.

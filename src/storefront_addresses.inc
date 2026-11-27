@@ -3,7 +3,7 @@
    The plan number selects a cutaway shell; edition selects an installation within
    that trade, not a random color. Keep addresses keyed to the street-building id. */
 typedef struct {const char*feature;unsigned char edition,shell;} WiAddress;
-static const WiAddress wiAddress[LEN(buildings)]={
+static WiAddress wiAddress[LEN(buildings)]={
  [0]={"MARINE FREQUENCY",0,3},[1]={"HOME COURT",0,1},[2]={"THE MAP ARCHIVE",0,5},[3]={"TERRACOTTA WORKS",0,4},
  [8]={"THE FITTING SALON",0,2},[9]={"THE RED CURTAIN",0,1},[10]={"THE SUNRISE COUNTER",0,6},[11]={"THE MONOLITH",0,7},
  [13]={"THE STAR PALACE",0,8},[14]={"COIN & BUBBLE",0,3},[17]={"THE KELP FOREST",0,5},[18]={"THE OLD BRASS LOBBY",0,6},
@@ -46,7 +46,7 @@ static int wi_shell_edge(int y,int right){
  return right?wi_right+w:wi_left-w;
 }
 /* These visitor notes describe what is physically on display at that address. */
-static const char*const wiPlaque[LEN(buildings)]={
+static const char*wiPlaque[LEN(buildings)]={
  [0]="The marine desk still signs off with the three harbor chimes.",[1]="The maple court was salvaged from a neighborhood school.",[2]="The atlas desk holds hand-inked charts from the old ferry company.",[3]="Every earth-red vessel was turned from the same local clay.",
  [8]="The fitting salon kept its first opening-day dress on the rail.",[9]="The house curtain was stitched by the tailors across town.",[10]="The breakfast counter still uses the old sunrise plate design.",[11]="The standing slabs are cut from a single pier foundation.",
  [13]="The star marquee once advertised silent movies and a live organ.",[14]="The first brass token from this laundry is set into the wall.",[17]="The kelp rises and falls in a slow artificial tide.",[18]="Each brass key once hung above a handwritten resident's name.",
@@ -66,3 +66,7 @@ static const char*const wiPlaque[LEN(buildings)]={
 };
 static int wi_plaque_x(void){return wi_mirror?414:546;}
 static int wi_at_plaque(void){return d2(wi_x-wi_plaque_x(),wi_y-414)<=20*20;}
+
+static void oc_room_metadata(int id,const OcRoom*r){
+ wiAddress[id]=(WiAddress){r->feature,r->edition,r->shell};wiPlaque[id]=r->plaque;
+}

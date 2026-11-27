@@ -28,7 +28,7 @@ static void approach(NavPoint start,NavPoint end,int inCar){
  for(int i=1;i<navCount;i++)assert(nav_traversable(navNodes[i-1],navNodes[i],inCar?6:3));
 }
 static void road_hulls(void){
- for(int i=LEN(outerRoads)-9;i<LEN(outerRoads);i++){
+ for(int i=OUT_ROADS_ORIGINAL;i<OUT_ROADS_WITH_QUAY;i++){
   const OuterRoad*r=outerRoads+i;
   OuterPoint a=outerNodes[r->a],b=outerNodes[r->b];float dx=b.x-a.x,dy=b.y-a.y;
   Car c={.type=0,.cond=100,.a=look(dx,dy)};
@@ -41,7 +41,7 @@ static void road_hulls(void){
 int main(int argc,char**argv){
  out=argc>1?argv[1]:0;init_city();scene=1;sv.intro=4;sv.dayClock=720;job.kind=-1;
  NavPoint oldCity={1792,1792};
- assert(LEN(outerStops)==9&&LEN(outerNodes)==66);
+ assert(OUT_HQ_TIDE==65&&OUT_NP_PASS==66&&LEN(outerStops)==10&&LEN(outerNodes)==74);
  assert(!strcmp(outerStops[3].label,"HARBOR PIER")&&woodline_is_grove(560,2100));
  assert(!harbor_nav_water(492,2636,4)&&!harbor_nav_water(3040,2572,2)&&!harbor_nav_water(2400,2400,-1));
  for(int i=0;i<LEN(harborPieces);i++)assert(harborPiecePlaced[i]);

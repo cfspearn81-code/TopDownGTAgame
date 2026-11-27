@@ -1,0 +1,42 @@
+DEAD CHANNEL  /  CHARACTER WARDROBE
+===================================
+
+New Career
+  The creator has two pages. Foundation contains the name and the original
+  appearance options. Tab or the page button opens Style Lab.
+
+An existing career
+  Press Esc on the street or in a standard room and select WARDROBE /
+  EDIT APPEARANCE. The editor starts with your current outfit. Enter or
+  Save Look applies it to the current slot. Escape or Discard leaves
+  the current outfit untouched. An outfit never changes the career name,
+  wallet, business ownership, missions, abilities or unlocked gear.
+
+Style Lab
+  Headwear     None, signal cap, fisher knit, bucket hat, broad fedora,
+               newsboy cap, dock helmet, storm hood, bandanna or sun brim
+  Hat color    12 fabric colors
+  Accent       12 independent colors for details on hats and clothing
+  Accessory    Chain, scarf, ear cuff, crossbody bag, pin, gloves or shawl
+  Hair cut +   Long twists, tapered waves, or twin buns
+  Face +       Small scar, freckles, or moustache
+  Outerwear    Wool, leather, utility, rain, knit, or shearling
+  Shoe accent  Seven independent accents, or leave the shoes unchanged
+
+Keyboard
+  Tab changes page; Up/Down selects a category; Left/Right or E changes
+  the selected option. M turns the live fitting model through four sides.
+  Space shuffles only the current page; F2 browses its coordinated looks.
+  Enter saves the current appearance; Esc discards without saving.
+  On a new career select the name row with E or click it to type a name.
+
+Where the outfit appears
+  The same wardrobe is used in the career card, live fitting model, 2D
+  gameplay and 3D street walking/interiors. Very small details are easier
+  to see in the fitting model. Tall fitted hats and a worn face wrap can
+  cover underlying hair or lower-face details, but do not erase them.
+
+Compatibility
+  Older saves load with their original appearance; new options default
+  to original/none. Saving an outfit with Style Lab additions uses the
+  game's existing extended save structure without changing its size.

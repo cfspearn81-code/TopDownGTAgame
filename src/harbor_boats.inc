@@ -254,8 +254,9 @@ static int harbor_boats_tick(U keys,U tap,float dt){
  return 1;
 }
 
-/* Shared top-down rendering. The colored keel, split rub rails, cabins
- * and light bars distinguish a launch, ferry, workboat and patrol at 1x. */
+/* Helm rendering is isolated from hb_board, movement, hull and traffic.
+ * Neither camera, animated foam, cosmetics nor the instrument panel can
+ * advance an actor, mutate hull condition, or consume the game RNG. */
 typedef struct{int x,y;} HbDrawPoint;
 typedef struct{int x,y;float c,s;} HbDrawRig;
 static HbDrawPoint hb_art(const HbDrawRig*r,float x,float y){
@@ -267,43 +268,82 @@ static void hb_quad(HbDrawPoint a,HbDrawPoint b,HbDrawPoint c,HbDrawPoint d,U in
 static void hb_edge(const HbDrawRig*r,float a,float b,float c,float d,U ink){
  HbDrawPoint p=hb_art(r,a,b),q=hb_art(r,c,d);line(p.x,p.y,q.x,q.y,ink);
 }
-static void hb_deck(const HbDrawRig*r,float x,float end,float mid,U ink){
- hb_quad(hb_art(r,x,-mid),hb_art(r,end,-mid),hb_art(r,end,mid),hb_art(r,x,mid),ink);
+static void hb_deck(const HbDrawRig*r,float aft,float fore,float half,U ink){
+ hb_quad(hb_art(r,aft,-half),hb_art(r,fore,-half),hb_art(r,fore,half),hb_art(r,aft,half),ink);
+}
+static void hb_deck_rect(const HbDrawRig*r,float a,float f,float port,float starboard,U ink){
+ hb_quad(hb_art(r,a,port),hb_art(r,f,port),hb_art(r,f,starboard),hb_art(r,a,starboard),ink);
+}
+static void hb_art_dot(const HbDrawRig*r,float u,float v,int radius,U color){
+ HbDrawPoint p=hb_art(r,u,v);
+ if(radius)disc(p.x,p.y,radius,color);else dot(p.x,p.y,color);
 }
 static void hb_hull_paint(const HarborHull*h){
- int x=sx(h->x),y=sy(h->y);if(x<-23||y<-23||x>W+23||y>H+23)return;
+ int x=sx(h->x),y=sy(h->y);if(x<-32||y<-32||x>W+32||y>H+32)return;
  HbDrawRig r={x,y,cs(h->a),sn(h->a)};
- static const U colors[]={0x7de8d3,0xedb574,0xd3827c,0x82b2ed};
- U c=colors[cl(h->kind,0,3)],trim=mix(c,0x20344b,3);
- float length=h->kind==HB_CARGO?17.2f:15.3f,width=h->kind==HB_CARGO?8.2f:7.f;
- HbDrawPoint a=hb_art(&r,-length,-width),b=hb_art(&r,length-7,-width);
- HbDrawPoint d=hb_art(&r,length,0),e=hb_art(&r,length-7,width),g=hb_art(&r,-length,width);
- hb_quad((HbDrawPoint){a.x+2,a.y+3},(HbDrawPoint){b.x+2,b.y+3},
-  (HbDrawPoint){e.x+2,e.y+3},(HbDrawPoint){g.x+2,g.y+3},0x102838);
- hb_quad(a,b,e,g,trim);tri(b.x,b.y,d.x,d.y,e.x,e.y,c);
- hb_edge(&r,-length,-width,length-7,-width,c);hb_edge(&r,-length,width,length-7,width,0x1b4253);
- hb_edge(&r,length,0,length-7,-width,mix(c,PAPER,2));hb_edge(&r,length,0,length-7,width,c);
- hb_deck(&r,-length+1,-8,4.9f,0x294453);
- hb_edge(&r,-length+1,-3,-length+1,3,0x829592);
- if(h->kind==HB_CARGO){
-  hb_deck(&r,-7,-2,4.3f,0x9c7e58);hb_deck(&r,0,6,4.3f,0xb7976c);
-  hb_edge(&r,-6,-1,-2,-1,0xe8be8a);hb_edge(&r,1,-1,5,-1,0xe8be8a);
- }else{
-  hb_deck(&r,-6,6,4.8f,0x324d62);
-  hb_deck(&r,-3,4,4.1f,mix(c,PAPER,2));
-  hb_edge(&r,5,-4,5,4,0x83b2be);hb_edge(&r,6,-4,6,4,0x294b61);
-  if(h->kind==HB_PATROL){
-   HbDrawPoint blue=hb_art(&r,-3,-3),white=hb_art(&r,-3,3);
-   int phase=(int)(anim*7.f)&1;
-   disc(blue.x,blue.y,phase?1:2,phase?0x487faa:0x61b8ff);
-   disc(white.x,white.y,phase?2:1,phase?0xc4eefe:0x547d9c);
-  }else if(h->kind==HB_SKIFF){
-   HbDrawPoint dash=hb_art(&r,1,0);dot(dash.x,dash.y,0x193b4a);dot(dash.x,dash.y-1,0x80c5c3);
-  }
+ static const U paint[]={0x6abdad,0xd89451,0xb86c5d,0x86add9};
+ static const U stripe[]={0xdcf6df,0xffe0ad,0xefd4a9,0xdfedf0};
+ int skin=cl(h->kind,0,3),dark=night_world_is_night();
+ U c=paint[skin],rail=stripe[skin],side=mix(c,0x192f45,4);
+ float length=skin==HB_CARGO?18.f:skin==HB_PATROL?16.4f:15.7f,beam=skin==HB_CARGO?8.1f:7.f;
+ float step[]={-length,-length+4,length-8.f,length-3.f,length};
+ float widths[]={beam*.84f,beam,beam*.93f,beam*.47f,.10f};
+ for(int i=0;i<4;i++){
+  HbDrawPoint a=hb_art(&r,step[i],-widths[i]),b=hb_art(&r,step[i+1],-widths[i+1]);
+  HbDrawPoint c0=hb_art(&r,step[i+1],widths[i+1]),d=hb_art(&r,step[i],widths[i]);
+  hb_quad((HbDrawPoint){a.x+1,a.y+2},(HbDrawPoint){b.x+1,b.y+2},
+   (HbDrawPoint){c0.x+1,c0.y+2},(HbDrawPoint){d.x+1,d.y+2},0x123342);
+  hb_quad(a,b,c0,d,i>1?mix(side,c,4):side);
+  hb_edge(&r,step[i],-widths[i],step[i+1],-widths[i+1],rail);
+  hb_edge(&r,step[i],widths[i],step[i+1],widths[i+1],c);
  }
- if(night_world_is_night()){
-  for(int i=-1;i<=1;i+=2){HbDrawPoint lamp=hb_art(&r,length-4,i*3);disc(lamp.x,lamp.y,1,i<0?0xe98e86:0x9bdfad);}
-  HbDrawPoint anchor=hb_art(&r,-length+3,0);dot(anchor.x,anchor.y,0xf2e7c8);
+ hb_edge(&r,step[0],-widths[0],step[0],widths[0],mix(c,rail,2));
+ for(int j=-1;j<=1;j+=2){
+  hb_edge(&r,-length+3,j*(beam-1.6f),length-10,j*(beam-1.6f),0x253943);
+  if(!fastGfx)for(int i=-8;i<7;i+=5)hb_art_dot(&r,i,j*(beam-.8f),0,rail);
+  hb_art_dot(&r,length-4,j*1.65f,0,0xbecbc5);
+ }
+ if(skin==HB_SKIFF){
+  hb_deck(&r,-length-1.45f,-length+1.9f,1.85f,0x263746); /* outboard */
+  hb_edge(&r,-length-.6f,-1.5f,-length+.5f,1.5f,0x718f90);
+  hb_deck(&r,-10.2f,-5.8f,4.5f,0x445963);
+  hb_edge(&r,-9.24f,-4.1f,-9.24f,4.1f,0xc4a688); /* seat rails */
+  hb_deck(&r,-3.2f,3.5f,4.4f,0x526d76);
+  hb_edge(&r,2.55f,-4.8f,2.55f,4.8f,dark?0x94b3b7:0xafdddd);
+  hb_edge(&r,3.3f,-4.f,3.3f,4.f,0x597785); /* windscreen */
+  hb_art_dot(&r,-4.1f,0,1,h==&hb.hull?charTop[sv.look.part[TOP_TONE]]:0xcca36f);
+#if __has_include("wardrobe_catalog.inc")
+  if(h==&hb.hull&&ward_hat(ward_live()))hb_art_dot(&r,-3.23f,0,0,ward_hat_color(ward_live()));
+#endif
+  hb_edge(&r,6,-1.9f,10.6f,-.8f,0xb3a38e);
+ }else if(skin==HB_CARGO){
+  static const U cargo[]={0xa5805d,0xb18b65,0x8b9b8f};
+  for(int i=0;i<3;i++){
+   float a=-14.f+5.2f*i;
+   hb_deck(&r,a,a+4.15f,4.7f,cargo[i]);
+   hb_edge(&r,a+.5f,-3.6f,a+3.6f,-3.6f,mix(cargo[i],PAPER,2));
+   hb_edge(&r,a+2.1f,-4.35f,a+2.1f,4.35f,0x584a37);
+  }
+  hb_deck(&r,2.8f,8.f,4.75f,0x5b7f85);
+  hb_edge(&r,7.4f,-4.4f,7.4f,4.4f,dark?0xe9c993:0xa9d6cc);
+ }else{
+  hb_deck(&r,-8.75f,6.f,4.8f,mix(rail,0x526f79,3));
+  hb_deck(&r,-6.9f,4.8f,3.55f,skin==HB_PATROL?0xa1b7c5:0xdac9a9);
+  for(int j=-1;j<=1;j+=2){
+   hb_edge(&r,-6.3f,4.3f*j,-2.25f,4.3f*j,dark?0xcaaf83:0x759ba5);
+   hb_edge(&r,-.3f,4.3f*j,3.95f,4.3f*j,dark?0xd8bf91:0x82a2ae);
+  }
+  hb_edge(&r,4.6f,-3.75f,4.6f,3.75f,0x587a87);
+  if(skin==HB_PATROL){
+   int phase=(int)(anim*7.f)&1;
+   hb_art_dot(&r,-3.2f,-2.9f,1,phase?0x5886b8:0x64c1ff);
+   hb_art_dot(&r,-3.2f,2.9f,1,phase?0xc4ecf4:0x5d8ba9);
+  }else hb_art_dot(&r,-3,-1,1,0xa17c58);
+ }
+ if(dark){
+  hb_art_dot(&r,length-5.f,-2.9f,1,0xf58e87);
+  hb_art_dot(&r,length-5.f,2.9f,1,0x9cf4b0);
+  hb_art_dot(&r,-length+3.f,0,0,0xf5e9c7);
  }
 }
 static void hb_foam(float x,float y,int ink){
@@ -315,14 +355,23 @@ static void hb_wakes_paint(void){
  if(fastGfx)return;
  for(int i=0;i<HB_WAKE;i++){
   const HarborWake*w=hbWakes+i;if(w->time<=0.f)continue;
-  int x=sx(w->x),y=sy(w->y);if(x<-33||y<-33||x>W+33||y>H+33)continue;
-  float elapsed=1.f-w->time,k=w->span+elapsed*12.f,co=cs(w->a),si=sn(w->a);
-  int strength=cl((int)(w->time*(w->owner?4.2f:5.5f)),1,6);
-  for(int side=-1;side<=1;side+=2)for(int sample=0;sample<8;sample++){
-   float t=sample*.143f,sideways=side*k*t,f=elapsed*4.f+t*5.f;
+  int x=sx(w->x),y=sy(w->y);if(x<-39||y<-39||x>W+39||y>H+39)continue;
+  float elapsed=1.f-w->time,k=w->span+elapsed*14.f,co=cs(w->a),si=sn(w->a);
+  int strength=cl((int)(w->time*(w->owner?4.4f:6.3f)),1,6);
+  for(int side=-1;side<=1;side+=2)for(int sample=0;sample<11;sample++){
+   float t=sample*.1f,jitter=sn(i*1.7f+side*1.5f+sample*1.02f)*elapsed;
+   float sideways=side*k*(t*.88f+t*t*.12f)+jitter,f=elapsed*6.0f+t*8.3f;
    hb_foam(w->x-co*f-si*sideways,w->y-si*f+co*sideways,strength);
+   if((sample+i+side+16)%3==0){
+    f+=1.6f;sideways+=side*(1.2f+jitter*.65f);
+    hb_foam(w->x-co*f-si*sideways,w->y-si*f+co*sideways,max(1,strength-2));
+   }
   }
-  hb_foam(w->x-co*elapsed*4.f,w->y-si*elapsed*4.f,max(1,strength-1));
+  /* Central stern wash holds for the fresh, near-field part of the wake. */
+  if(w->time>.32f)for(int j=0;j<5;j++){
+   float f=elapsed*5.f+j*.95f,v=sn(i+j*1.7f)*(.5f+elapsed*1.4f);
+   hb_foam(w->x-co*f-si*v,w->y-si*f+co*v,max(1,strength-j/2));
+  }
  }
 }
 static void harbor_boats_paint(void){
@@ -330,27 +379,55 @@ static void harbor_boats_paint(void){
  hb_wakes_paint();
  for(int i=0;i<HB_AMBIENT;i++)if(hbTraffic[i].live)hb_hull_paint(&hbTraffic[i].hull);
  if(hb.active)hb_hull_paint(&hb.hull);
- else{
-  int dock=hb_near_dock(p.x,p.y,0),x,y,wx,wy;
-  if(dock>=0&&hb_dock(dock,&x,&y,&wx,&wy)&&harbor_boat_clear(wx,wy,1.5707963f)){
+ for(int dock=0;dock<HB_DOCKS;dock++){
+  int x,y,wx,wy;
+  if(hb.active&&dock==hb.dock)continue;
+  if(!hb_dock(dock,&x,&y,&wx,&wy)||sx(wx)<-32||sx(wx)>W+32||sy(wy)<-32||sy(wy)>H+32)continue;
+  if(hb.active&&d2(wx-hb.hull.x,wy-hb.hull.y)<32.f*32.f)continue;
+  if(harbor_boat_clear(wx,wy,1.5707963f)){
    HarborHull launch={.x=wx,.y=wy,.a=1.5707963f,.kind=HB_SKIFF};
    hb_hull_paint(&launch);
   }
  }
+}
+static int hb_heading(float a){
+ /* Angle zero points map east, and screen-down points south. */
+ int degrees=90+(int)(a*57.2957795f+(a>=0?.5f:-.5f));
+ return (degrees%360+360)%360;
+}
+static void hb_compass(int x,int y,float angle){
+ int h=hb_heading(angle);
+ U ink=0xdbebda;disc(x,y,12,0x1a303d);disc(x,y,9,0x182630);
+ for(int j=0;j<4;j++){
+  int dx=j==1?9:j==3?-9:0,dy=j==0?-9:j==2?9:0;
+  dot(x+dx,y+dy,j?0x789496:0xffdc9c);
+ }
+ float co=cs(angle),si=sn(angle);
+ int dx=(int)(co*7.5f),dy=(int)(si*7.5f);
+ tri(x+dx,y+dy,x-(int)(co*3.5f+si*3.f),y-(int)(si*3.5f-co*3.f),
+     x-(int)(co*3.5f-si*3.f),y-(int)(si*3.5f+co*3.f),ink);
+ char label[5]={(char)('0'+h/100),(char)('0'+h/10%10),(char)('0'+h%10),0};
+ textat(x+17,y-10,label,ink,0);
 }
 static void harbor_boats_hint(void){
  if(scene!=1||menu>=0||mapOn||p.dead)return;
  if(hb.active){
   int dock=hb_near_dock(hb.hull.x,hb.hull.y,1);
   int recent=dock>=0&&absf(hb.hull.s)<=20.f&&d2(hb.hull.vx,hb.hull.vy)<19.f*19.f;
-  const char*t=recent?"E  MOOR AT QUAY":dock>=0?"SHIFT  SLOW TO MOOR":"WASD / ARROWS  STEER    SHIFT  BRAKE";
-  int x=286;box(x,480,389,43,0x111e27,0x4f7e81);
-  textat(x+10,482,t,recent?TEAL:PAPER,0);
-  textat(x+10,501,"HULL",0xabb9b7,0);
-  rect(x+59,509,78,5,0x283b42);rect(x+59,509,hb.condition*78/100,5,hb.condition>32?TEAL:PINK);
+  int edge=hb.hull.x<100.f||hb.hull.y<100.f||hb.hull.x>ROOM-100.f||hb.hull.y>ROOM-100.f;
+  const char*t=recent?"E  MOOR AT QUAY":dock>=0?"SHIFT  SLOW TO MOOR":
+   edge?"CHART EDGE   /   TURN INLAND":"ARROWS / WASD  HELM    SHIFT  BRAKE";
+  int x=265,y=475;box(x,y,431,50,0x111e27,0x4f7e81);
+  rect(x+1,y+1,429,2,recent?TEAL:0x5b8f8f);
+  hb_compass(x+19,y+14,hb.hull.a);
+  line(x+74,y+6,x+74,y+24,0x38515e);
+  textat(x+82,y+4,t,recent?TEAL:edge&&dock<0?GOLD:PAPER,0);
+  textat(x+10,y+28,"HULL",0xabb9b7,0);
+  rect(x+56,y+36,68,5,0x283b42);rect(x+56,y+36,hb.condition*68/100,5,hb.condition>32?TEAL:PINK);
+  for(int i=1;i<4;i++)dot(x+56+i*17,y+36,0x111e27);
   char info[100];char*q=number(append(info,"KNOTS "),min(99,(int)(absf(hb.hull.s)*.27f)));
-  q=append(q,"  /  ");append(q,dock>=0?hb_dock_name(dock):"HARBOR CHANNEL");
-  textat(x+148,501,info,0xb7cbc5,0);
+  q=append(q,"  /  ");append(q,dock>=0?hb_dock_name(dock):hb.hull.s<-.16f?"ASTERN / OPEN WATER":"HARBOR CHANNEL");
+  textat(x+136,y+28,info,0xb7cbc5,0);
  }else if(p.car<0&&p.x>2150.f&&p.y>1960.f){
   int dock=hb_near_dock(p.x,p.y,0);if(dock<0)return;
   char label[90];append(append(label,"E  BOARD LAUNCH  /  "),hb_dock_name(dock));

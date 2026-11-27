@@ -108,7 +108,7 @@ static void far_south_helm(void){
  assert(hb_lane_open(hb.hull.x,2920.f,1540.f,2920.f));
  p.x=hb.hull.x=1540; p.y=hb.hull.y=2920; p.a=hb.hull.a=3.14f;
  sv.dayClock=750;menu=-1;mapOn=0;fastGfx=0;tick(0);paint();
- int n=0;for(int i=0;i<W*H;i++)if(pixels[i]==0x7de8d3)n++;
+ int n=0;for(int i=0;i<W*H;i++)if(pixels[i]==0xdcf6df)n++;
  assert(n>2);
  press(CAMERA);paint();assert(chProjected);
  ChVec pilot=ch_local((ChVec){hb.hull.x-2.65f*cs(hb.hull.a),hb.hull.y-2.65f*sn(hb.hull.a),9});

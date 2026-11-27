@@ -13,24 +13,24 @@ static void cf_road_prepare(void){
   int edge=absf(perp),c=0;
   if(max(u,v)>41){
    /* Split curbstone cap, underside, gutter and poured slab joints. The
-    * inner lip has a soft line rather than the old harsh double edge. */
-   if(edge==29)c=len%14!=0?5:8;
-   if(edge==30)c=10;
-   if(edge==28)c=6;
-   if(edge==27)c=2;
-   if(edge>=31&&edge<=40&&(len/9+((edge-30)>>2))%3)c=11;
-   if(edge>=31&&edge<=41&&(len%18==0||edge==37))c=8;
+    * two-pixel wider asphalt matches the same curb in the overhead bake. */
+   if(edge==31)c=len%14!=0?5:8;
+   if(edge==32)c=10;
+   if(edge==30)c=6;
+   if(edge==29)c=2;
+   if(edge>=33&&edge<=40&&(len/9+((edge-32)>>2))%3)c=11;
+   if(edge>=33&&edge<=41&&(len%18==0||edge==37))c=8;
    if(edge==41)c=14;
-   if(edge==25&&len%45<16)c=9;
-   if(edge>=23&&edge<28&&len>104&&len<119)
-    c=(len==105||len==118||edge==23)?3:len%3?6:1;
+   if(edge==27&&len%45<16)c=9;
+   if(edge>=25&&edge<30&&len>104&&len<119)
+    c=(len==105||len==118||edge==25)?3:len%3?6:1;
    if(edge<=1&&(len%36)<18)c=4;
    int mx=len-165,my=perp-9,rr=mx*mx+my*my;
    if(rr<=31)c=rr>20?6:((mx+my)&3)==0?1:2;
    /* A visible curbside chip and repaired lane strip, not visual noise in
     * the far field. The color can be swapped by tile address cheaply. */
    if(len>62&&len<86&&perp>=-14&&perp<=-12+(len-62)/10)c=12;
-   if(len>84&&len<91&&edge>=29&&edge<=31)c=14;
+   if(len>84&&len<91&&edge>=31&&edge<=33)c=14;
   }else if(cross<20&&max(u,v)>38&&max(u,v)<42)c=7; /* stop line */
   cfRoadInk[y*256+x]=(unsigned char)c;
  }

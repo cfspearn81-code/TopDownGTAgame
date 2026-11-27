@@ -220,7 +220,12 @@ static int night_phone_action(U tap){
   nv.phone[NP_RIVAL]=1;nv.phone[NP_HOLD]=600;tell("Rival crew interrupted the meetup. The contact returns in 10 seconds.");request_save();return 1;}
  if(j)nv.phone[NP_BAG+b->id]=np_get(NP_BAG+b->id,99)-b->qty;
  int area=np_area(loc[v].x,loc[v].y),streak=nv.phone[NP_LASTSALE]==(U)(area+1)?min(5,np_get(NP_STREAK,5)+1):1;
- nv.phone[NP_LASTSALE]=area+1;nv.phone[NP_STREAK]=streak;if(j)night_phone_heat_add(loc[v].x,loc[v].y,5+b->id%3*5+streak*2);
+ nv.phone[NP_LASTSALE]=area+1;nv.phone[NP_STREAK]=streak;
+ if(j){
+  int x=loc[v].x,y=loc[v].y,delta=5+b->id%3*5+streak*2;
+  if(!(b->id%3))delta=night_gear_witness_delta(x,y,delta);
+  night_phone_heat_add(x,y,delta);
+ }
  nv.phone[NP_JOB]=nv.phone[NP_SAMPLE]=nv.phone[NP_HOLD]=nv.phone[NP_RIVAL]=nv.phone[NP_PATROL]=0;nv.phone[NP_DONE]=min(1000000,np_get(NP_DONE,1000000)+1);
  nv.phone[NP_REP]=min(999,np_get(NP_REP,999)+1+b->id%3);np_clear_ours(v);
  gain(!j,b->pay,j?"Night Wire / Matching lot delivered.":"Signal / Proof delivered.");request_save();return 1;
@@ -249,7 +254,7 @@ static void np_label(NPLine*r,const char*name,const char*small,const char*detail
 #include "signal_receipts.inc"
 /* Receipts remains on its own M shortcut and does not change the seven-app ring. */
 static int np_rows(void){
- static const int counts[]={4,4,NP_WIRE_ROWS,10,9,6,4};
+ static const int counts[]={4,4,NP_WIRE_ROWS,10,9,6,5};
  return np_app==NP_RECEIPTS?RRC_ROWS:counts[cl(np_app,0,NP_NAPP-1)];
 }
 static const char *const np_meet_name[]={"Switchyard Social","Bluff Lights","Wharf After Dark"};
@@ -330,8 +335,9 @@ static void np_line(NPLine *l,int r){
   if(!r)np_label(l,"Phone key",np_get(NP_BIND,1)?"F7":"P","Select to switch between P and F7. The preferred binding is saved for this career.");
   else if(r==1)np_label(l,"Device / Signal 09","OFFLINE","Local save-slot data only. No online accounts. External music always opens separately.");
   else if(r==2){np_label(l,"Buy burner SIM token","$85 GAME CASH","This is an offline fictional inventory item, not a real SIM card or service.");}
-  else{np_label(l,"Activate burner SIM","","Spends one fictional token, rotates the Signal alias and subtracts 15 district attention. Does not clear an active patrol.");
+  else if(r==3){np_label(l,"Activate burner SIM","","Spends one fictional token, rotates the Signal alias and subtracts 15 district attention. Does not clear an active patrol.");
    q=number(l->suffix,np_get(NP_SIM,3));q=append(q," HELD");if(np_get(NP_SIM_COOL,3600)){q=append(q," / ");q=number(q,(np_get(NP_SIM_COOL,3600)+59)/60);append(q,"s");}}
+  else np_label(l,"Shade Supply","PIN SHOP","Pin the signed west porch of Saltmarsh Cinema in Glass Mile. Fictional gear and wearable cosmetics.");
 
  }
 }
@@ -380,7 +386,8 @@ static void np_apply(void){int r=np_row,j=np_job();
  if(np_app==NP_RADIO){if(r<5){nv.phone[NP_STATION]=r;np_msg(r?"Station selected.":"Radio switched off.");request_save();}else if(!np_confirm){np_confirm=1;np_msg("Open official YouTube Music in your default browser? Press Enter again. No in-game streaming.");}
   else{np_confirm=0;np_link_pending=1;np_msg("Requesting your default browser.");}return;}
  if(np_app==NP_PREF){if(!r){nv.phone[NP_BIND]=!np_get(NP_BIND,1);np_msg(nv.phone[NP_BIND]?"F7 now opens and closes Signal.":"P now opens and closes Signal.");request_save();}
-  else if(r==2)np_sim_buy();else if(r==3)np_sim_activate();}
+  else if(r==2)np_sim_buy();else if(r==3)np_sim_activate();
+  else if(r==4){night_gear_pin();np_msg("Shade Supply pinned. Press Enter at the signed west porch.");}}
 
 }
 static void night_phone_open(void){

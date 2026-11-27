@@ -58,12 +58,12 @@ static InteriorProp wi_f[12];
 static U wi_back[W*H],wi_seed;
 static const char *const wi_brand[]={"SALTMARSH","BLUE HOUR","LOW TIDE","HARBOURLIGHT","NINTH ST.","MARINER","BLUEBIRD","COPPER","WEST WIND","TERN","BELL LANE","GREYCAP"};
 static U wi_hash(U n){n=(n^(n>>16))*0x7feb352du;n=(n^(n>>15))*0x846ca68bu;return n^(n>>16);}
-static int wi_index(int b){return (b*7+4)%LEN(wiRoles);}
+static int wi_index(int b){const OcDoor*d=oc_entry(b);return d?d->room->role:(b*7+4)%LEN(wiRoles);}
 static const char*storefront_sign(int i){return wiRoles[wi_index(i)].noun;}
 static int tram_hall(int b){return b!=ncFrontId&&wiRoles[wi_index(b)].plan[0].t==WI_TIMETABLE;}
 static int tram_destination(int b){
- for(int offset=1;offset<nb;offset++){
-  int stop=(b+offset)%nb;
+ for(int offset=1;offset<ocLegacyCount;offset++){
+  int stop=(b+offset)%ocLegacyCount;
   if(ordinaryDoorY[stop]&&tram_hall(stop))return stop;
  }
  return -1;
@@ -71,7 +71,7 @@ static int tram_destination(int b){
 static int contract_room(int kind,int x,int y,int exclude){
  int role=kind==JOB_VAULT?WI_PARCELS:WI_RADIO;
  int best=-1;float distance=ROOM*ROOM*2.f;
- for(int i=0;i<nb;i++){
+ for(int i=0;i<ocLegacyCount;i++){
   if(i==exclude||i==ncFrontId||!ordinaryDoorY[i]||wiRoles[wi_index(i)].plan[0].t!=role)continue;
   float d=d2(x-ordinaryDoorX[i],y-ordinaryDoorY[i]);
   if(d<distance){best=i;distance=d;}
@@ -80,6 +80,7 @@ static int contract_room(int kind,int x,int y,int exclude){
 }
 static const char*walkin_name(int b){
  if(b<0||b>=nb)return "STREET DOOR";
+ const OcDoor*d=oc_entry(b);if(d)return d->room->name;
  if(b==ncFrontId)return "THE AFTERIMAGE STRIP CLUB";
  if(b==NIGHT_CLUB_LEGACY)return "SHADOW STAGE PLAYHOUSE";
  if(!wi_names[b][0]){char*q=append(wi_names[b],wi_brand[(b/LEN(wiRoles)+wi_index(b)*3)%LEN(wi_brand)]);q=append(q," ");append(q,wiRoles[wi_index(b)].noun);}

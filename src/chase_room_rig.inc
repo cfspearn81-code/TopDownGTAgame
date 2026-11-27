@@ -64,7 +64,7 @@ static void ch_room_step(void){
  if(!ch_mode_active()){roomRig.key=0;return;}
  /* Guide and Signal are presented over/from existing rooms. Don't replay
     the doorway reveal or move the room behind one of those static screens. */
- if(scene==2||scene==NIGHT_PHONE_SCENE)return;
+ if(scene==2||scene==NIGHT_PHONE_SCENE||(scene==NIGHT_CLUB_SCENE&&menu==PAUSE_MENU))return;
  RoomMount m=ch_room_mount(scene);
  if(!m.key){roomRig.key=0;return;}
  float dx=m.x-roomRig.px,dy=m.y-roomRig.py;

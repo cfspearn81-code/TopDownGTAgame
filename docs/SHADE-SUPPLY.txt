@@ -1,0 +1,27 @@
+SHADE SUPPLY / SALTMARSH WEST PORCH
+=================================
+Visit the marked west side of Saltmarsh Cinema in Glass Mile.
+Use the aqua gear diamond in M/F8 or Signal > Settings >
+Shade Supply for a GPS pin. Stand on foot by the side sign and
+press Enter. The primary cinema door still uses E as before.
+The shop is unavailable during active city jobs or pursuits.
+
+Jules offers three permanent purchases, charged in clean credits:
+  $90  Ski mask. A visible wearable. It can absorb one eligible
+       small opening Witness ping on the fictional district meter.
+       A charge returns after 60 active seconds. It cannot clear
+       any active pursuit, suppress a shot or collision, or affect
+       serious events. Unfitting/refitting does not restore charge.
+ $120  Pulse Hush Module. A purely fictional filter for the Pulse
+       tool's visual signal afterglow. The trace is 46% of its usual
+       lifetime when fitted. Damage, range, fire timing, ammo,
+       alerts and police Heat do not change.
+  $38  Trail Lamp. Draws a small navigation ring at your feet in
+       overhead outdoor view. It never changes an encounter.
+
+Use the arrows to browse, E or Enter twice to purchase and fit,
+or once afterward to fit/remove owned gear. Escape exits. F5 saves.
+Signal opens and returns to the same shop. Prices, fitted state
+and the mask charge are durable. Equipment uses formerly unused
+bits of the 1,044-byte Rev11 extension; no change to previous
+slot lengths or Pulse ownership. Existing saves begin with no gear.

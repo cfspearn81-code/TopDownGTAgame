@@ -114,7 +114,7 @@ static const Place originalLoc[]={
 {1280,512,"VANTA POLICE HQ","Desk Officer","Headquarters and patrol dispatch.",0x8aabff,15}
 };
 static Place loc[LEN(originalLoc)];
-static const char* district(int x,int y){if(x>=BASE_ROOM-36||y>=BASE_ROOM-36){if(y>BASE_ROOM-36&&x<1106+(int)(55*sn(y*.010f)))return "GREYREED WOOD";return y<820?"GLASS BLUFF":y<1130?"FREIGHT PARKWAY":y<1570?"BELT WORKSHOPS":x>=2180?"HARBOR PIER":"SALT REACH";}if(y<545)return "GLASS MILE";if(y>1160)return x<900?"LANTERN WARD":"BREAKWATER";return x<850?"TIDE MARKET":x<1400?"NIGHTGLASS":"EAST FREIGHT";}
+static const char* district(int x,int y){if(x>=BASE_ROOM-36||y>=BASE_ROOM-36){if(y>BASE_ROOM-36&&x<1106+(int)(55*sn(y*.010f)))return "GREYREED WOOD";return y<336&&x>2012?"NORTHPOINT":y<820?"GLASS BLUFF":y<1130?"FREIGHT PARKWAY":y<1570?"BELT WORKSHOPS":x>=2180?"HARBOR PIER":"SALT REACH";}if(y<545)return "GLASS MILE";if(y>1160)return x<900?"LANTERN WARD":"BREAKWATER";return x<850?"TIDE MARKET":x<1400?"NIGHTGLASS":"EAST FREIGHT";}
 static const char*venue_address(int b){return b==ncFrontId?"BASE VILLAGE":district(ordinaryDoorX[b],ordinaryDoorY[b]);}
 /* Forward caps use each model's former 10/100-condition speed at full
  * health. Keep throttle response and low-speed control unchanged. */
@@ -157,6 +157,7 @@ static Particle fx[100];static int fn;
 typedef struct{int own,crew,tier,product,durationMs,batches;float timer;} Business;
 typedef struct{int owned;float elapsed,cooldown;int pending;} LegalBusiness;
 #include "character.inc"
+#include "wardrobe_catalog.inc"
 typedef struct{U magic,rev;int cash,hp,armor,gear,units,owned,selection,legal,crime,sales,arrests,vehicleCond,home;float x,y;Business b[2];int stocks[3],dirty,pending,audit,charges,restitution,legacyRivalCooldown,protect;float clearT,auditT;U intro;int carCond[5];U taxiFares;LegalBusiness legit[3];float dayClock;U playedTicks;Look look;unsigned char legacyClock,medPatches;char name[20];int bank,dirtySpent,sweepTicks;U hash;} Save;
 enum{SAVE_REV=10,SAVE_REV_PATCHES=11,MAX_MED_PATCHES=99,DAY_SECONDS=24*60,LEGACY_DAY_SECONDS=8*60,
  SAVE_COUNTER_LIMIT=1000000000,REVENUE_DIRTY_LIMIT=500,REVENUE_SWEEP_TICKS=5*60*60,WALLET_LIMIT=2147483647, SAVE_STOCK_LIMIT=500000000};
@@ -181,11 +182,22 @@ static int street_next_car(int i){
 typedef struct { U club[32],garage[64],phone[64],world[24]; } NightSave;
 typedef struct { Save base; NightSave night; U hash; } Save11;
 enum { NIGHT_SAVE_REV=11, NIGHT_CLUB_SCENE=7, NIGHT_GARAGE_SCENE=8, NIGHT_PHONE_SCENE=9,
-       NIGHT_VENUES_SCENE=10,NIGHT_TRAP_SCENE=11,NIGHT_FOREST_SCENE=12 };
+       NIGHT_VENUES_SCENE=10,NIGHT_TRAP_SCENE=11,NIGHT_FOREST_SCENE=12,
+       OPEN_CITY_GEAR_SCENE=13 };
+/* Append-only bit ranges, not new save words. Low deed and Pulse bits are
+ * still exclusively owned by the existing venue modules. */
+enum { OC_GEAR_WORD=4, OC_GEAR_SHIFT=8 };
+_Static_assert(CW_WORD==1&&CW_SHIFT==2,"Wardrobe bit-range ownership changed");
+enum { OC_GEAR_X=570,OC_GEAR_Y=468 };
 enum {NT_DOOR_X=174,NT_DOOR_Y=944};
 enum { NIGHT_CLEAR, NIGHT_FOG, NIGHT_RAIN };
 _Static_assert(sizeof(NightSave)==736 && sizeof(Save11)==1044 && __builtin_offsetof(Save11,night.world[6])==968,"Unexpected Night District save layout");
 static NightSave nv;
+static U ward_live(void){return ward_valid((nv.world[CW_WORD]>>CW_SHIFT)&CW_VALUE_MASK);}
+static void ward_store(U bits){nv.world[CW_WORD]=(nv.world[CW_WORD]&~CW_SAVE_MASK)|(ward_valid(bits)<<CW_SHIFT);}
+static U wardPreview;
+static void ward_open(void);
+static int night_gear_mask(void);
 #include "vehicle_condition.inc"
 static U night_hash(const void *bytes,unsigned n){
  const unsigned char *p=bytes;U h=2166136261u;
@@ -219,9 +231,14 @@ static void night_phone_link_result(int),night_phone_road_paint(void),night_phon
 static int night_club_queue(void),night_club_signature_demand(int),night_club_listing(void);
 static void night_club_queue_paint(int,int,int);
 static int night_trap_owned(void),night_trap_entry(U);
+static int night_gear_enter(U),night_gear_mask(void),night_gear_hush(void),night_gear_lamp(void),night_gear_witness_delta(int,int,int);
+static void night_gear_reset(void),night_gear_tick(U,U),night_gear_paint(void),night_gear_world(float),night_gear_hint(void);
+static void night_gear_sign_world(void),night_gear_sign_chase(void),night_gear_lamp_world(void),night_gear_pin(void);
+static float night_gear_trail(float);
 static int npc_gate_street_use(void);
 static int harbor_boats_tick(U,U,float),harbor_boat_active(void),harbor_boat_save_point(float*,float*),harbor_boat_nav_clear(float,float);
 static void harbor_boats_world(float),harbor_boats_paint(void),harbor_boats_hint(void),harbor_boats_reset(void);
+static int harbor_boat_clear(float,float,float);
 static int harbor_jobs_use(U),harbor_jobs_route(int*,int*),harbor_jobs_panel_active(void);
 static void harbor_jobs_card(int,char*,char*,char*),harbor_jobs_phone(int);
 static void harbor_jobs_tick(float),harbor_jobs_world_paint(void),harbor_jobs_hint(void),harbor_jobs_panel_tick(U,U),harbor_jobs_reset(void);
@@ -398,10 +415,12 @@ static void draw_wallet(int x,int y,int w){
 static int spend(int x){if(sv.cash<x){tell("Not enough credits.");return 0;}sv.cash-=x;rr_checkout(x,x,0);return 1;}
 static void ground(int x,int y,int w,int h,U c){for(int j=max(0,y);j<min(ROOM,y+h);j++)for(int i=max(0,x);i<min(ROOM,x+w);i++)city[j*ROOM+i]=c;}
 static StreetBounds building_bounds(const Building*b){
+ if(b->x>=BASE_ROOM-36||b->y>=BASE_ROOM-36)return (StreetBounds){b->x,b->y,b->w,b->h};
  int blockX=b->x/256*256,blockY=b->y/256*256;
  int x=b->x,y=max(blockY+42,b->y-b->ht);
  return (StreetBounds){x,y,min(blockX+214,x+b->w+b->ht/2+1)-x,b->y+b->h+1-y};
 }
+static int oc_plot_reserved(int,int);
 #include "outer_city.inc"
 static void street_lamp_reset(void);
 static int street_lamp_foot(float,float,float);
@@ -423,7 +442,7 @@ static int open_space(float x,float y){return !solid(x,y,10);}
 static void particle(float x,float y,int n,U c){while(n--){Particle*q=fx+(fn++%LEN(fx));q->x=x;q->y=y;q->vx=(int)(rnd()%151)-75;q->vy=(int)(rnd()%151)-75;q->t=.2f+(rnd()%36)*.01f;q->c=c;}}
 static void setupCity(void){
  street_lamp_reset();
- rng=0x873f24c7u;nb=0;z(lot,sizeof lot);cp(loc,originalLoc,sizeof loc);for(int y=0;y<BASE_ROOM;y++)for(int x=0;x<BASE_ROOM;x++){int xx=x%256,yy=y%256,n=(int)(rnd()%12);U c;if(xx<29||xx>=227||yy<29||yy>=227){c=RGB(24+n,34+n,43+n);if((xx==0&&yy>40&&yy<219&&yy%35<17)||(yy==0&&xx>40&&xx<219&&xx%35<17))c=0x90845a;}else if(xx<42||xx>214||yy<42||yy>214)c=RGB(48+n,55+n,60+n);else c=RGB(32+n,44+n,47+n);if(x>1390&&y>1110)c=mix(c,0x264044,2);else if(y<550)c=mix(c,0x4a4258,2);else if(x<850)c=mix(c,0x54433e,2);if(x<25||y<25||x>BASE_ROOM-26||y>BASE_ROOM-26)c=RGB(11+n/2,31+n,40+n);city[y*ROOM+x]=c;}
+ rng=0x873f24c7u;nb=0;z(lot,sizeof lot);cp(loc,originalLoc,sizeof loc);for(int y=0;y<BASE_ROOM;y++)for(int x=0;x<BASE_ROOM;x++){int xx=x%256,yy=y%256,n=(int)(rnd()%12);U c;if(xx<31||xx>=225||yy<31||yy>=225){c=RGB(24+n,34+n,43+n);if((xx==0&&yy>40&&yy<219&&yy%35<17)||(yy==0&&xx>40&&xx<219&&xx%35<17))c=0x90845a;}else if(xx<42||xx>214||yy<42||yy>214)c=RGB(48+n,55+n,60+n);else c=RGB(32+n,44+n,47+n);if(x>1390&&y>1110)c=mix(c,0x264044,2);else if(y<550)c=mix(c,0x4a4258,2);else if(x<850)c=mix(c,0x54433e,2);if(x<25||y<25||x>BASE_ROOM-26||y>BASE_ROOM-26)c=RGB(11+n/2,31+n,40+n);city[y*ROOM+x]=c;}
  for(int iy=0;iy<8;iy++)for(int ix=0;ix<8;ix++){
   int tx=ix*256,ty=iy*256,kind=(int)(rnd()%8);
   if(kind==0||kind==2){ground(tx+47,ty+47,161,161,0x273b35);for(int j=0;j<22;j++){int px=tx+52+rnd()%149,py=ty+52+rnd()%149;ground(px,py,5,5,(j%2)?0x3e5848:0x344d3c);}ground(tx+48,ty+123,162,7,0x566260);ground(tx+123,ty+48,7,160,0x566260);continue;}
@@ -550,8 +569,18 @@ static void restore_outer_position(void){
  nv.world[NW_SAVE_X]&=0x7fffffffu;
  if(!nv.world[NW_SAVE_X]&&!nv.world[NW_SAVE_Y])return;
  float x=(float)nv.world[NW_SAVE_X]/NW_SAVE_SCALE,y=(float)nv.world[NW_SAVE_Y]/NW_SAVE_SCALE;
- if(outer_is_new(x,y)&&outer_walkable(x,y,3)){sv.x=x;sv.y=y;}
- else nv.world[NW_SAVE_X]=nv.world[NW_SAVE_Y]=0;
+ if(outer_is_new(x,y)&&outer_walkable(x,y,3)){sv.x=x;sv.y=y;return;}
+ if(outer_is_new(x,y)&&x>=35&&y>=35&&x<=ROOM-36&&y<=ROOM-36){
+  /* A former empty lot or adjusted coast may now be occupied. Keep a
+     legal predecessor career near that place when dry ground is nearby. */
+  for(int r=4;r<=144;r+=4)for(int k=0;k<16;k++){
+   float a=k*.3926991f,px=x+cs(a)*r,py=y+sn(a)*r;
+   if(outer_is_new(px,py)&&outer_walkable(px,py,10)){
+    sv.x=px;sv.y=py;save_outer_position_at(px,py);return;
+   }
+  }
+ }
+ nv.world[NW_SAVE_X]=nv.world[NW_SAVE_Y]=0;
 }
 /* Old Afterhours builds can still read the compatible 304-byte prefix
  * with a safe original-city location; only the new build sees outer terrain. */
@@ -592,6 +621,18 @@ void load_save(void){
 #endif
  starter_save();
 }
+#ifndef DC_TEST
+/* One serializer for existing career autosaves and new extended careers. */
+static void build_save11(Save11*blob){
+ if(sv.medPatches)nv.garage[HYBRID_SAVE_MARK]|=0x80000000u;
+ cp(&blob->base,&sv,sizeof sv);cp(&blob->night,&nv,sizeof nv);
+ blob->base.rev=NIGHT_SAVE_REV;
+ if(outer_is_new(blob->base.x,blob->base.y))outer_safe_anchor(&blob->base);
+ blob->night.world[NW_SAVE_X]|=0x80000000u;
+ blob->base.hash=night_hash(&blob->base,sizeof(Save)-4);
+ blob->hash=night_hash(blob,sizeof *blob-4);
+}
+#endif
 void request_save(void){
  if(scene==0||scene==5||p.dead)return;
  float x=p.x,y=p.y;
@@ -603,12 +644,7 @@ void request_save(void){
  int changed=0;const unsigned char *p=(const unsigned char*)&nv;
  for(unsigned i=0;i<sizeof nv;i++)if(p[i]){changed=1;break;}
  if(changed){
-  if(sv.medPatches)nv.garage[HYBRID_SAVE_MARK]|=0x80000000u;
-  Save11 blob;cp(&blob.base,&sv,sizeof sv);cp(&blob.night,&nv,sizeof nv);
-  blob.base.rev=NIGHT_SAVE_REV;if(outer_is_new(blob.base.x,blob.base.y))outer_safe_anchor(&blob.base);
-  blob.night.world[NW_SAVE_X]|=0x80000000u;
-  blob.base.hash=night_hash(&blob.base,sizeof(Save)-4);
-  blob.hash=night_hash(&blob,sizeof blob-4);
+  Save11 blob;build_save11(&blob);
 #ifdef DC_LINUX_NATIVE
   if(!linux_disk_backup_upgrade(sv.medPatches)){saveFlash=-200;return;}
 #endif
@@ -626,7 +662,7 @@ static void profiles_paint(void);
 static int stoppingToExit;
 static void district_notice_reset(void),district_notice_tick(float);
 static void spawnPlayer(void){
- woodline_wild_reset();harbor_boats_reset();harbor_jobs_reset();
+ woodline_wild_reset();harbor_boats_reset();harbor_jobs_reset();night_gear_reset();
  npc_reset();pulse_guard_reset();ncr_reset();
  wheelFists=wheelOpen=wheelFeedback=0;wheelSuppressed=0;
  stoppingToExit=0;lampBumpRide=-1;
@@ -1188,13 +1224,15 @@ static void makeMenu(void){
  if(job.kind>=0)add("ABANDON CURRENT CONTRACT","No payout. Free roam continues.",92);
  add("SAVE MENU","Switch careers or create a new character.",95);
  add("SHOW CONTROLS","Movement, action and menu keys.",93);
- add("CITY LISTINGS  /  F6","Free-roam activities and neighborhood stories.",96);break;
+ add("CITY LISTINGS  /  F6","Free-roam activities and neighborhood stories.",96);
+ add("WARDROBE / EDIT APPEARANCE","Restyle this career without changing your name, money or progress.",CW_PAUSE_OPTION);break;
  }
  if(npc_front_option())add("PERSONAL INTERACTION","Say hello, stay quiet, or draw your owned pistol.",N_ACT_OPEN);
  if(menu!=PAUSE_MENU&&legal_menu_index(menu)<0&&legal_rear_index(menu)<0)add("BACK","Close this menu.",90);
  sel=cl(sel,0,max(0,nopt-1));
 }
 static void doOpt(int a){
+ if(a==CW_PAUSE_OPTION){ward_open();return;}
  if(a==N_ACT_OPEN){if(npc_open_context())menu=-1;return;}
  if(a==184){night_garage_open(-1);return;}
  if(a==CAB_RANK_ACTION){cab_rank_counter();return;}
@@ -1308,7 +1346,7 @@ static void shoot(void){
  int range=sv.gear>0?165:112,damage=sv.gear>0?2:1,hit=-1;
  float cooldown=sv.gear>0?.21f:.33f;U beam=GOLD;
  if(!night_venue_apply_pulse(&range,&damage,&cooldown,&beam))return;
- trailInk=beam;p.shot=cooldown;p.trail=.11f;heat(24);
+ trailInk=beam;p.shot=cooldown;p.trail=night_gear_trail(.11f);heat(24);
  firedPulse=g;firedX=p.x;firedY=p.y;firedA=p.a;
  trailX=g.mx;trailY=g.my;particle(trailX,trailY,5,beam);
  float best=range,co=g.co,si=g.si;
@@ -1396,10 +1434,10 @@ static void tick_world(U keys){
  if(!(keys&USE)||scene!=1||menu>=0||mapOn||p.dead||p.car<0)stoppingToExit=0;
  // Keep fractional frame precision during long sessions.
  anim+=dt;if(anim>=3600.f)anim-=3600.f;
- if(scene==0||scene==5){profiles_tick(tap);return;}
+ if(scene==0||scene==5||scene==OPEN_CITY_WARDROBE_SCENE){profiles_tick(tap);return;}
  if(scene==NIGHT_PHONE_SCENE){if(tap&SAVE)request_save();night_phone_tick(keys,tap);return;}
  if(!harbor_boat_active()&&(vd_input(tap)||taxi_radio_input(tap)))return;
- if(!p.dead&&menu<0&&!mapOn&&(scene==1||scene==3||scene==4||scene==NIGHT_CLUB_SCENE||scene==NIGHT_GARAGE_SCENE||scene==NIGHT_VENUES_SCENE||scene==NIGHT_TRAP_SCENE||scene==NIGHT_FOREST_SCENE)
+ if(!p.dead&&menu<0&&!mapOn&&(scene==1||scene==3||scene==4||scene==NIGHT_CLUB_SCENE||scene==NIGHT_GARAGE_SCENE||scene==NIGHT_VENUES_SCENE||scene==NIGHT_TRAP_SCENE||scene==NIGHT_FOREST_SCENE||scene==OPEN_CITY_GEAR_SCENE)
     &&night_phone_toggle(tap)){night_phone_open();return;}
  if(!p.dead&&(tap&(SLOT|NEW_SLOT))){profiles_open(!!(tap&NEW_SLOT));return;}
  if(saveFlash>0)saveFlash--;if(saveFlash<0)saveFlash++;
@@ -1408,7 +1446,7 @@ static void tick_world(U keys){
    production_tick(dt);
    npc_room_conditions_tick(dt);
    revenue_tick();
-   night_world_tick(dt);night_phone_world_tick(dt);night_trap_world_tick(dt);woodline_world_tick(dt);night_club_business_tick();night_venues_world_tick();ng_schedule_tick();outer_life_tick(dt);
+   night_world_tick(dt);night_phone_world_tick(dt);night_trap_world_tick(dt);woodline_world_tick(dt);night_gear_world(dt);night_club_business_tick();night_venues_world_tick();ng_schedule_tick();outer_life_tick(dt);
  }
  if(tap&SAVE)request_save();
  if((tap&CAMERA)&&ch_world_input_allowed()){
@@ -1424,11 +1462,12 @@ static void tick_world(U keys){
  if(scene==NIGHT_VENUES_SCENE){night_venues_tick(keys,tap);return;}
  if(scene==NIGHT_TRAP_SCENE){night_trap_tick(keys,tap);return;}
  if(scene==NIGHT_FOREST_SCENE){woodline_tick(keys,tap);return;}
+ if(scene==OPEN_CITY_GEAR_SCENE){night_gear_tick(keys,tap);return;}
  /* Normal E keeps the original service/job precedence. Shift+E is
     explicit conversation, including at the ranger's journal desk. */
  if(scene==1&&(tap&USE)&&(keys&BRAKE)&&menu<0&&!vdPanel&&!mapOn&&
-    p.car<0&&!p.dead&&npc_open_near())return;
- if(night_trap_entry(tap)||woodline_entry(tap))return;
+    p.car<0&&!p.dead&&!harbor_boat_active()&&atmOpen<0&&!wheelOpen&&npc_open_near())return;
+ if(night_trap_entry(tap)||woodline_entry(tap)||night_gear_enter(tap))return;
  if(night_club_entry(tap))return;
  if((scene==3||scene==4)&&night_venues_entry(tap))return;
  if(scene==3){if(menu<0)night_venue_reload(tap);interior_tick(keys,tap);return;}
@@ -1603,7 +1642,7 @@ void pointer_input(int sx,int sy,U clicks){
  if((U)sx>=W||(U)sy>=H){sx=sy=-1;clicks=0;}
  wheelX=sx;wheelY=sy;
  if(wheelOpen)return;
- if(scene==0||scene==5){profiles_pointer(sx,sy,clicks);return;}
+ if(scene==0||scene==5||scene==OPEN_CITY_WARDROBE_SCENE){profiles_pointer(sx,sy,clicks);return;}
  if(scene==NIGHT_CLUB_SCENE){night_club_pointer(sx,sy,clicks);return;}
  if(scene==NIGHT_PHONE_SCENE){night_phone_pointer(sx,sy,clicks);return;}
  if(scene==1&&mapOn&&!p.dead)navigation_pointer(sx,sy,clicks);
@@ -1646,6 +1685,7 @@ typedef struct {Pt muzzle,slide,grip,support;float co,si;int hand;} PulseSprite;
 static float modelExtraPunch;
 #include "model_person.inc"
 #include "pulse_sprite.inc"
+#include "wardrobe_sprite.inc"
 static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,const Look*look,const PulseSprite*gun){
  float co=cs(a),si=sn(a);int hero=style==MODEL_PLAYER,top=0,legs=0,wide=0,face=0,hs=-1;U ink=0x111a27;
  static const U skins[]={0xdeb291,0xa16352,0x805248,0xe3c3a7,0xbd8571};
@@ -1666,6 +1706,8 @@ static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,
    pants=fabric[hue%LEN(fabric)];
   }
  }
+ U styleBits=look?(previewRig?wardPreview:look==&sv.look?ward_live():0):0;
+ int liveWrap=look==&sv.look&&!previewRig&&night_gear_mask();
  U seam=mix(jacket,ink,4),rim=mix(jacket,PAPER,3);
  if(previewRig)rect(x-6,y+2,13,2,0x151d27);
  else if(!streetPersonNoShadow)for(int dy=-3;dy<=3;dy++){
@@ -1701,6 +1743,7 @@ static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,
   disc(hand.x,hand.y,1,skin);
  }
  }
+ if(styleBits)ward_body_2d(x,y,co,si,step,styleBits,jacket,pants,shoe,skin,w);
  /* Facing away, the shoulder grip can tuck behind the silhouette
     but must never overwrite hair and face. The muzzle geometry stays
     off to the side so its cap and flash remain readable. */
@@ -1745,6 +1788,7 @@ static void figure_held(int x,int y,U jacket,int step,float a,int style,int hue,
   }
   if(face==6){dot(hx-3,hy+1,0xffdc8e);dot(hx+3,hy+1,0xffdc8e);}
  }
+ if(styleBits||liveWrap)ward_head_2d(hx,hy,co,si,styleBits,skin,hair,liveWrap);
  if(gun&&!gunBehind)pulse_pistol_paint(gun);
  if(hero&&!gun){
     /* Keep the direction arrow at the existing world size and offset.
@@ -1858,6 +1902,7 @@ static void paint_ordinary_door(int i){
  rect(x-9,end+1,19,3,glow);
  rect(x-4,end+5,9,10,0x556168);rect(x-4,end+11,9,2,0x7b8281);
 }
+#include "open_city_addresses.inc"
 static void bake_scenery_legacy_city(void){
  surface=city;rw=rh=ROOM;clipLeft=clipTop=0;clipRight=clipBottom=ROOM;
  for(int gy=0;gy<8;gy++)for(int gx=0;gx<8;gx++){
@@ -1893,6 +1938,7 @@ static void bake_scenery_legacy_city(void){
 }
 static void bake_scenery_outer_paint(void){
  outer_bake_art();
+ oc_paint_city();
  for(int i=0;i<LEN(outerNodes);i++){
   StreetLamp fixture;if(street_lamp_outer(i,&fixture))street_lamp_bake(&fixture);
  }
@@ -1910,6 +1956,7 @@ static void bake_scenery(void){
  city=chaseFloor;surface=city;bakeFloorOnly=1;bake_scenery_legacy_city();
  city=cityAtlas;surface=city;bakeFloorOnly=0;bake_scenery_legacy_city();
  outer_bake();
+ oc_extend_city();
  street_lamp_place_outside();street_lamp_index();
  for(int y=0;y<ROOM;y++)for(int x=y<BASE_ROOM?BASE_ROOM:0;x<ROOM;x+=4)
   *(Strip*)(chaseFloor+y*ROOM+x)=*(const Strip*)(cityAtlas+y*ROOM+x);
@@ -2068,8 +2115,9 @@ static void field_guide(void){
  rect(92,395,775,1,0x39545e);
  textat(92,401,"TEAL",TEAL,0);textat(151,401,"Legal work",PAPER,0);
  textat(314,401,"PINK",PINK,0);textat(373,401,"Street contracts",PAPER,0);
- textat(92,429,"Cases: pay Revenue or finish three courier or recovery shifts.",MUTED,0);
- textat(92,463,"ENTER / ESC   RETURN",TEAL,0);
+ textat(92,423,"OPEN CITY: Find doors and Shade Supply on the atlas. Pause opens Wardrobe.",MUTED,0);
+ textat(92,444,"Cases: pay Revenue or finish three courier or recovery shifts.",MUTED,0);
+ textat(92,473,"ENTER / ESC   RETURN",TEAL,0);
 }
 #include "interiors.inc"
 #include "streetside_interiors.inc"
@@ -2207,6 +2255,7 @@ static void paint_world(int view){
  if(view==NIGHT_VENUES_SCENE){night_venues_paint();return;}
  if(view==NIGHT_TRAP_SCENE){night_trap_paint();return;}
  if(view==NIGHT_FOREST_SCENE){woodline_paint();return;}
+ if(view==OPEN_CITY_GEAR_SCENE){night_gear_paint();return;}
  if(mapOn){minimap();return;}
  cx=camera_left();cy=camera_top();
  int introVenue=job.kind<0&&vdActive<0&&!ncr_active()?nav_intro_venue():-1;
@@ -2215,7 +2264,7 @@ static void paint_world(int view){
  for(int y=0;y<H;y++){const V4 *q=(const V4*)(city+(cy+y)*ROOM+cx);V4 *r=(V4*)(pixels+y*W);for(int x=0;x<W/4;x++)r[x]=q[x];}
  roadFX_paint(cx,cy);
  night_world_street_fx();harbor_paint_world();
- night_phone_road_paint();night_trap_street_paint();woodline_street_paint();
+ night_phone_road_paint();night_trap_street_paint();woodline_street_paint();night_gear_sign_world();night_gear_lamp_world();
  cab_marquee_paint();
  headlamps_overhead();
  draw_street_actors();outer_life_paint();street_extra_down_paint();night_city_actors();
@@ -2309,7 +2358,7 @@ static void paint_world(int view){
   if(px>=34&&px<=W-34&&py>=97&&py<=H-70&&!(px>=750&&py>=333))diamond(px,py,10,0xff9adb);
   else {int ax=cl(px,31,W-32),ay=cl(py,148,H-72);if(ax>=750&&ay>=333)ax=730;mark(ax,ay,8,0xff9adb);}
  }
- hud();night_world_hud();minimap();ng_gate_overlay();ch_badge();night_trap_hint();district_notice_paint();woodline_hint();woodline_wild_hint();harbor_boats_hint();harbor_jobs_hint();
+ hud();night_world_hud();minimap();ng_gate_overlay();ch_badge();night_trap_hint();district_notice_paint();woodline_hint();woodline_wild_hint();harbor_boats_hint();harbor_jobs_hint();night_gear_hint();
  if(scene==1&&menu<0&&p.car<0&&!p.dead&&job.kind<0&&vdActive<0&&!vdPanel&&atmOpen<0){
   int x,y;if(night_venue_vendor_pos(&x,&y)&&d2(p.x-x,p.y-y)<42*42){
    box(317,486,326,29,DARK,0xf6aada);center(W/2,489,"E   NIGHT SIGNAL VAN",0xf6aada,0);
@@ -2323,7 +2372,7 @@ static void paint_world(int view){
 #include "weapon_wheel.inc"
 void paint(void){
  chProjected=0;
- if(scene==0||scene==5){profiles_paint();return;}
+ if(scene==0||scene==5||scene==OPEN_CITY_WARDROBE_SCENE){profiles_paint();return;}
  if(scene==NIGHT_PHONE_SCENE){night_phone_paint();return;}
  if(scene==2){paint_world(helpBack);field_guide();return;}
  paint_world(scene);vd_draw();
@@ -2456,6 +2505,7 @@ int exit_save_ok(void){
 #include "harbor_boats.inc"
 #include "harbor_jobs.inc"
 #include "outdoor_cast.inc"
+#include "shade_gear.inc"
 #include "chase_maritime.inc"
 #include "chase_rooms.inc"
 

@@ -14,20 +14,24 @@ static int wl_swell(unsigned x,unsigned y,unsigned phase){
  int swell=15-max(a,-a);
  return max(0,swell)*2+max(0,9-max(b,-b));
 }
-static U wl_bluewater(unsigned x,unsigned y,unsigned phase,int detail){
- int tone=wl_surface_scale(wl_swell(x,y,phase),detail);
+static U wl_bluewater(int x,int y,unsigned phase,int detail){
+ /* Broad wave fronts carry across the chart; gradually leave the baked
+  * in-chart flecks behind rather than retile their coarse hash at its edge. */
+ int tone=wl_surface_scale(wl_swell((unsigned)x,(unsigned)y,phase),detail);
  return nw_blend(0x193948,0x548392,17+tone);
 }
 static U wl_ocean_edge(U ink,unsigned x,unsigned y,unsigned phase,int detail){
- /* Positive easting/southing overflow is continuation of the same sea.
-  * Ocean already fills the old map's no-land boundary all the way round. */
- if(x>=12000u||y>=12000u)return ink;
- if(x<ROOM-96u&&y<ROOM-96u)return ink;
- int edge=min(ROOM-1-(int)x,ROOM-1-(int)y);
- if(edge>=0){
-  int ix=(int)y*ROOM+(int)x;if(outerLand[ix]!=TILE_TIDE||outerLane[ix])return ink;
- }
- U water=wl_bluewater(x,y,phase,detail);
+ /* Projected coordinates were produced as signed integer floor samples.
+  * Outside the chart, extend only from a real surveyed tidal edge. This
+  * lets the north/east water continue while retaining the legacy dry
+  * block and all in-world boundaries for the hull and walking player. */
+ int sx=(int)x,sy=(int)y;
+ if(sx<=-8192||sy<=-8192||sx>=12000||sy>=12000)return ink;
+ int edge=min(min(sx,sy),min(ROOM-1-sx,ROOM-1-sy));
+ if(edge>=96)return ink;
+ int ix=cl(sx,0,ROOM-1),iy=cl(sy,0,ROOM-1),i=iy*ROOM+ix;
+ if(!outer_is_new(ix,iy)||outerLand[i]!=TILE_TIDE||outerLane[i])return ink;
+ U water=wl_bluewater(sx,sy,phase,detail);
  return edge<0?water:nw_blend(ink,water,cl(256-(edge*256/95),0,256));
 }
 static U wl_material_ink(U ink,unsigned x,unsigned y){
@@ -104,7 +108,7 @@ static void wl_build_terrain(void){
 }
 static inline U wl_terrain_sample(U ink,unsigned x,unsigned y,float depth,unsigned wave){
  if(x<ROOM&&y<ROOM)ink=chaseFloor[y*ROOM+x];
- if(x>=ROOM-96u||y>=ROOM-96u)
+ if(x<96u||y<96u||x>=ROOM-96u||y>=ROOM-96u)
   return wl_ocean_edge(ink,x,y,wave,cl((int)(271.f-depth*.26f),35,242));
  return ink;
 }

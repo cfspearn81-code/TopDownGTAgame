@@ -47,6 +47,10 @@ static int street_lamp_rect(int x,int y,int w,int h){
 static int street_lamp_clear(const StreetLamp*s){
  int x=s->x,y=s->y;
  if(!street_lamp_rect(x-3,y-3,7,7))return 0;
+ /* The outer address pass reserves walk-up space before fixtures choose
+  * an anchor. A lamp must not become the body in front of an open door. */
+ for(int i=0;i<nb;i++)if(ordinaryDoorY[i]&&outer_is_new(ordinaryDoorX[i],ordinaryDoorY[i])&&
+   d2(x-ordinaryDoorX[i],y-ordinaryDoorY[i])<20.f*20.f)return 0;
  /* Independently match the continuous road geometry with a safety
   * buffer, not just the road bitmap at this one integer point. */
  for(int i=0;i<LEN(outerRoads);i++){

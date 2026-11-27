@@ -337,25 +337,38 @@ static void nc_sun(int x,int y,int r,U c){
 static void nc_label(int x,int y,const char*s,U c){
  int w=textw(s,0);rect(x-w/2-6,y+1,w+12,18,0x201a2c);center(x,y,s,c,0);
 }
+#include "club_materials.inc"
 static void nc_speaker(int x,int y){
  box(x,y,23,45,0x252539,0x5d4960);for(int k=0;k<2;k++){
   int yy=y+12+k*20;disc(x+11,yy,9,0x141622);disc(x+11,yy,7,0x3d344c);disc(x+11,yy,4,0x292435);disc(x+10,yy-1,2,0x655166);}
  for(int i=3;i<22;i+=4)dot(x+i,y+2,0x918395);
+ for(int j=4;j<43;j+=3)for(int i=2;i<21;i+=3)if(nc_grain(i,j)%3==1)
+  dot(x+i,y+j,j%4?0x49394c:0x847585);
+ line(x+1,y+2,x+1,y+41,0x936d83);dot(x+19,y+40,0xffa884);
 }
 static void nc_sofa(int x,int y,int w,U col){
  rect(x+4,y+8,w,32,0x171521);box(x,y,w,32,mix(col,0x1f1725,3),mix(col,ncGold,2));
- for(int i=3;i<w-6;i+=26){int k=min(24,w-6-i);box(x+i,y+3,k,13,col,mix(col,ncRose,2));rect(x+i+2,y+19,k-2,9,mix(col,ncRose,1));}
+ for(int i=3;i<w-6;i+=26){
+  int k=min(24,w-6-i);box(x+i,y+3,k,13,col,mix(col,ncRose,2));
+  nc_cloth_pads(x+i+1,y+4,k-2,11,col);
+  nc_cloth_pads(x+i+2,y+19,k-3,9,mix(col,ncRose,1));
+  line(x+i+3,y+28,x+i+k-3,y+28,mix(col,ncGold,3));
+ }
  rect(x+3,y+31,w-6,3,0x9f805d);rect(x+7,y+34,3,4,0x9c7b55);rect(x+w-10,y+34,3,4,0x9c7b55);
 }
 static void nc_bottle(int x,int y,U c){
- rect(x-2,y-6,4,6,mix(c,ncIce,1));rect(x-4,y,8,10,c);rect(x-3,y+4,6,3,ncGold);rect(x-3,y+1,1,3,0xffe3cd);
+ rect(x-2,y-6,4,6,mix(c,ncIce,1));rect(x-2,y-7,4,2,mix(c,ncGold,4));
+ rect(x-4,y,8,10,c);rect(x+1,y+1,3,8,mix(c,0x1e3546,4));rect(x-3,y+4,6,3,ncGold);
+ rect(x-3,y+1,1,3,0xffe3cd);dot(x+1,y+9,mix(c,ncIce,2));
 }
 static void nc_console(int x,int y){
- box(x,y,145,44,0x252336,ncGold);rect(x+1,y+2,143,3,0x746071);
+ box(x,y,145,44,0x252336,ncGold);nc_fill(x+2,y+4,141,38,NC_M_MARBLE,0x353244);rect(x+1,y+2,143,3,0x746071);
  for(int k=0;k<2;k++){int cx=x+28+k*88;
   nc_oval(cx,y+21,20,12,0x0e131e);nc_oval(cx,y+21,15,9,0x343547);
   nc_oval(cx,y+21,9,6,0x202333);nc_oval(cx,y+21,4,3,k?ncRose:ncIce);
-  line(cx+11,y+10,cx+8,y+20,ncGold);dot(cx+8,y+20,PAPER);}
+  line(cx+11,y+10,cx+8,y+20,ncGold);dot(cx+8,y+20,PAPER);
+  line(cx-15,y+20,cx-4,y+16,0x515c73);dot(cx-10,y+16,0x9ba4b2);dot(cx-17,y+28,0x8c7484);
+ }
  for(int i=0;i<7;i++){int xx=x+54+i*5;rect(xx,y+11,2,19,0x11151c);rect(xx-1,y+14+i%4*3,4,3,i%2?ncIce:ncRose);}
 }
 static void nc_torch(int x,int y,U accent){
@@ -374,18 +387,18 @@ static void nc_mirror(int x,int y,int w,int h){
  nc_rhomb(x+w/2,y+h/2,8,11,0xdebac0);
 }
 static void nc_static_floor(int room,int level){
- U top=room==NC_FLOOR?0x2c2034:room==NC_SUITE?0x39232f:0x23323a;
- U bottom=room==NC_FLOOR?0x110f20:room==NC_SUITE?0x1e1725:0x171d29;
- for(int y=0;y<H;y++)rect(0,y,W,1,mix(top,bottom,cl((y-20)/52,0,8)));
- /* A stepped proscenium frames a cutaway rather than a second floating menu. */
- for(int i=0;i<6;i++){int k=i*4;box(50+k,86+k,860-k*2,365-k,0x201d2b,i%2?0x665064:0x2e2738);}
- box(76,113,808,326,top,0x9a7a76);
- for(int y=115;y<438;y++){
-  int ratio=(y-115)*64/323;U base=mix(top,bottom,ratio/8);
-  for(int x=77;x<883;x++){U grain=wi_hash((U)(x*937+y*5881));U v=base+((grain>>30)&1u)*0x020202;
-   if(y>174&&room!=NC_FLOOR&&((x/32+y/16)&1))v+=0x020202;
-   surface[y*rw+x]=v;}
+ nc_build_materials(room);
+ for(int y=0;y<H;y++)for(int x=0;x<W;x++){
+  U ink=ncGround[y*W+x];
+  if(y<112)ink=nw_blend(0x292236,0x171724,cl((y-74)*6,0,210));
+  surface[y*rw+x]=ink;
  }
+ for(int i=0;i<4;i++){
+  int k=i*5;U rim=i==0?0x57506a:i==3?0xa38387:0x3a304c;
+  line(52+k,95+k,909-k,95+k,rim);line(52+k,444-k,909-k,444-k,rim);
+  line(52+k,95+k,52+k,444-k,rim);line(909-k,95+k,909-k,444-k,rim);
+ }
+ for(int x=76;x<888;x+=22)if(x>226&&x<728)dot(x,109,0xe7a792);
  /* Recessed, curved brass sight line with parallel marble inlays. */
  for(int k=0;k<3;k++){int y=395+k*8;
   line(81,y-11,289,y-11,0x53404c);line(289,y-11,332,y+1,0x53404c);
@@ -395,7 +408,18 @@ static void nc_static_floor(int room,int level){
  for(int x=81;x<883;x+=4)dot(x,169,0xa18174);
  if(room==NC_FLOOR){
   /* Pair of stair-stepped wings and an authentic-looking art deco band shell. */
-  box(284,112,392,100,0x291a2a,0xa48178);
+  box(284,112,392,100,0x291a2a,0xc4a180);
+  nc_fill(289,116,382,75,NC_M_VELVET,0x48243d);
+  for(int i=0;i<6;i++){
+   int a=292+i*6,d=668-i*6;
+   if(i&1){line(a,120+i*4,d,120+i*4,0xb07a7d);continue;}
+   line(a,120+i*4,a+28+i*4,179,0xa16c7b);line(d,120+i*4,d-28-i*4,179,0xa16c7b);
+  }
+  nc_fill(348,130,264,62,NC_M_GLASS,0x362747);
+  for(int x=355;x<=605;x+=15){
+   int yy=140+((x-355)*5)%32;
+   dot(x,yy,0xf2c898);dot(x+1,yy+1,0xa3768e);
+  }
   for(int i=0;i<13;i++){
    int l=288+i*14,r=672-i*14,y=132+i*3;
    line(l,y,l+20,115,0x795667);line(r-20,115,r,y,0x795667);
@@ -409,7 +433,8 @@ static void nc_static_floor(int room,int level){
   rect(319,120,322,2,0x9a7775);
   for(int i=0;i<15;i++)disc(324+i*22,124,1,ncGold);
   for(int i=0;i<2;i++){int xx=404+i*152;rect(xx-1,129,3,62,0x79687a);rect(xx,130,1,61,0xd5b3a4);}
-  rect(302,180,356,36,0x523746);rect(293,192,374,22,0x624351);
+  nc_fill(302,180,356,36,NC_M_WOOD,0x633e54);nc_fill(293,192,374,22,NC_M_MARBLE,0x563857);
+  for(int y=181;y<219;y+=4){line(306,y,653,y,mix(0xb08b97,0x473245,y%9>6?6:5));}
   for(int y=195;y<=218;y+=4)rect(291+(y-195)/2,y,378-(y-195),2,(y&4)?0x987279:0x553b4c);
   rect(299,219,362,3,0xd99b8c);rect(306,222,348,4,0x533c4b);
   for(int i=0;i<13;i++){int x=314+i*28;rect(x,220,4,2,ncGold);}
@@ -419,15 +444,13 @@ static void nc_static_floor(int room,int level){
   for(int i=0;i<9;i++)nc_bottle(744+i*14,155-(i%2)*4,i%3==0?0x769a90:i%3==1?0xad737f:0xb99c77);
   for(int i=0;i<6;i++)nc_bottle(750+i*20,177-(i%2)*3,i%2?0x9a7c9e:0xa77d71);
   box(732,209,143,41,0x614455,0xb88f83);
+  nc_fill(734,211,139,37,NC_M_WOOD,0x633d56);
   for(int k=0;k<13;k++)rect(739+k*11,218,2,25,0x9b7381);
-  rect(730,207,148,6,0xbc9483);nc_label(803,123,"02  /  BAR",ncRose);
-  /* Glass tiles laid on the diagonal, with an offset border instead of a grid of noise. */
-  box(275,255,409,117,0x27253d,0x815771);box(279,259,401,109,0x211f32,0xb28b81);
-  for(int y=262;y<366;y++)for(int x=282;x<678;x++){
-   int u=(x-280+2*(y-260))/46,v=(1040+x-2*(y-260))/46;
-   int edge=((x-280+2*(y-260))%46<2)||((1040+x-2*(y-260))%46<2);
-   surface[y*rw+x]=edge?0x46374e:((u+v)&1)?0x332a42:0x29253a;
-  }
+  nc_fill(730,207,148,6,NC_M_BRASS,0xbc9483);nc_label(803,123,"02  /  BAR",ncRose);
+  /* The common material atlas already contains the glass mosaic, gold
+     border and centered sunburst. A double lip makes the inset readable. */
+  line(278,257,681,257,0x876c81);line(278,370,681,370,0x785766);
+  for(int x=300;x<680;x+=29){dot(x,258,0xdab192);dot(x,370,0xad818f);}
   nc_portal(104,331,"OFFICE",ncGold);nc_portal(856,331,"VIP",ncRose);
   nc_sofa(145,309,93,0x534059);nc_sofa(724,309,91,0x634255);
   for(int side=0;side<2;side++){
@@ -443,7 +466,7 @@ static void nc_static_floor(int room,int level){
   /* Private bays: separate finish, silhouette and lamp per booth. */
   for(int i=0;i<3;i++){
    int x=91+i*266,cx=x+119;U ink=ncBoothInk[i],cloth=ncBoothUph[i],base=mix(cloth,0x211b2a,5);
-   box(x,125,239,76,base,mix(ink,cloth,4));
+   box(x,125,239,76,base,mix(ink,cloth,4));nc_fill(x+3,128,233,69,i==0?NC_M_VELVET:i==1?NC_M_GLASS:NC_M_MARBLE,mix(cloth,0x211a2b,3));
    if(i==0){
     for(int j=0;j<19;j++){int xx=x+8+j*12,dy=(int)(sn(j*.1745f)*13);
      rect(xx,128,4,47+dy,mix(cloth,base,2+j%3));line(xx,174+dy,xx+3,176+dy,0xb27d83);}
@@ -469,7 +492,8 @@ static void nc_static_floor(int room,int level){
   nc_label(151,356,"LINEN CART",ncGold);
   box(747,306,128,50,0x333944,0xb79b88);for(int j=0;j<6;j++)nc_bottle(761+18*j,323,j%2?0x9e6679:0x688e87);
   rect(746,347,131,5,0x9d7b6a);nc_label(811,355,"STOCK",ncIce);
-  box(288,300,385,62,0x432c40,0x8b666c);box(294,306,373,50,0x3b2939,0x735464);
+  line(288,300,672,300,0xb9829d);line(288,361,672,361,0xb9829d);
+  line(288,300,288,361,0x8b666c);line(672,300,672,361,0x8b666c);
   for(int i=0;i<13;i++)nc_rhomb(315+i*27,331,12,15,i%2?0x765665:0x5d4252);
   if(level>=2){for(int i=0;i<6;i++){int xx=210+i*106;line(xx,115,xx,129,ncGold);nc_rhomb(xx,131,6,6,ncIce);}}
  }else{
@@ -480,6 +504,7 @@ static void nc_static_floor(int room,int level){
   nc_label(480,119,"OPERATIONS   /   PRIVATE",ncGold);
   for(int k=0;k<5;k++){int x=329+k*72;line(x,143,x+14,127,0x877164);line(x+14,127,x+29,143,0x877164);}
   box(305,185,350,55,0x59444b,0xd1a986);
+  nc_fill(307,188,346,48,NC_M_WOOD,0x60483e);
   for(int i=0;i<13;i++)rect(310+i*27,206,2,26,0x81606b);
   rect(301,184,358,13,0xae8e79);rect(305,186,350,2,0xc8ab94);
   box(444,155,69,30,0x172c30,0xc0a28c);for(int i=0;i<4;i++)rect(450,161+5*i,42-i*5,1,i%2?ncIce:0x587a77);
@@ -492,14 +517,30 @@ static void nc_static_floor(int room,int level){
  nc_label(480,422,room==NC_FLOOR?"STREET  /  EXIT":"MAIN  /  FLOOR",ncGold);
  for(int i=0;i<7;i++){rect(424+i*17,440,8,2,i&1?ncGold:0x8c676b);}
 }
+static void nc_light_pool(int cx0,int cy0,int rx,int ry,int strength,U light0){
+ if(fastGfx)return;
+ for(int y=max(0,cy0-ry);y<min(H,cy0+ry+1);y++){
+  int v=(y-cy0)*100/ry,lim=10000-v*v;
+  for(int x=max(0,cx0-rx);x<min(W,cx0+rx+1);x++){
+   int u=(x-cx0)*100/rx,p=lim-u*u;
+   if(p<=0)continue;
+   int w=p/100;U *dst=pixels+y*W+x;
+   *dst=nw_blend(*dst,light0,strength*w*w/10000);
+  }
+ }
+}
 static void nc_beam(int ax,int ay,int bx,int by,int w,U color){
  if(fastGfx||by<=ay)return;
- for(int y=ay;y<=by;y++){int d=y-ay,len=by-ay,k=2+d*w/len,cx=ax+(bx-ax)*d/len;
-  for(int x=cx-k;x<=cx+k;x++){
-   U*p0=pixels+y*W+x;int weight=absf(x-cx)<k*.58f&&d<len*3/4?2:1;
-   *p0=mix(*p0,color,weight);}
+ for(int y=max(0,ay);y<=min(H-1,by);y++){
+  int d=y-ay,len=by-ay,k=2+d*w/len,cx0=ax+(bx-ax)*d/len;
+  for(int x=max(0,cx0-k);x<=min(W-1,cx0+k);x++){
+   U*p0=pixels+y*W+x;
+   int u=(k-nc_abs(x-cx0))*100/k,a=u*u*(63-21*d/len)/10000;
+   if(d<len/3&&u>85)a+=7;
+   *p0=nw_blend(*p0,color,a);
+  }
  }
- nc_oval(bx,by,w,3,mix(0x312837,color,3));
+ nc_light_pool(bx,by,w+6,9,80,color);
 }
 #include "club_cast.inc"
 /* The named contacts keep their authored meeting positions and job roles.
@@ -536,8 +577,11 @@ static void nc_dynamics(void){
  if(ncRoom==NC_FLOOR){
   U left=track==0?0xe79dad:track==1?0xefd388:0xbcacec,
     right=track==0?0x75c3c6:track==1?0x84d2a6:0x8ac6e7;
-  nc_beam(312,126,391+(int)(sn(time*.71f)*41),226,40,left);
-  nc_beam(645,126,563+(int)(sn(time*.83f+1.4f)*43),225,37,right);
+  int l=391+(int)(sn(time*.71f)*41),r=563+(int)(sn(time*.83f+1.4f)*43);
+  nc_beam(312,126,l,229,53,left);
+  nc_beam(645,126,r,228,49,right);
+  nc_light_pool(l,271,89,28,74,left);nc_light_pool(r,276,86,30,69,right);
+  nc_light_pool(480,338,130,35,29,ncRose);
   if(level==2)nc_beam(481,117,481+(int)(sn(time*.48f)*83),245,48,0xcfacdf);
   for(int j=0;j<2;j++){int xx=j?645:312;rect(xx-8,119,16,7,0x302a3c);rect(xx-5,126,10,2,j?right:left);}
   /* Downstage after reflected light to keep silhouettes + upper bodies readable. */
@@ -559,7 +603,7 @@ static void nc_dynamics(void){
   int plotted=0,regular=0;
   for(int i=0;i<16;i++){
    int idx=crowd[i][2];if(idx>=guests)continue;
-   int yy=crowd[i][1]+(int)(sn(time*1.9f+idx)*2),xx=crowd[i][0]+(int)(sn(time*.83f+idx*4.2f)*7);
+   int yy=crowd[i][1]+(int)(sn(time*1.9f+idx)*2);
    while(regular<LEN(ncr_cast)&&ncr_cast[regular].y<=yy){
     if(!plotted&&ncY<=ncr_cast[regular].y){nc_player();plotted=1;}
     npc_club_unit(NAR_REGULAR+regular++);
@@ -574,12 +618,12 @@ static void nc_dynamics(void){
   /* Draw foreground guests/crew in order, with player occlusion matching
      their feet. The old path always drew all of them over the player. */
   for(int i=0;i<1+nc_get(NC_STAFF);i++){
-   int xx=568+i*25,yy=377+i*3;
+   int yy=377+i*3;
    if(!plotted&&ncY<=yy){nc_player();plotted=1;}
    npc_club_unit(NAR_DOOR+i);
   }
   if(nc_get(NC_DISPUTE))for(int i=0;i<nc_get(NC_DISPUTE)+1;i++){
-   int yy=396+i*3,xx=610+i*18+(int)(sn(time*3.7f+i)*3);
+   int yy=396+i*3;
    if(!plotted&&ncY<=yy){nc_player();plotted=1;}
    npc_club_unit(NAR_DISPUTE+i);
   }
@@ -591,11 +635,8 @@ static void nc_dynamics(void){
  }else if(ncRoom==NC_SUITE){
   for(int i=0;i<3;i++){
    int cx=210+i*266;U ink=ncBoothInk[i];
-   for(int j=0;j<2;j++){
-    int xx=cx+(j?49:-49)+(int)(sn(time*.7f+i+j)*2);
-    int guest=2+i*3+j;
-    npc_club_unit(NAR_SUITE+i*2+j);
-   }
+   nc_light_pool(cx,252,83,22,55,ink);
+   for(int j=0;j<2;j++)npc_club_unit(NAR_SUITE+i*2+j);
    for(int j=0;j<2;j++){
     int xx=cx+24+(j?-48:0),y=223;
     nc_oval(xx,y+3,4,2,ncGold);rect(xx,y-1,1,5,ncGold);
@@ -613,7 +654,8 @@ static void nc_dynamics(void){
   nc_player();
  }else{
   npc_club_unit(NAR_OFFICE);
-  nc_restore_front(521,184,565,199);nc_player();
+  nc_restore_front(521,184,565,199);
+  nc_light_pool(482,267,152,31,32,0xd4b697);nc_player();
   int val=nc_get(NC_TILL),fill=min(4,val/32);for(int i=0;i<fill;i++)box(405+i*5,181-i*2,15,4,0x6e947f,ncGold);
  }
 }
@@ -629,9 +671,14 @@ static void nc_draw_status(void){
  textat(tx,37,cash,PAPER,0);textat(877,37,clock,ncDim,0);
  /* A narrow marquee, separate from the architecture. */
  char marquee[95];char*q=append(marquee,nc_headline()?"HEADLINE SET":"MATINEE");q=append(q,"   /   ");q=append(q,ncActs[nc_get(NC_ACT)]);q=append(q,"    *    ON DECK: ");append(q,ncTracks[nc_music()]);
- int mw=textw(marquee,0);rect(470-mw/2,82,mw+20,22,0x201b2a);center(480,82,marquee,0xe1c1b5,0);
- int t=nc_target(),nearRegular=!t?ncr_near():-1;const char*people=(!t&&nearRegular<0)?npc_prompt():0;rect(0,455,W,85,0x161622);rect(0,455,W,1,0x715764);
- box(35,466,30,24,0x342a3b,t||nearRegular>=0||people?accent:0x66596b);center(50,467,"E",t||nearRegular>=0||people?PAPER:ncDim,0);
+ int mw=textw(marquee,0),band=ch_mode_active()?432:82;
+ rect(470-mw/2,band,mw+20,22,0x201b2a);
+ line(471-mw/2,band,489+mw/2,band,0x8d6476);
+ center(480,band,marquee,0xe1c1b5,0);
+ int t=nc_target(),nearRegular=!t?ncr_near():-1;const char*people=(!t&&nearRegular<0)?npc_prompt():0;
+ rect(0,455,W,85,0x161622);rect(0,455,W,1,0x715764);
+ box(35,466,30,24,0x342a3b,t||nearRegular>=0||people?accent:0x66596b);
+ center(50,467,"E",t||nearRegular>=0||people?PAPER:ncDim,0);
  if(nearRegular>=0){char prompt[70];append(append(prompt,"Talk to "),ncr_cast[nearRegular].name);textat(76,467,prompt,PAPER,0);}
  else textat(76,467,people?people:nc_hint(t),PAPER,0);
  char meter[115];if(nc_owned()){q=append(meter,"REP ");q=number(q,nc_get(NC_REP));q=append(q,"   /   TILL $");q=number(q,nc_get(NC_TILL));q=append(q,"   /   SET ");q=number(q,(NC_SHOW-nc_get(NC_CLOCK)+59)/60);append(q,"s");}
@@ -777,7 +824,8 @@ static void nc_dance_paint(void){
  float elapsed=ncDanceTicks/60.f,t=elapsed*(nc_music()==0?4.8f:nc_music()==1?5.6f:4.1f);
  modal(76,74,808,391,ink);
  box(91,145,778,251,frame,0x886c83);box(97,152,766,238,frame,0x564356);
- for(int y=153;y<387;y++)rect(99,y,762,1,mix(0x332438,frame,(y-153)*7/234));
+ nc_fill(99,153,762,135,NC_M_VELVET,mix(cloth,frame,4));
+ nc_fill(99,288,762,99,NC_M_MARBLE,0x3d3044);
  for(int i=0;i<15;i++){
   int x=154+i*45;rect(x,159,3,110,mix(cloth,frame,i%3+2));rect(x+4,159,1,110,mix(cloth,ink,2));
   if(i%3==0)nc_torch(x,190,ink);
@@ -787,7 +835,11 @@ static void nc_dance_paint(void){
  line(108,283,851,283,0x99778b);line(108,286,851,286,0x554252);
  for(int i=0;i<8;i++)line(177+i*87,287,116+i*103,382,0x4c3a50);
  for(int y=295;y<385;y+=15)line(108,y,851,y,0x48384b);
- nc_oval(471,349,198,28,0x402c42);nc_oval(471,346,188,23,0x6e5168);nc_oval(471,345,184,20,0x513b53);
+ nc_oval(471,349,198,28,0x402c42);nc_oval(471,346,188,23,0xa9787d);nc_oval(471,345,184,20,0x513b53);
+ for(int y=326;y<365;y++)for(int x=290;x<653;x++){
+  int dx=x-471,dy=y-345;
+  if(dx*dx*400+dy*dy*33489<13395600)dot(x,y,nc_rug(x,y,0x674458,ink));
+ }
  for(int i=0;i<10;i++)nc_rhomb(318+i*33,344,11,6,0x806479);
  nc_beam(420,158,416+(int)(sn(t*.21f)*23),335,70,mix(ink,cloth,3));
  nc_beam(570,158,497+(int)(sn(t*.17f)*32),328,58,0xa88c9e);
@@ -826,7 +878,7 @@ static void night_club_pointer(int sx,int sy,U clicks){
 static void night_club_tick(U keys,U tap){
  if(walkin_active!=NC_ID&&(ncFrontId<0||walkin_active!=ncFrontId)){scene=1;menu=-1;return;}
  if(tap&HELP){helpBack=NIGHT_CLUB_SCENE;scene=2;return;}if(tap&GFX)fastGfx=!fastGfx;
- if(p.noticeT>0)p.noticeT-=1.f/60;
+ if(p.noticeT>0&&menu!=PAUSE_MENU)p.noticeT-=1.f/60;
  if(ncPanel==NC_DANCE_PLAY){
   if((tap&(ESC|USE|ENTER))||++ncDanceTicks>=NC_DANCE_DURATION)nc_end_dance();
   return;

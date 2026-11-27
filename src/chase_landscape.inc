@@ -138,7 +138,7 @@ static void wl_wood(void){
     ch_quad((ChVec){l-2,t-2,17},(ChVec){k+2,t-2,17},(ChVec){k+2,y,29},(ChVec){l-2,y,29},0x526959,1);
     ch_quad((ChVec){l-2,y,29},(ChVec){k+2,y,29},(ChVec){k+2,b+2,17},(ChVec){l-2,b+2,17},0x43594e,1);
     for(int side=-1;side<=1;side+=2){float u=x+side*r;wl_tri((ChVec){u,t,17},(ChVec){u,b,17},(ChVec){u,y,29},0x827458);}
-    wl_box(x+2,t-.2f,x+8,b+.2f,0,13,0x3c5148,0x96876b);
+    ch_oc_small_door(oc_placed_door(OC_WOOD,j),13.f);
     wl_box(l+3,t-.3f,l+10,b+.3f,7,13,0x9ab3a1,0xb1a58a);
     if(d<330){
      /* Sills / split glazing and a ridge cap keep the little ranger shed
@@ -147,7 +147,7 @@ static void wl_wood(void){
      wl_box(l+6.2f,t-.35f,l+6.9f,b+.35f,7,13,0x766952,0x766952);
      wl_box(l-2,y-.35f,k+2,y+.35f,28.6f,29.2f,0x7f8d72,0x899780);
      for(int n=0;n<3;n++)wl_box(l-.13f,t+2,l+.12f,b-2,3.0f+n*4.1f,3.35f+n*4.1f,0x645e4d,0x716957);
-     wl_box(x+6.35f,t-.36f,x+6.9f,b+.36f,5.75f,6.6f,0xc4a473,0xc4a473);
+
     }
     break;}
   }

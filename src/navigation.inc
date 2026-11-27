@@ -112,10 +112,12 @@ static int nav_atm(int id){return id>=NAV_ATM_BASE&&id<NAV_ATM_BASE+LEN(bankAtms
 #define NAV_OUT_BASE (NAV_OWN_CAR+1)
 #define NAV_TRAP (NAV_OUT_BASE+LEN(outerStops))
 #define NAV_WOOD_BASE (NAV_TRAP+1)
+#define NAV_GEAR (NAV_WOOD_BASE+WOOD_N_SITES+1)
 static int nav_wood_stop(int id){return id>=NAV_WOOD_BASE&&id<NAV_WOOD_BASE+WOOD_N_SITES?id-NAV_WOOD_BASE:-1;}
 static int nav_out_stop(int id){return id>=NAV_OUT_BASE&&id<NAV_OUT_BASE+LEN(outerStops)?id-NAV_OUT_BASE:-1;}
 static NavPoint nav_door(int i){
  if(i==NAV_TRAP)return (NavPoint){NT_DOOR_X,NT_DOOR_Y};
+ if(i==NAV_GEAR)return (NavPoint){OC_GEAR_X,OC_GEAR_Y};
  int wood=nav_wood_stop(i);if(wood>=0)return (NavPoint){woodline_sites[wood].x,woodline_sites[wood].y};
  int outer=nav_out_stop(i);if(outer>=0)return nav_outer_point(outerStops[outer].node);
  if(i==NAV_OWN_CAR)return(NavPoint){(int)cars[0].x,(int)cars[0].y};
@@ -123,7 +125,7 @@ static NavPoint nav_door(int i){
  if(i<LEN(loc))return (NavPoint){loc[i].x,loc[i].y};
  int shop=i-LEN(loc);return (NavPoint){ordinaryDoorX[shop],ordinaryDoorY[shop]};
 }
-static const char*nav_name(int i){int wood=nav_wood_stop(i);if(wood>=0)return woodline_names[wood];if(i==NAV_TRAP)return "TRAP HOUSE / BELL LANE";int outer=nav_out_stop(i);if(outer>=0)return outerStops[outer].label;if(i==NAV_OWN_CAR)return "YOUR REGISTERED CAR";int k=nav_atm(i);return k>=0?bankAtms[k].label:i<LEN(loc)?loc[i].label:walkin_name(i-LEN(loc));}
+static const char*nav_name(int i){if(i==NAV_GEAR)return "SHADE SUPPLY / GLASS MILE";int wood=nav_wood_stop(i);if(wood>=0)return woodline_names[wood];if(i==NAV_TRAP)return "TRAP HOUSE / BELL LANE";int outer=nav_out_stop(i);if(outer>=0)return outerStops[outer].label;if(i==NAV_OWN_CAR)return "YOUR REGISTERED CAR";int k=nav_atm(i);return k>=0?bankAtms[k].label:i<LEN(loc)?loc[i].label:walkin_name(i-LEN(loc));}
 static NavPoint nav_job_goal(void){
  int ride=job_vehicle_target();
  if(ride>=0)return (NavPoint){(int)cars[ride].x,(int)cars[ride].y};
@@ -181,6 +183,49 @@ static int nav_sea_segment(NavPoint a,NavPoint b){
  for(int i=0;i<=steps;i++)if(!harbor_boat_nav_clear(a.x+(b.x-a.x)*i/(float)steps,a.y+(b.y-a.y)*i/(float)steps))return 0;
  return 1;
 }
+/* A boat needs room to turn at a chart point, but a circle appreciably
+ * overestimates the width needed on a straight stretch. Check the exact
+ * immutable directional hull at close intervals on the new east channel. */
+static int nav_sea_hull_segment(NavPoint a,NavPoint b){
+ if(nav_same(a,b))return harbor_boat_nav_clear(a.x,a.y);
+ float dx=b.x-a.x,dy=b.y-a.y,angle=look(dx,dy);
+ int steps=(nav_dist(a,b)+3)/4;
+ for(int i=0;i<=steps;i++)
+  if(!harbor_boat_clear(a.x+dx*i/steps,a.y+dy*i/steps,angle))return 0;
+ return 1;
+}
+static void nav_sea_east_channel(NavPoint a,NavPoint b){
+ int reversed=a.y<b.y;
+ NavPoint lower=reversed?b:a,upper=reversed?a:b;
+ if(upper.y>=2010||upper.x<ROOM-145||!harbor_boat_nav_clear(lower.x,lower.y)||
+    !harbor_boat_nav_clear(upper.x,upper.y))return;
+ static const short elbowY[]={2210,2244,2250,2268,2316,2370,2440,2538,2636,2738};
+ int best=1<<20;
+ for(int x=ROOM-56;x<=ROOM-52;x++){
+  NavPoint end={x,upper.y};
+  if(!harbor_boat_nav_clear(end.x,end.y)||!nav_sea_hull_segment(end,upper))continue;
+  for(int j=0;j<LEN(elbowY);j++){
+   NavPoint entry={x,elbowY[j]},turn={lower.x,entry.y};
+   if(!harbor_boat_nav_clear(entry.x,entry.y))continue;
+   int length=nav_length(lower,entry)+nav_length(entry,end)+nav_length(end,upper);
+   if(length>=best)continue;
+   int detour=!nav_sea_hull_segment(lower,entry);
+   if(detour){
+    length=nav_length(lower,turn)+nav_length(turn,entry)+nav_length(entry,end)+nav_length(end,upper);
+    if(length>=best||!harbor_boat_nav_clear(turn.x,turn.y)||
+       !nav_sea_hull_segment(lower,turn)||!nav_sea_hull_segment(turn,entry))continue;
+   }
+   if(!nav_sea_hull_segment(entry,end))continue;
+   NavPoint path[]={lower,detour?turn:lower,entry,end,upper};
+   navCount=0;
+   for(int k=0;k<LEN(path);k++){
+    NavPoint q=path[reversed?LEN(path)-1-k:k];
+    if(!navCount||!nav_same(navNodes[navCount-1],q))navNodes[navCount++]=q;
+   }
+   best=navDist=length;
+  }
+ }
+}
 static void nav_solve_sea(NavPoint a,NavPoint b){
  navCount=0;navDist=0;
  if(nav_sea_segment(a,b)){navNodes[0]=a;navNodes[1]=b;navCount=2;navDist=nav_length(a,b);return;}
@@ -195,6 +240,7 @@ static void nav_solve_sea(NavPoint a,NavPoint b){
    best=n;navNodes[0]=a;navNodes[1]=c;navNodes[2]=d;navNodes[3]=b;navCount=4;navDist=n;
   }
  }
+ if(!navCount)nav_sea_east_channel(a,b);
 }
 static void nav_update(void){
  NavPoint here=nav_player(),goal={0,0},curb;
@@ -309,6 +355,8 @@ static void navigation_pointer(int sx,int sy,U clicks){
  }
  {int dx=sx-NAV_MAP_X-NT_DOOR_X*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-NT_DOOR_Y*NAV_MAP_SIZE/span;
   int d=dx*dx+dy*dy;if(d<=6*6&&d<closest){closest=d;navSelected=NAV_TRAP;}}
+ {int dx=sx-NAV_MAP_X-OC_GEAR_X*NAV_MAP_SIZE/span,dy=sy-NAV_MAP_Y-OC_GEAR_Y*NAV_MAP_SIZE/span;
+  int d=dx*dx+dy*dy;if(d<=6*6&&d<closest){closest=d;navSelected=NAV_GEAR;}}
  if(outer_is_new(navCursor.x,navCursor.y)&&navSelected<0){
   int x,y;
   if(!(harbor_boat_active()&&harbor_boat_nav_clear(navCursor.x,navCursor.y))&&
@@ -354,7 +402,7 @@ static void nav_terrain(const NavView*v,int large){
  }
  for(int i=1;i<=7;i++){
   const int a=i*256;
-  nav_land(v,a-25,39,50,1970,NAV_CURB);nav_land(v,39,a-25,1970,50,NAV_CURB);
+  nav_land(v,a-27,39,54,1970,NAV_CURB);nav_land(v,39,a-27,1970,54,NAV_CURB);
  }
  for(int i=1;i<=7;i++){
   const int a=i*256;
@@ -386,7 +434,7 @@ static void nav_terrain(const NavView*v,int large){
    const OuterRoad*r=outerRoads+i;NavPoint a=nav_outer_point(r->a),b=nav_outer_point(r->b);
    U c=r->kind==OUT_HWY?0x9a866c:r->kind==OUT_DOCK?0x628c93:r->kind==OUT_HILL?0x84758a:0x7b8190;
    int x=nav_x(v,a.x),y=nav_y(v,a.y),ux=nav_x(v,b.x),uy=nav_y(v,b.y);
-   int width=large?2:1;
+   int width=large?(r->half>=50?3:2):1;
    for(int o=-width;o<=width;o++)nav_seg(v,x+o,y,ux+o,uy,c);
    for(int o=-width;o<=width;o++)nav_seg(v,x,y+o,ux,uy+o,c);
   }
@@ -402,6 +450,7 @@ static void nav_terrain(const NavView*v,int large){
    int x=nav_x(v,402),y=nav_y(v,2838);
    center(x,y,"GREYREED WOOD",0xc8d9a9,0);
    x=nav_x(v,2770);y=nav_y(v,2425);center(x,y,"LANTERN BAY",0x8dbfbf,0);
+   x=nav_x(v,2587);y=nav_y(v,52);center(x,y,"NORTHPOINT",0xd4bc94,0);
    for(int i=0;i<HARBOR_N_DOCK_POINTS;i+=2){
     int px=nav_x(v,harborDockPoints[i].x),py=nav_y(v,harborDockPoints[i].y);
     if(nav_inside(v,px,py,3)){nav_rect(v,px-2,py-1,5,3,0xa9d5c6);dot(px,py+2,0xa9d5c6);}
@@ -588,6 +637,10 @@ static void nav_overlay(const NavView*v,int large,const NavReadout*r){
    U c=night_trap_owned()?0x8ae2bd:0xffbf7d;
    box(x-3,y-2,7,6,NAV_INK,c);line(x-4,y-2,x,y-6,c);line(x,y-6,x+4,y-2,c);dot(x,y+2,c);
  }}
+ if(large){
+  int x=nav_x(v,OC_GEAR_X),y=nav_y(v,OC_GEAR_Y);
+  if(nav_inside(v,x,y,7)){diamond(x,y,6,0xa4e1c2);box(x-2,y-2,5,5,0x19353e,0xa4e1c2);}
+ }
  NavPoint objective={0,0};
  int realGoal=0;U color=LIME;
  if(job.kind>=0&&job.step>=0&&job.step<job.total){
@@ -728,7 +781,8 @@ static void minimap(void){
    nav_wrap(rx,249,rw0,tram_block()?tram_block():"Open: board at timetable.",tram_block()?PINK:TEAL,2);
   }else{
    int outer=nav_out_stop(navSelected);
-   const char*note=wood>=0?woodline_details[wood]:navSelected==NAV_TRAP?(night_trap_owned()?"Owned. Manage construction, graded storage and neighborhood repair bookings.":"For sale: $480 clean. Press Enter at the signed Bell Lane side door."):
+   const char*note=navSelected==NAV_GEAR?"Gear merchant at the labeled west porch. Enter on foot. The original Saltmarsh Cinema uses E.":
+    wood>=0?woodline_details[wood]:navSelected==NAV_TRAP?(night_trap_owned()?"Owned. Manage construction, graded storage and neighborhood repair bookings.":"For sale: $480 clean. Press Enter at the signed Bell Lane side door."):
      outer>=0?outerStops[outer].detail:navSelected==NAV_OWN_CAR?"Current registered vehicle. Enter pins its live location.":
      atm>=0?"Clean cash: deposit or withdraw at this kiosk.":navSelected<LEN(loc)?nav_venue_note(navSelected,status):
      shop==ncFrontId?"Tide Flats: straight west of Apartment 4. Direct E entry; no prerequisites.":"Storefront entrance. Enter pins this door.";

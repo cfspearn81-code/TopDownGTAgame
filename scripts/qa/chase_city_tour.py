@@ -9,11 +9,11 @@ import gzip, os, struct, subprocess, sys, tempfile
 r = Path(__file__).resolve().parents[2]
 app = Path(sys.argv[1]).resolve()
 capture = Path(sys.argv[2]).resolve() if len(sys.argv)>2 else None
-raw=gzip.decompress((r/"scripts/qa/curb-access-tour.txt.gz").read_bytes()).splitlines()
+raw=gzip.decompress(Path(os.environ.get("DC_OPENING_TOUR",r/"scripts/qa/curb-lamp-tour.txt.gz")).read_bytes()).splitlines()
 frames=[]
 for row in raw[1:]:
     n,bits=map(int,row.split());frames.extend([bits]*n)
-assert len(frames)==3664
+assert len(frames)==int(raw[0].split()[0]) and len(frames) in (3664,3682)
 # Also exercise the same atlas/guide menu, including a C tap that must *not*
 # switch preference while modal. Actual releases avoid typematic behavior.
 panels=[256,0,2097152,0,128,0,2048,0,2097152,0,128,0,2097152,0,512,0]

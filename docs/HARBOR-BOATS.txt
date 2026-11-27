@@ -10,7 +10,11 @@ water traffic and a scheduled patrol use the same physical water mask.
 F1, Signal (P/F7), the atlas and F5 still work aboard. The game always saves
 the last safe shore position, not a session-only boat floating out at sea.
 Leaving the game at sea therefore brings you back to the quay on reload.
-F2 Low FX suppresses foam trails. Boat condition is independent of car
+F2 Low FX suppresses foam trails. The helm shows your compass heading,
+speed, hull condition, and when you are approaching the finite chart edge.
+Launch and traffic hulls have revised fittings, navigation lights and wakes
+in overhead and C view. Throttle, steering, drift, brake, hull damage,
+boarding and tow physics are unchanged. Boat condition is independent of car
 condition; dock launches do not replace the current car or add save fields.
 
 Verification on integrated source:

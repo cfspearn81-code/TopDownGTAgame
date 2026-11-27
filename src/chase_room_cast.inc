@@ -129,7 +129,9 @@ static void ir_hero(float x,float y,float a,int which){
   ir_face(left,right,tip,tip,0xf2f1df);
  }
  float gait=which==11?(nt_walking?sn(anim*12)*4.f:0):which==10?(nvs_rail_walk?sn(nvs_frames*.24f)*4.f:0):(walking?sn(footcycle)*5.f:0);
- AvPose opt={.scale=1.78f,.activity=AV_STILL,.t=anim*4.f,.gait=gait};
+  /* Afterimage uses a suspendable show clock, including the hero's idle
+  * breathing. Global anim intentionally continues while in Pause. */
+ AvPose opt={.scale=1.78f,.activity=AV_STILL,.t=(which==NIGHT_CLUB_SCENE?nc_motion():anim)*4.f,.gait=gait};
  if(armed){
   PulseRoomSolid room=which==4?wi_solid:npc_room_solid();
   PulsePose g=room?npc_room_pulse(x,y,a,player_gait(),room):(PulsePose){0};
@@ -154,7 +156,8 @@ static void ir_encounter_actor(const NpcRef*r){
    ir_box(r->x+7.8f,r->y-2,1.7f,5,2.81f,.31f,0xd8ca94,0);ir_marker(r->x+8,r->y,GOLD);}
  }else{
   StreetPerson q={r->x,r->y,r->a,0,r->model,r->hue,coat};
-  AvPose opt={.scale=1.67f,.activity=AV_STILL,.t=anim*3,.gait=phase==NPC_FIGHT?sn(anim*18.f)*4.f:0};
+  float t=scene==NIGHT_CLUB_SCENE?nc_motion():anim;
+  AvPose opt={.scale=1.67f,.activity=AV_STILL,.t=t*3,.gait=phase==NPC_FIGHT?sn(t*18.f)*4.f:0};
   ic_body(&q,0,opt,phase,npcEnc.strike,0,3);ir_marker(r->x,r->y,phase==NPC_FIGHT?PINK:phase==NPC_YIELD?LIME:GOLD);
  }
 }
@@ -174,15 +177,8 @@ static void ir_trace(void){
   ic_face(q,4,0xffe1a3);ic_finish();
  }
 }
-static void ic_club_cast(float x,float y,float z,const NcCast*a,int stance,float t,float heading,float mul){
- static const int style[]={5,8,1,2,7,8,9,6};
- int motion=stance==CA_SWAY||stance==CA_PRIVATE?AV_DANCE:stance==CA_APPLAUSE?AV_CLAP:stance==CA_SEATED?AV_SEATED:stance==CA_WORKING?AV_SERVICE:AV_STILL;
- AvPose opt={.scale=(1.53f+a->tall*.054f)*mul,.floor=z,.activity=motion,.t=t,.styled=1,
-             .skin=a->skin,.hair=a->hair,.pants=a->leg,.trim=a->trim,.style=style[a->style],
-             .top=a->fit==CA_BAR||a->fit==CA_DJ?5:a->fit==CA_TRACK?4:a->fit==CA_DUSTER?3:2,.face=a->fit==CA_LEDGER?1:0};
- StreetPerson q={x,y,heading,0,MODEL_STAFF,1,a->cloth};
- ic_body(&q,0,opt,NPC_IDLE,0,0,7);
-}
+/* Implemented with the localized room materials and costume meshes. */
+static void ic_club_cast(float x,float y,float z,const NcCast*a,int stance,float t,float heading,float mul,int stage);
 
 static void ir_room_actors(void){
  for(int id=scene==3?N_ACT_FRONT:N_ACT_ROOM_BASE,end=scene==3?N_ACT_GROW+1:N_ACT_ROOM_END;id<end;id++){
@@ -196,7 +192,7 @@ static void ir_room_actors(void){
 static void ir_club_actor(int id){
  RoomCast q;NpcRef r;if(!npc_club_actor_ref(id,&q,&r))return;
  NcCast skin=*q.costume;skin.cloth=r.coat;
- ic_club_cast(q.x,q.y,q.z,&skin,q.pose,q.t,r.a,q.mul*.01f);
+ ic_club_cast(q.x,q.y,q.z,&skin,q.pose,q.t,r.a,q.mul*.01f,id>=NAR_STAGE&&id<NAR_DJ);
  if(id>=NAR_REGULAR&&id<NAR_DISPUTE&&ncr_near()==id-NAR_REGULAR)
   ir_label(r.x,r.y,29,r.name,id-NAR_REGULAR==NCR_PROMOTER?ncGold:ncIce,0);
 }

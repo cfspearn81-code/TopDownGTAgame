@@ -12,7 +12,7 @@
 /* On unsupported older SDL installations only the external link is absent. */
 extern int SDL_OpenURL(const char*) __attribute__((weak));
 
-static const char title[]="Dead Channel | Street Contact Update";
+static const char title[]="Dead Channel | Open City: Street Contact";
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *surface_tex;

@@ -67,6 +67,18 @@ THE AFTERIMAGE | PORT VANTA AFTER-HOURS CABARET
     queue. Opening the field guide, phone or Pause freezes the room's cast.
     Service, cover, bookings and the existing saved business are unchanged.
 
+PERFORMANCE HALL FINISHES
+The performance hall has veined stone, inset brass, smoked glass tiles and a
+tiered stage. Velvet booths, individual table fixtures and the walnut office
+are new visual treatments of the existing rooms. Stagewear includes opaque
+sequined bodices, silk fringe, long gloves, platform boots, dramatic capes
+and feather fans. Each act has its own silhouette.
+
+Press C to switch between overhead and the dimensional interior. The same
+E controls, contacts and queues apply either way. F2 Low FX skips moving
+beams and uses the original overhead camera while keeping the new textures.
+The stage and the new light sweeps freeze beneath Pause and the field guide.
+
 REGULARS AND SHOW RIDES
 Bryn Calder (promoter), Jules Vale (vocalist) and Remi Lens (stage
 photographer) have their own spots on the main floor. Approach and

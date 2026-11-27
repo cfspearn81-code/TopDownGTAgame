@@ -4,8 +4,10 @@ typedef struct {int x,y;} OuterPoint;
 typedef struct {unsigned char a,b,half,kind;} OuterRoad;
 enum{OUT_HILL,OUT_HWY,OUT_DOCK,OUT_WORKS,OUT_COUNTRY};
 enum{OUT_BL_BEGIN=0,OUT_HW_BEGIN=14,OUT_SH_BEGIN=29,OUT_S_BEGIN=49,OUT_W_BEGIN=52};
+enum{OUT_ROADS_ORIGINAL=60,OUT_ROADS_WITH_QUAY=69};
 enum {OUT_HQ_GATE=57,OUT_HQ_QUAY,OUT_HQ_LOT,OUT_HQ_YARD,OUT_HQ_FREIGHT,OUT_HQ_LOAD,
-      OUT_HQ_TURN,OUT_HQ_BANK,OUT_HQ_TIDE};
+      OUT_HQ_TURN,OUT_HQ_BANK,OUT_HQ_TIDE,
+      OUT_NP_PASS,OUT_NP_WJ,OUT_NP_WEST,OUT_NP_GREEN,OUT_NP_RIDGE,OUT_NP_EAST,OUT_NP_EJ,OUT_NP_GREENWAY};
 static const OuterPoint outerNodes[]={
  {1792,512},{2048,512},{2144,482},{2197,411},{2263,382},{2332,421},{2388,471},
  {2460,481},{2530,437},{2598,380},{2690,384},{2770,452},{2800,568},{2752,707},
@@ -16,9 +18,10 @@ static const OuterPoint outerNodes[]={
  {2240,2280},{2200,2400},{2064,2496},{1920,2496},{1792,2432},{1792,2152},{1792,1792},
  {1712,2504},{1592,2464},{1024,1792},{1024,2144},{1136,2265},{1360,2321},{1520,2368},
  {2856,2054},{2916,2070},{2950,2086},{2848,2114},{2824,2150},{2824,2192},
- {2426,2285},{2463,2370},{2478,2451}
+ {2426,2285},{2463,2370},{2478,2451},
+ {2511,350},{2425,283},{2425,146},{2587,146},{2815,146},{2867,222},{2867,330},{2651,282}
 };
-#define OR(a,b,w,k) {(a),(b),(w),(k)}
+#define OR(a,b,w,k) {(a),(b),(w)+((k)==OUT_DOCK?0:3),(k)}
 static const OuterRoad outerRoads[]={
  OR(0,1,32,OUT_HILL),OR(1,2,33,OUT_HILL),OR(2,3,33,OUT_HILL),OR(3,4,36,OUT_HILL),
  OR(4,5,35,OUT_HILL),OR(5,6,35,OUT_HILL),OR(6,7,31,OUT_HILL),OR(7,8,32,OUT_HILL),
@@ -39,7 +42,12 @@ static const OuterRoad outerRoads[]={
  OR(39,OUT_HQ_GATE,25,OUT_DOCK),OR(OUT_HQ_GATE,OUT_HQ_QUAY,25,OUT_DOCK),
  OR(OUT_HQ_QUAY,OUT_HQ_LOT,24,OUT_DOCK),OR(OUT_HQ_GATE,OUT_HQ_YARD,23,OUT_DOCK),
  OR(OUT_HQ_YARD,OUT_HQ_FREIGHT,22,OUT_DOCK),OR(OUT_HQ_FREIGHT,OUT_HQ_LOAD,19,OUT_DOCK),
- OR(42,OUT_HQ_TURN,24,OUT_DOCK),OR(OUT_HQ_TURN,OUT_HQ_BANK,24,OUT_DOCK),OR(OUT_HQ_BANK,OUT_HQ_TIDE,22,OUT_DOCK)
+ OR(42,OUT_HQ_TURN,24,OUT_DOCK),OR(OUT_HQ_TURN,OUT_HQ_BANK,24,OUT_DOCK),OR(OUT_HQ_BANK,OUT_HQ_TIDE,22,OUT_DOCK),
+ OR(8,OUT_NP_PASS,34,OUT_HILL),OR(OUT_NP_PASS,OUT_NP_WJ,30,OUT_HILL),
+ OR(OUT_NP_WJ,OUT_NP_WEST,30,OUT_COUNTRY),OR(OUT_NP_WEST,OUT_NP_GREEN,33,OUT_COUNTRY),
+ OR(OUT_NP_GREEN,OUT_NP_RIDGE,34,OUT_COUNTRY),OR(OUT_NP_RIDGE,OUT_NP_EAST,31,OUT_HILL),
+ OR(OUT_NP_EAST,OUT_NP_EJ,31,OUT_HILL),OR(OUT_NP_EJ,11,32,OUT_HILL),
+ OR(OUT_NP_EJ,OUT_NP_GREENWAY,27,OUT_COUNTRY),OR(OUT_NP_GREENWAY,OUT_NP_WJ,28,OUT_COUNTRY)
 };
 #undef OR
 typedef struct{int node;const char *label,*detail;U tint;} OuterLandmark;
@@ -52,7 +60,8 @@ static const OuterLandmark outerStops[]={
  {54,"WINDMILL CURVE","Rural turnoff from the older Seawall Road.",0xc3d590},
  {OUT_HQ_LOT,"LANTERN QUAY","Park on the marked spur. Walk south to the public boat slip and ocean terminal.",0x9edfc9},
  {OUT_HQ_LOAD,"FREIGHT BERTH","Cargo lane and work handoff. The last stretch to the water is a foot gangway.",0xe0ad84},
- {OUT_HQ_TIDE,"TIDE SIGNAL PIER","Old coastal signal station. Follow the plank pier south to the mooring.",0xa6bbd9}
+ {OUT_HQ_TIDE,"TIDE SIGNAL PIER","Old coastal signal station. Follow the plank pier south to the mooring.",0xa6bbd9},
+ {OUT_NP_GREEN,"NORTHPOINT HEADLAND","Two entrances from Glass Bluff meet at an open coastal neighborhood.",0xd4bc94}
 };
 /* Four pixels in a packed lane index carry timed fixtures and forward map
    routing while scenery, shoulder and hull geometry use the same ribbon. */
@@ -129,6 +138,7 @@ static void outer_bake_art(void){
     rect(p.x+d*19-2,p.y+14,5,17,0x233440);disc(p.x+d*19,p.y+14,3,s->tint);
   }
  }
+ if(!bakeFloorOnly)center(2614,107,"NORTHPOINT",0xd8b88f,0);
  center(1966,493,"GLASS BLUFF",0xa7afd2,0);
  center(1966,990,"FREIGHT PARKWAY",0xe9c891,0);
  center(1954,1759,"HARBOR PIER",0x83cfc2,0);

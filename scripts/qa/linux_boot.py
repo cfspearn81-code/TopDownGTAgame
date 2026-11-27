@@ -11,7 +11,7 @@ root = Path(__file__).resolve().parents[2]
 app, interposer, disk = (Path(a).resolve() for a in sys.argv[1:])
 # Historical builds retain their exact keyboard tape. New world collision
 # may require a different path to the same courier and taxi outcomes.
-tour_path = Path(os.environ.get("DC_OPENING_TOUR", root/"scripts/qa/curb-access-tour.txt.gz"))
+tour_path = Path(os.environ.get("DC_OPENING_TOUR", root/"scripts/qa/curb-lamp-tour.txt.gz"))
 tour = gzip.decompress(tour_path.read_bytes())
 frames, digest = tour.splitlines()[0].split()
 frames, digest = int(frames), int(digest, 16)

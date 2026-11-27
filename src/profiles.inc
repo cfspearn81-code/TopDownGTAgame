@@ -1,11 +1,13 @@
 /* Save browser and in-world character creator. Never creates a slot before commit. */
 enum{PROFILE_SLOTS=252,PROFILE_PAGE=5,CREATOR_ROWS=CHAR_FIELDS+1};
-typedef struct{int id,status,cash,dirty;U ticks,legacy,intro;Look look;char name[20];} Card;
+typedef struct{int id,status,cash,dirty;U ticks,legacy,intro,style;Look look;char name[20];} Card;
 static Card cards[PROFILE_SLOTS];
 static int cardCount,cardSelected,profileReturn,profileHoverX=-1,profileHoverY=-1;
 static int createField,createWriting,createFacing,createPreset;
 static U styleSeed=0x82ef1cabu;
 static Look draft;
+static U draftWard;
+static int wardPage,wardBack;
 static char draftName[20],oldDraftName[20];
 static const char *profileError;
 static Card deleteCard;
@@ -27,14 +29,14 @@ static void profiles_scan(void){
   disk_slot(i);if(!disk_present())continue;
   load_save();
   Card *c=cards+cardCount;
-  *c=(Card){.id=i,.status=wason,.cash=sv.cash,.dirty=sv.dirty,.ticks=sv.playedTicks,.legacy=sv.legacyClock,.intro=sv.intro,.look=sv.look};
+  *c=(Card){.id=i,.status=wason,.cash=sv.cash,.dirty=sv.dirty,.ticks=sv.playedTicks,.legacy=sv.legacyClock,.intro=sv.intro,.look=sv.look,.style=ward_live()};
   cp(c->name,sv.name,sizeof c->name);
   if(i==sideSlot)selected=cardCount;
   cardCount++;
  }
  cp(&sv,&held,sizeof sv);cp(&nv,&heldNight,sizeof nv);wason=loaded;disk_slot(sideSlot);
 #else
- if(wason)cards[cardCount++]=(Card){.id=sideSlot,.status=1,.cash=sv.cash,.dirty=sv.dirty,.ticks=sv.playedTicks,.legacy=sv.legacyClock,.intro=sv.intro,.look=sv.look};
+ if(wason)cards[cardCount++]=(Card){.id=sideSlot,.status=1,.cash=sv.cash,.dirty=sv.dirty,.ticks=sv.playedTicks,.legacy=sv.legacyClock,.intro=sv.intro,.look=sv.look,.style=ward_live()};
 #endif
  cardSelected=selected;
 }
@@ -60,8 +62,26 @@ static void confirm_delete(void){
 }
 static void new_profile(void){
  if(profileReturn&&saveFlash<0)return; /* Includes a click on the empty catalog card. */
- draft=defaultLook;z(draftName,sizeof draftName);append(draftName,"Vanta Local");
+ draft=defaultLook;draftWard=0;wardPage=0;wardBack=0;z(draftName,sizeof draftName);append(draftName,"Vanta Local");
  createField=1;createWriting=0;createFacing=0;createPreset=-1;profileError=0;scene=5;
+}
+static int ward_editing(void){return scene==OPEN_CITY_WARDROBE_SCENE;}
+static void ward_open(void){
+ if(p.dead)return;
+ wardBack=scene;wardPage=0;createField=1;createFacing=createWriting=0;createPreset=-1;profileError=0;
+ draft=sv.look;draftWard=ward_live();cp(draftName,sv.name,sizeof draftName);
+ scene=OPEN_CITY_WARDROBE_SCENE;menu=-1;profileHoverX=profileHoverY=-1;walking=0;
+}
+static void creator_close(void){scene=ward_editing()?wardBack:0;profileError=0;}
+static void ward_page(void){
+ wardPage^=1;createField=wardPage?0:1;createWriting=0;profileError=0;
+}
+static void creator_apply(void){
+ Save before=sv;NightSave previous=nv;
+ sv.look=draft;ward_store(draftWard);
+ request_save();
+ if(saveFlash<0){sv=before;nv=previous;profileError="Couldn't save your outfit. The live career was left unchanged. Retry or press Esc.";return;}
+ creator_close();tell("Wardrobe updated. Your career is unchanged.");
 }
 static void profiles_open(int create){
  request_save();
@@ -93,20 +113,22 @@ static void profiles_choose(void){
  sideSlot=c->id;profiles_activate();
 }
 static void creator_commit(void){
+ if(ward_editing()){creator_apply();return;}
  int oldSlot=sideSlot;
  Save held;NightSave heldNight;cp(&held,&sv,sizeof sv);cp(&heldNight,&nv,sizeof nv);
- starter_save();sv.look=draft;
+ starter_save();sv.look=draft;ward_store(draftWard);
  int len=sl(draftName);
  while(len>0&&draftName[len-1]==' ')len--;
  int start=0;while(start<len&&draftName[start]==' ')start++;
  if(start==len)append(sv.name,"Vanta Local");else cp(sv.name,draftName+start,len-start);
  sv.hash=savehash();
 #if (defined(_WIN_NATIVE) || defined(DC_LINUX_NATIVE)) && !defined(DC_TEST)
- int id=-1;
+ int id=-1;Save11 expanded;
+ if(ward_live())build_save11(&expanded);
  for(int i=0;i<PROFILE_SLOTS;i++){
    if(i==1)continue; /* Historical side-career path is load-only unless it already exists. */
    disk_slot(i);if(disk_present())continue;
-   if(disk_create(&sv,sizeof sv)){id=i;break;}
+   if(ward_live()?disk_create(&expanded,sizeof expanded):disk_create(&sv,sizeof sv)){id=i;break;}
    /* Another running copy may have claimed the slot since disk_present().
     * Continue only when the slot is now occupied, not on general I/O failure. */
    if(!disk_present())break;
@@ -118,16 +140,28 @@ static void creator_commit(void){
 #endif
  wason=1;profiles_activate();
 }
+static int creator_rows(void){return wardPage?CW_N:CREATOR_ROWS;}
+static int creator_first(void){return !wardPage&&ward_editing()?1:0;}
 static void creator_change(int f,int change){
+ if(wardPage){int n=wardExtra[f].count;draftWard=ward_set(draftWard,f,(ward_part(draftWard,f)+n+change)%n);createPreset=-1;return;}
+ if(f==0&&ward_editing())return;
  if(f==0){cp(oldDraftName,draftName,sizeof draftName);createWriting=1;return;}
  int i=f-1,count=wardrobe[i].count;draft.part[i]=(draft.part[i]+count+change)%count;createPreset=-1;
 }
 static U style_random(void){styleSeed^=styleSeed<<13;styleSeed^=styleSeed>>17;styleSeed^=styleSeed<<5;return styleSeed;}
-static void creator_shuffle(void){for(int i=0;i<CHAR_FIELDS;i++)draft.part[i]=style_random()%(U)wardrobe[i].count;createPreset=-1;}
+static void creator_shuffle(void){
+ if(wardPage){for(int i=0;i<CW_N;i++)draftWard=ward_set(draftWard,i,style_random()%(U)wardExtra[i].count);}
+ else for(int i=0;i<CHAR_FIELDS;i++)draft.part[i]=style_random()%(U)wardrobe[i].count;
+ createPreset=-1;
+}
 enum{LOOKBOOK_COUNT=360};
 static void creator_preset(int step){
  int i=createPreset<0?(step<0?LOOKBOOK_COUNT-1:0):(createPreset+step+LOOKBOOK_COUNT)%LOOKBOOK_COUNT;
  createPreset=i;
+ if(wardPage){
+  draftWard=0;for(int k=0;k<CW_N;k++)draftWard=ward_set(draftWard,k,((i/(1+2*k))*7+k*3)%wardExtra[k].count);
+  return;
+ }
  int haircut=(i/6)%10,top=i%6,tone=i/60;
  draft=(Look){{(i+2*haircut)%3,(haircut+3*tone+top)%8,haircut,(top*3+tone)%8,(tone+haircut+top)%7,top,(tone*2+top*3)%12,
   (haircut+2*top+tone)%5,(2*tone+3*top)%8,(top+tone*3+haircut)%6}};
@@ -165,15 +199,17 @@ static void profiles_tick(U tap){
   else if(tap&ENTER)createWriting=0;
   return;
  }
- if(tap&ESC){scene=0;profileError=0;return;}
- if(tap&UP)createField=(createField+CREATOR_ROWS-1)%CREATOR_ROWS;
- if(tap&DOWN)createField=(createField+1)%CREATOR_ROWS;
+ if(tap&ESC){creator_close();return;}
+ if(tap&WHEEL){ward_page();return;}
+ int rows=creator_rows(),minRow=creator_first();
+ if(tap&UP)createField=createField>minRow?createField-1:rows-1;
+ if(tap&DOWN)createField=createField<rows-1?createField+1:minRow;
  if(tap&LEFT)creator_change(createField,-1);
  if(tap&RIGHT)creator_change(createField,1);
  if(tap&FIRE)creator_shuffle();
  if(tap&MAP)createFacing=(createFacing+1)&3;
  if(tap&GFX)creator_preset(1);
- if(tap&USE){if(!createField)creator_change(0,1);else creator_change(createField,1);}
+ if(tap&USE)creator_change(createField,1);
  if(tap&ENTER)creator_commit();
 }
 static int in_ui(int x,int y,int w,int h){return profileHoverX>=x&&profileHoverY>=y&&profileHoverX<x+w&&profileHoverY<y+h;}
@@ -204,13 +240,14 @@ static void profiles_pointer(int sx,int sy,U clicks){
  if(createWriting&&in_ui(64,138,544,26))return;
  if(createWriting)createWriting=0;
  if(in_ui(689,455,207,42)){creator_commit();return;}
- if(in_ui(64,468,107,33)){scene=0;profileError=0;return;}
+ if(in_ui(64,468,133,33)){creator_close();return;}
  if(in_ui(462,468,146,33)){creator_shuffle();return;}
  if(in_ui(689,358,207,34)){createFacing=(createFacing+1)&3;return;}
  if(in_ui(689,403,207,32)){creator_preset(sx<727?-1:1);return;}
- if(in_ui(64,138,544,CREATOR_ROWS*28)){
-  int f=(sy-138)/28;createField=f;
-  if(!f||sx>=558)creator_change(f,1);
+ if(in_ui(430,101,174,29)){ward_page();return;}
+ if(in_ui(64,138,544,creator_rows()*28)){
+  int f=(sy-138)/28;if(f<creator_first())return;createField=f;
+  if((!f&&!wardPage)||sx>=558)creator_change(f,1);
   else if(sx>=320&&sx<364)creator_change(f,-1);
  }
 }
@@ -231,7 +268,7 @@ static void profile_button(int x,int y,int w,int h,const char*label,U ink,int en
  box(x,y,w,h,over?ink:0x14242e,enabled?ink:0x32434b);
  center(x+w/2,y+(h-20)/2,label,c,0);
 }
-static void portrait(int x,int y,int w,int h,const Look*l,int scale,int facing){
+static void portrait_style(int x,int y,int w,int h,const Look*l,int scale,int facing,U style){
  static U thumb[54*44];
  U*old=surface;int ow=rw,oh=rh,ol=clipLeft,ot=clipTop,orr=clipRight,ob=clipBottom;
  surface=thumb;rw=clipRight=54;rh=clipBottom=44;clipLeft=clipTop=0;
@@ -240,7 +277,7 @@ static void portrait(int x,int y,int w,int h,const Look*l,int scale,int facing){
  for(int j=2;j<54;j+=6)line(j,0,j,43,0x152b35);
  disc(27,35,11,0x193a42);line(10,38,43,38,0x315963);
  static const float angles[]={1.570796f,0,-1.570796f,3.141593f};
- previewRig=1;figure(27,35,0,0,angles[facing],0,0,l);previewRig=0;
+ U prior=wardPreview;wardPreview=style;previewRig=1;figure(27,35,0,0,angles[facing],0,0,l);previewRig=0;wardPreview=prior;
  surface=old;rw=ow;rh=oh;clipLeft=ol;clipTop=ot;clipRight=orr;clipBottom=ob;
  box(x,y,w,h,0x10232c,0x365362);
  int cw=min(w-2,54*scale),ch=min(h-2,44*scale);
@@ -248,6 +285,9 @@ static void portrait(int x,int y,int w,int h,const Look*l,int scale,int facing){
   int a=(54-cw/scale)/2+i/scale,b=(44-ch/scale)/2+j/scale;
   dot(x+(w-cw)/2+i,y+(h-ch)/2+j,thumb[b*54+a]);
  }
+}
+static void portrait(int x,int y,int w,int h,const Look*l,int scale,int facing){
+ portrait_style(x,y,w,h,l,scale,facing,0);
 }
 static char *two(char*b,U n){*b++='0'+n/10;*b++='0'+n%10;*b=0;return b;}
 static void time_display(char *b,U ticks){
@@ -281,7 +321,7 @@ static void profile_list_paint(void){
   char buf[36],t[20];
   U primary=sel?LIME:over?TEAL:0x324954;
   box(64,y,582,54,sel?0x20393c:0x12232e,primary);rect(64,y,4,54,primary);
-  if(c->status)portrait(76,y+5,52,44,&c->look,1,0);
+  if(c->status)portrait_style(76,y+5,52,44,&c->look,1,0,c->style);
   else {box(76,y+5,52,44,DARK,0x5e4a54);center(102,y+18,"!",PINK,0);}
   textat(141,y+5,c->status?card_name(c):"Unreadable save",PAPER,0);
   slot_label(buf,c->id);textat(141,y+28,buf,sel?TEAL:MUTED,0);
@@ -295,7 +335,7 @@ static void profile_list_paint(void){
  box(666,112,250,406,0x12212b,0x3b5864);
  rect(666,112,250,3,TEAL);
  if(cardCount&&cards[cardSelected].status){
-  Card*c=cards+cardSelected;portrait(686,133,210,156,&c->look,4,0);
+  Card*c=cards+cardSelected;portrait_style(686,133,210,156,&c->look,4,0,c->style);
   center(791,301,c->intro<3?"FIRST SHIFT":"PORT VANTA CAREER",TEAL,0);
   center(791,324,"CLEAN CASH / DIRTY MONEY",MUTED,0);
  }else{
@@ -317,37 +357,49 @@ static void profile_list_paint(void){
 static U creator_color(int f,int v){
  switch(f){case SKIN:return charSkin[v];case HAIR_TONE:return charHair[v];case TOP_TONE:return charTop[v];case LEG_TONE:return charLeg[v];case SHOES:return charShoe[v];default:return 0;}
 }
+static U ward_swatch(int field,int value){
+ switch(field){case CW_HAT_TONE:return wardDyes[value];case CW_TRIM:return wardAccents[value];case CW_FOOT_TONE:return wardSole[value];default:return 0;}
+}
 static void profile_creator_paint(void){
- textat(64,23,"PORT VANTA  /  NEW CAREER",TEAL,0);
- textat(64,51,"CREATE YOUR CHARACTER",LIME,1);
- textat(65,104,"MIX AND MATCH YOUR LOOK BEFORE MOVING INTO APARTMENT 4.",MUTED,0);
- for(int f=0;f<CREATOR_ROWS;f++){
+ int edit=ward_editing(),rows=creator_rows();
+ textat(64,23,edit?"PORT VANTA  /  PERSONAL WARDROBE":"PORT VANTA  /  NEW CAREER",TEAL,0);
+ textat(64,51,edit?"EDIT YOUR APPEARANCE":"CREATE YOUR CHARACTER",LIME,1);
+ textat(64,106,wardPage?"02 / STYLE LAB   /   WARDROBE":"01 / FOUNDATION   /   CORE LOOK",MUTED,0);
+ profile_button(430,101,174,29,wardPage?"TAB  FOUNDATION":"TAB  STYLE LAB",TEAL,1);
+ for(int f=0;f<rows;f++){
   int y=138+f*28,sel=f==createField,over=in_ui(64,y,544,26);
   U c=sel?LIME:over?TEAL:0x304755;
   box(64,y,544,26,sel?0x20393c:0x12232e,c);if(sel)rect(64,y,3,26,c);
-  textat(78,y+3,f?wardrobe[f-1].label:"NAME",sel?LIME:MUTED,0);
-  if(!f){
-   textat(347,y+3,draftName,PAPER,0);
+  textat(78,y+3,wardPage?wardExtra[f].label:f?wardrobe[f-1].label:edit?"CAREER":"NAME",sel?LIME:MUTED,0);
+  if(!f&&!wardPage){
+   textat(347,y+3,draftName[0]?draftName:"Vanta Local",PAPER,0);
    if(createWriting){int x=347+textw(draftName,0);rect(x+1,y+5,2,16,TEAL);}
-   else textat(559,y+3,"EDIT",TEAL,0);
+   else textat(559,y+3,edit?"FIXED":"EDIT",edit?MUTED:TEAL,0);
   }else{
-   int v=draft.part[f-1];U swatch=creator_color(f-1,v);
-   textat(374,y+3,wardrobe[f-1].name[v],PAPER,0);
+   int v=wardPage?ward_part(draftWard,f):draft.part[f-1];
+   U swatch=wardPage?ward_swatch(f,v):creator_color(f-1,v);
+   textat(374,y+3,wardPage?wardExtra[f].name[v]:wardrobe[f-1].name[v],PAPER,0);
    if(swatch)box(347,y+6,14,14,swatch,0x69838b);
    profile_button(320,y+2,25,22,"<",TEAL,1);
    profile_button(558,y+2,42,22,">",TEAL,1);
   }
  }
+ if(wardPage){
+  box(64,378,544,70,0x11232b,0x34505a);
+  textat(77,384,"FIT NOTES / LIVE",TEAL,0);
+  wrapped(77,403,wardExtra[createField].caption,MUTED,51);
+ }
  box(666,115,250,393,0x12212b,0x3b5864);rect(666,115,250,3,TEAL);
- center(791,126,"LIVE PREVIEW",TEAL,0);
- portrait(686,153,210,194,&draft,5,createFacing);
- profile_button(689,358,207,34,"M  TURN CHARACTER",TEAL,1);
- char book[48];if(createPreset<0)append(book,"F2  BROWSE 360 LOOKS");else number(append(number(append(book,"LOOK "),createPreset+1)," / "),LOOKBOOK_COUNT);
+ static const char*const side[]={"FRONT","RIGHT","BACK","LEFT"};
+ center(791,126,"LIVE FITTING",TEAL,0);
+ portrait_style(686,153,210,194,&draft,5,createFacing,draftWard);
+ char turn[48];append(append(turn,"M  TURN   /   "),side[createFacing]);profile_button(689,358,207,34,turn,TEAL,1);
+ char book[48];if(createPreset<0)append(book,"F2  LOOKBOOK");else number(append(number(append(book,"LOOK "),createPreset+1)," / "),LOOKBOOK_COUNT);
  profile_button(689,403,34,32,"<",TEAL,1);profile_button(728,403,129,32,book,TEAL,1);profile_button(862,403,34,32,">",TEAL,1);
- profile_button(689,455,207,42,"ENTER  START CAREER",LIME,1);
- profile_button(64,468,107,33,"ESC  BACK",MUTED,1);
+ profile_button(689,455,207,42,edit?"ENTER  SAVE LOOK":"ENTER  START CAREER",LIME,1);
+ profile_button(64,468,133,33,edit?"ESC  DISCARD":"ESC  BACK",MUTED,1);
  profile_button(462,468,146,33,"SPACE  SHUFFLE",TEAL,1);
- textat(64,510,profileError?profileError:createWriting?"TYPE A NAME. ENTER ACCEPTS. ESC UNDOES.":"UP / DOWN  CATEGORY     LEFT / RIGHT  CHANGE     E  EDIT OR CHANGE",profileError?PINK:MUTED,0);
+ textat(64,510,profileError?profileError:createWriting?"TYPE A NAME. ENTER ACCEPTS. ESC UNDOES.":"UP / DOWN  CATEGORY     LEFT / RIGHT  CHANGE     TAB  PAGE",profileError?PINK:MUTED,0);
 }
 static void delete_prompt_paint(void){
  modal(247,156,466,216,PINK);
@@ -361,5 +413,5 @@ static void delete_prompt_paint(void){
  profile_button(508,315,176,38,"DELETE SAVE",deleteArmed?PINK:0xc5778d,1);
 }
 static void profiles_paint(void){
- profile_bg();if(scene==5)profile_creator_paint();else{profile_list_paint();if(deleteOpen)delete_prompt_paint();}
+ profile_bg();if(scene==5||ward_editing())profile_creator_paint();else{profile_list_paint();if(deleteOpen)delete_prompt_paint();}
 }

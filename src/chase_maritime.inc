@@ -22,6 +22,39 @@ static void ch_ship_box(const ChShip*b,float aft,float fore,float mid,float half
 static void ch_ship_segment(const ChShip*b,float a,float f,float w,float w2,float z0,float z1,U c){
  ch_quad(ch_ship_pt(b,a,-w,z0),ch_ship_pt(b,f,-w2,z1),ch_ship_pt(b,f,w2,z1),ch_ship_pt(b,a,w,z0),c,1);
 }
+/* Helm-only fittings: use the same rocked origin as the hull.  The deck
+ * mesh never contributes to the collision envelope or to steering. */
+static void ch_ship_fender(const ChShip*b,float u,float v,U c){
+ float s=v<0?-1:1;
+ ch_ship_box(b,u-.6f,u+.65f,v,.30f,2.25f,3.75f,.16f,0,0x263741,c);
+ ch_ship_box(b,u-.13f,u+.12f,v-s*.27f,.13f,3.64f,4.12f,.05f,0,0xb39b78,0xe1c898);
+}
+static void ch_ship_planks(const ChShip*b,float a,float f,float w,float z0,float z1,U ink){
+ for(int row=-2;row<=2;row++){
+  float q=row*w*.33f;
+  ch_quad(ch_ship_pt(b,a,q,z0),ch_ship_pt(b,f,q,z1),
+          ch_ship_pt(b,f,q+.09f,z1),ch_ship_pt(b,a,q+.09f,z0),ink,1);
+ }
+}
+static int ch_sea_wet_quad(ChVec a,ChVec b,ChVec c,ChVec d,U ink){
+ if(!harbor_ocean_cell(a.x,a.y)||!harbor_ocean_cell(b.x,b.y)||
+    !harbor_ocean_cell(c.x,c.y)||!harbor_ocean_cell(d.x,d.y))return 0;
+ ch_quad(a,b,c,d,ink,1);return 1;
+}
+static void ch_ship_lens_ripple(const ChShip*b,float u,float v,U lens){
+ U sea=0x335665;U wash=mix(sea,lens,2),end=mix(sea,lens,1);
+ ChShip flat=*b;flat.lift=.17f;flat.pitch=flat.roll=0;
+ float wob=sn(anim*3.4f+b->x*.021f+v)*.7f;
+ float s=v>0?1.f:-1.f;
+ for(int i=0;i<5;i++){
+  float j=(float)i,mid=v+s*(.9f+j*1.12f)+wob;
+  float a=u-j*.67f;
+  ch_sea_wet_quad(ch_ship_pt(&flat,a-.45f-j*.22f,mid,0),ch_ship_pt(&flat,a+.68f+j*.15f,mid,0),
+                  ch_ship_pt(&flat,a+.3f,mid+s*.20f,0),ch_ship_pt(&flat,a-.32f-j*.16f,mid+s*.21f,0),i<2?wash:end);
+ }
+}
+/* Human clothing stays with a seated helm rig. The wardrobe catalog is
+ * also consumed by the standing avatar and its in-editor preview. */
 static void ch_ship_pilot(const ChShip*b,int hero){
  U skin=hero?charSkin[sv.look.part[SKIN]]:0xb88162,coat=hero?charTop[sv.look.part[TOP_TONE]]:0xc27f52;
  ch_ship_box(b,-4.5f,-1.1f,0,1.85f,3.6f,8.5f,.26f,.15f,coat,mix(coat,PAPER,1));
@@ -30,6 +63,18 @@ static void ch_ship_pilot(const ChShip*b,int hero){
   U cap=hero?charHair[sv.look.part[HAIR_TONE]]:0x334858;
   ch_ship_box(b,-3.8f,-1.2f,0,1.32f,9.9f,10.87f,.16f,0,cap,cap);
  }
+#if __has_include("wardrobe_catalog.inc")
+ if(hero){
+  U extras=ward_live();int hat=ward_hat(extras);
+  if(hat){
+   U cap=ward_hat_color(extras),trim=ward_trim_color(extras);
+   float brim=hat==9||hat==4?1.76f:hat==3||hat==6?1.54f:1.33f;
+   float top=hat==8?10.58f:hat==2||hat==7?11.25f:11.07f;
+   ch_ship_box(b,-3.88f,hat==1||hat==5?-.75f:-1.22f,0,brim,10.16f,10.39f,.10f,0,trim,cap);
+   ch_ship_box(b,-3.60f,-1.44f,0,1.27f,10.30f,top,.21f,0,cap,cap);
+  }
+ }
+#endif
  for(int side=-1;side<=1;side+=2)ch_ship_box(b,-2.3f,.75f,side*1.6f,.49f,6.7f,7.65f,.10f,0,coat,skin);
 }
 /* Public skiff, amber ferry, freight lighter, patrol, blue rendezvous cabin
@@ -48,7 +93,8 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
  int detail=hero||d2(b.x-ch.x,b.y-ch.y)<197.f*197.f;
  static const U colors[]={0x54ae9f,0xca8e53,0x9b5a52,0x527996,0x437fa6,0xdc874b};
  U sides=colors[skin],rail=mix(sides,0xf1e8ca,5),deck=skin==HB_CARGO?0xab916d:0xb7ad91;
- float len=skin==HB_CARGO?18.f:skin==CH_ORANGE_TRAINER?12.4f:15.8f;
+ int close=d2(h->x-ch.x,h->y-ch.y)<280.f*280.f;
+ float len=skin==HB_CARGO?18.f:skin==CH_ORANGE_TRAINER?12.4f:skin==HB_PATROL?16.5f:15.8f;
  float u[]={-len,-len*.60f,len*.43f,len*.81f,len},w[]={5.1f,6.8f,6.6f,3.5f,.18f},lip[]={3.75f,3.5f,3.8f,4.4f,5.05f};
  for(int k=0;k<4;k++){
   if(skin==HB_CARGO){w[k]*=1.22f;lip[k]+=.48f;}
@@ -59,7 +105,10 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
   ChVec e=ch_ship_pt(&b,u[k+1],next,lip[k+1]),d=ch_ship_pt(&b,u[k],v,lip[k]);
   ChVec m=ch_ship_pt(&b,u[k],v*.90f,lip[k]*.47f),n=ch_ship_pt(&b,u[k+1],next*.90f,lip[k+1]*.47f);
   ch_quad(a,f,n,m,mix(sides,0x163844,s<0?4:6),1);
-  ch_quad(m,n,e,d,s<0?sides:mix(sides,0x152c3c,2),1);
+  U above=s<0?sides:mix(sides,0x152c3c,2);
+  ch_quad(m,n,e,d,above,1);
+  if(close)ch_quad(ch_ship_pt(&b,u[k],v*.921f,lip[k]*.61f),ch_ship_pt(&b,u[k+1],next*.921f,lip[k+1]*.61f),
+   ch_ship_pt(&b,u[k+1],next*.926f,lip[k+1]*.655f),ch_ship_pt(&b,u[k],v*.926f,lip[k]*.655f),mix(rail,above,4),1);
   ch_quad(ch_ship_pt(&b,u[k],v*.977f,lip[k]-.49f),ch_ship_pt(&b,u[k+1],next*.977f,lip[k+1]-.49f),e,d,rail,1);
   if(detail){
    /* Twin continuous rails connect into the same cross sections as the
@@ -75,6 +124,15 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
    ch_quad(ch_ship_pt(&b,u[k],s*w[k]*.95f,lip[k]+.045f),ch_ship_pt(&b,u[k+1],s*w[k+1]*.95f,lip[k+1]+.045f),
            ch_ship_pt(&b,u[k+1],s*w[k+1]*.81f,lip[k+1]+.045f),ch_ship_pt(&b,u[k],s*w[k]*.81f,lip[k]+.045f),rail,1);
  }
+ if(close){
+  for(int k=0;k<3;k++)ch_ship_planks(&b,u[k]+.04f,u[k+1]-.04f,min((int)w[k],(int)w[k+1])*.70f,
+   lip[k]+.045f,lip[k+1]+.045f,mix(deck,0x726b64,4));
+  if(skin!=CH_ORANGE_TRAINER)for(int side=-1;side<=1;side+=2){
+   ch_ship_fender(&b,-len*.56f,w[1]*side,rail);
+   ch_ship_fender(&b,len*.24f,w[2]*side,rail);
+   ch_ship_box(&b,8.1f,8.8f,side*2.4f,.36f,4.15f,4.68f,.10f,0,0x59696d,rail);
+  }
+ }
  ch_quad(ch_ship_pt(&b,u[0],-w[0]*.69f,.02f),ch_ship_pt(&b,u[0],w[0]*.69f,.02f),ch_ship_pt(&b,u[0],w[0],lip[0]),ch_ship_pt(&b,u[0],-w[0],lip[0]),sides,1);
  if(skin==HB_SKIFF){
   ch_ship_box(&b,-len-.8f,-len+1.f,0,1.68f,1,5.3f,.22f,0,0x253741,0x567079);
@@ -82,6 +140,11 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
   ch_ship_box(&b,.5f,4.3f,0,4.5f,3.6f,6.5f,.22f,-.5f,0x375b60,0x536d70);
   ch_ship_box(&b,2.8f,3.95f,0,4.25f,6.3f,9.f,.15f,-1.2f,0x82afb5,0xc2d5ca);
   ch_ship_box(&b,7.4f,11.f,0,1.8f,4.3f,4.9f,.2f,0,0xb79d75,0xe2cfab);
+  if(close){
+   ch_ship_box(&b,2.05f,2.48f,0,3.10f,6.2f,6.47f,.05f,0,0x344b54,0x879b95);
+   ch_ship_box(&b,1.08f,1.62f,0,.65f,6.45f,6.76f,.07f,0,0x324a54,chDark>.5f?0x77c3b2:0x577b7b);
+   ch_ship_box(&b,-len-.76f,-len+.8f,0,.54f,5.1f,5.47f,.11f,0,0x263f4d,0xa5b4ad);
+  }
   if(hero||h->s!=0)ch_ship_pilot(&b,hero);
   if(detail){
    /* Outboard collar, distinct port/starboard rails, tied bow cleat. */
@@ -114,6 +177,11 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
    ch_quad(ch_ship_pt(&b,a,s*4.62f,7.8f),ch_ship_pt(&b,a+4.6f,s*4.62f,7.8f),ch_ship_pt(&b,a+3.95f,s*4.35f,10.8f),ch_ship_pt(&b,a+.33f,s*4.35f,10.8f),k?0x8bb6bb:0x567e92,1);
   }
   ch_ship_box(&b,-7.9f,5.7f,0,5.06f,11.55f,12.07f,.15f,-.1f,rail,0xe4dfc4);
+  if(close){
+   ch_ship_box(&b,5.28f,5.64f,0,3.25f,8.3f,10.16f,.14f,0,
+    chDark>.5f&&skin!=HB_PATROL?0xd4bd8a:0x819da6,0xb3cdc6);
+   ch_ship_box(&b,-5.4f,-4.85f,0,2.36f,12.09f,12.31f,.04f,0,0x768287,0xa8a99a);
+  }
   if(skin==HB_PATROL){
    for(int s=-1;s<=1;s+=2){
     U c=((int)(hbClock*4)&1)==(s>0)?0x9ddff2:0x47759b;
@@ -127,6 +195,7 @@ static void ch_sea_hull(const HarborHull*h,int skin,int hero){
  for(int s=-1;s<=1;s+=2){
   U lens=s<0?0xd77e72:0x80cb9e;float v=s*w[2]*.85f;
   ch_ship_box(&b,u[2]-.7f,u[2]+.55f,v,.39f,lip[2],lip[2]+.55f,.10f,0,lens,lens);
+  if(close&&chDark>.5f&&skin!=CH_ORANGE_TRAINER)ch_ship_lens_ripple(&b,u[2],v,lens);
  }
 }
 typedef struct {float x,y,co,si,width,time;} ChWakeTail;

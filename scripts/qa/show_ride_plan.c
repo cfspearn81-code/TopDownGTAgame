@@ -44,8 +44,12 @@ int main(int argc,char **argv){
  key(MAP);paint();assert(navGoalKind==8&&navGoal.x==179&&navGoal.y==746);
  key(MAP);
  drive(248,722,1);drive_via(179,746,1);hold(0,70);assert(ncr.phase==NCR_DRIVE);
- drive(170,775,1);drive_via(509,778,1);if(!show){drive(522,991,1);drive_via(863,1002,1);}
- else{drive(520,1025,1);
+ drive(170,775,1);drive_via(509,778,1);
+ if(!show){
+  /* The old test cut the north curb and hit a now-solid Tideway lamp.
+   * Stay centered on the road until turning into the actual marked stop. */
+  drive(522,1024,1);drive_via(862,1024,1);drive_via(ncr.drop.x,ncr.drop.y,1);
+ }else{drive(520,1025,1);
   if(show==1){drive_via(1260,1028,1);drive_via(1297,1049,1);drive_via(1376,1049,1);}
   else{drive_via(1026,1028,1);drive_via(1026,1535,1);drive_via(1090,1532,1);}
   drive_via(ncr.drop.x,ncr.drop.y,1);

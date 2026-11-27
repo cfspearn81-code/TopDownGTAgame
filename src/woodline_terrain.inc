@@ -37,8 +37,8 @@ typedef struct{short x,y;unsigned char radius,kind,height,grade;} WoodProp;
 enum{WOOD_TREE,WOOD_ROCK,WOOD_STUMP,WOOD_POST,WOOD_CRATE,WOOD_HUT,WOOD_LOGPROP,WOOD_UNDERGROWTH};
 static WoodProp woodProps[1150];static int woodPropN;
 static int woodline_coast_x(int y){
- static const short shore[][2]={{0,2375},{161,2490},{315,2880},{520,2988},{810,3018},
-  {1045,3038},{1280,3018},{1470,2984},{1780,3040},{2008,3000},{2178,2850},
+ static const short shore[][2]={{0,2890},{161,2975},{315,2976},{520,2977},{810,2979},
+  {1045,2980},{1280,2984},{1470,2979},{1780,2980},{2008,3000},{2178,2850},
   {2307,2688},{2409,2530},{2569,2358},{2740,2074},{2930,1735},{3072,1362}};
  for(int i=1;i<LEN(shore);i++)if(y<shore[i][0])
   return shore[i-1][1]+(shore[i][1]-shore[i-1][1])*(y-shore[i-1][0])/(shore[i][0]-shore[i-1][0]);
@@ -86,13 +86,24 @@ static int outer_walkable(float x,float y,float r){
 static int woodline_is_grove(int x,int y){
  int k=outer_tile(x,y)&127;return k==TILE_WOOD||k==TILE_TRAIL||k==TILE_TARN;
 }
+/* Continuous world-anchored tide colors. Used both before clipping the
+ * map into place and by the chase renderer past the last surveyed cell. */
+static U oc_ocean_ink(int x,int y){
+ int wave=y+(int)(sn(x*.019f)*3),phase=(wave+((x>>5)&7))%19;
+ if(phase<0)phase+=19;
+ unsigned s=outer_noise(x/3,y/3);
+ U base=mix(0x1a3547,0x2b4c5b,s%4);
+ if(phase<2&&((x/13)+(wave/19)*3)%9<4)base=mix(base,0x63858d,2);
+ return base;
+}
 static U woodline_ground_ink(int x,int y,int kind){
  U grain=outer_noise(x/2,y/2),fleck=outer_noise(x,y);
  int wave=y+(int)(sn(x*.019f)*3),coset=(wave+((x>>5)&7))%19;
- if(kind==TILE_TIDE||kind==TILE_TARN){
-  U water=kind==TILE_TIDE?0x182f42:0x183c40;
+ if(kind==TILE_TIDE)return oc_ocean_ink(x,y);
+ if(kind==TILE_TARN){
+  U water=0x183c40;
   if(coset<2&&((x/12)+(wave/19)*3)%9<4)return mix(water,0x78a4a6,2);
-  return mix(water,kind==TILE_TIDE?0x2d5161:0x467471,fleck%3);
+  return mix(water,0x467471,fleck%3);
  }
  if(kind==TILE_BLUSH){
   int terrace=(y+((x/3)%81)+(int)(6.f*sn(x*.007f)))%92;
@@ -164,7 +175,7 @@ static void woodline_scatter(void){
  for(int y=73;y<2740;y+=77)for(int x=2070;x<3010;x+=83){
   U u=outer_noise(x/4,y/4);int xx=x+(int)(u%29),yy=y+(int)((u>>5)%27),rx,ry;
   int ground=outer_tile(xx,yy);
-  if(!(ground==TILE_BLUSH||ground==TILE_DUNE)||outer_nearest(xx,yy,&rx,&ry,65)>=0)continue;
+  if(!(ground==TILE_BLUSH||ground==TILE_DUNE)||oc_plot_reserved(xx,yy)||outer_nearest(xx,yy,&rx,&ry,65)>=0)continue;
   if(u%5<2)woodline_prop(xx,yy,6+(u>>7)%8,WOOD_ROCK,11+(u>>15)%15,u>>26);
  }
  for(int y=2057;y<2980;y+=42)for(int x=71;x<1101;x+=57){

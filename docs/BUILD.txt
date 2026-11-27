@@ -1,3 +1,28 @@
+Open City: Street Contact build:
+  bash scripts/build-linux.sh
+  bash scripts/build.sh
+  DC_QA_BUILT=1 bash scripts/test-street-contact.sh
+  DC_QA_BUILT=1 bash scripts/test-open-city.sh
+  python3 scripts/package-open-contact.py <release-directory>
+  python3 scripts/qa/verify_open_contact_archives.py <release-directory>
+
+The current 3,682-frame opening tape is curb-lamp-tour.txt.gz (7dfa7bce).
+Windows testing uses the exact x64 PE under simulated Win32.
+See OPEN-CITY-STREET-CONTACT.md for the merged release.
+
+Open City build and verification:
+  bash scripts/build-linux.sh
+  bash scripts/build.sh
+  DC_QA_BUILT=1 bash scripts/test-open-city.sh
+  python3 scripts/package-open-city.py <release-directory>
+  python3 scripts/qa/verify_open_city_archives.py <release-directory>
+
+The exact Windows PE smoke uses a simulated Win32 host; the ELF uses
+native SDL2. The optional test-open-city.sh argument is the extracted
+All-Area 3D source directory for the bit-exact boat-motion comparison.
+
+Earlier release instructions:
+
 Conversation hold verification: after building both hosts, run
   DC_NPC_CASE=hold python3 scripts/qa/npc_keyboard_replay.py
   python3 scripts/qa/npc_indoor_replay.py

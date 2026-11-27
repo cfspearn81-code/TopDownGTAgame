@@ -70,7 +70,7 @@ static void ch_harbor_props(void){
    wl_tri((ChVec){r,t,h},(ChVec){r,b,h},(ChVec){r,y,h+3},panel);
    if(d<385){for(float xx=l+3;xx<r-5;xx+=9.f){
      wl_box(xx,t-.18f,xx+4.8f,b+.18f,5,h-2,0x9db6ae,0xb7c5ad);}
-    wl_box(r-7.1f,t-.29f,r-2.1f,b+.29f,0,h*.72f,0x435256,0xa5a68a);}
+    ch_oc_small_door(oc_placed_door(OC_QUAY,i),h*.78f);}
   }else{
    if(q->kind==HB_STACK)wl_box(l+1.6f,t+1.7f,r-1.6f,b-1.7f,h,h+4.8f,0x7f9392,0xa3b2a8);
    if(d<345){

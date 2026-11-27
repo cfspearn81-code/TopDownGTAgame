@@ -11,15 +11,15 @@ typedef struct {
  unsigned char fit,style,wide,tall;
 } NcCast;
 static const NcCast ncStageCast[]={
- /* Velvet Minx: rose fringe over a covered leotard and opaque tights. */
+ /* Velvet Minx: rose-crystal longline bodice, silk fringe and opaque stockings. */
  {0xd95388,0xffcb97,0x483451,0xb47058,0x24192b,CA_FRINGE,CA_COILS,4,1},
- /* Orbit: teal reflective jumpsuit, wing seams, extra-wide hems. */
+ /* Orbit: teal foil jumpsuit, jeweled wing shoulders and flared platform boots. */
  {0x3faaa9,0xa4e8e6,0x4b7891,0xe3ab83,0x353045,CA_FLARES,CA_QUIFF,5,2},
- /* Sable: violet fan, ostrich-feather comb, braided silhouette. */
+ /* Sable: corset-inspired satin shell, tall gloves and a violet feather fan. */
  {0x9975d7,0xebbbef,0x4d3975,0x925c4c,0x2b1e2f,CA_FEATHER,CA_BRAID,4,3},
- /* Comet: amber star-tail costume and stacked cuffs. */
+ /* Comet: amber show cape, starburst breastplate and stacked cuffs. */
  {0xeaa14f,0xffe0aa,0x723c58,0xc9896e,0x4c2d2f,CA_STAR,CA_BOB,4,0},
- /* Prism: emerald ribbon costume with techno inserts. */
+ /* Prism: emerald ribbon drape, studded hip panels and high boots. */
  {0x72b98e,0xb9fff0,0x2d6269,0xe1b6a1,0x76405d,CA_RIBBON,CA_HAWK,5,1}
 };
 static const char*const ncStageNames[]={"Velvet Minx","Orbit","Sable","Comet","Prism"};
@@ -114,6 +114,7 @@ static void nc_cast_actor(int x,int y,int scale,const NcCast*a,int pose,float t,
  U edge=0x261b2f,low=mix(a->cloth,edge,3),hi=mix(a->cloth,a->trim,4),skin=a->skin,trim=a->trim;
  int s=(int)(sn(t)*2),wave=(int)(cs(t)*3),off=(int)(sn(t*.53f)*2);
  int seated=pose==CA_SEATED,dance=pose==CA_SWAY||pose==CA_PRIVATE,working=pose==CA_WORKING;
+ int stage=dance&&a->fit<=CA_RIBBON;
  int hipY=seated?-8:-13,sy=hipY-10-a->tall,wide=a->wide,hy=sy-5,bias=seated?0:off;
  int spread=dance?4+(int)(cs(t)*2):4;
  Pt lh={-spread-s,0},rh={spread+s,-(dance?max(0,wave):0)};
@@ -130,6 +131,17 @@ static void nc_cast_actor(int x,int y,int scale,const NcCast*a,int pose,float t,
  nc_patch(g,lh.x-3,lh.y-1,5,2,edge);nc_patch(g,rh.x-1,rh.y-1,5,2,edge);
  nc_stroke(g,lh.x-3,lh.y,lh.x,lh.y,a->fit<CA_DJ?trim:hi);
  nc_stroke(g,rh.x+1,rh.y,rh.x+3,rh.y,a->fit<CA_DJ?trim:hi);
+ if(stage){
+  for(int side=-1;side<=1;side+=2){
+   Pt b=side<0?lh:rh;
+   int sl=b.x-(side<0?1:0),length=a->fit==CA_FLARES?3:7+((a->fit+1)%3);
+   nc_edge(g,(Pt){b.x-side,b.y-length},b,1,low);
+   nc_stroke(g,sl,b.y-length,sl+1,b.y-length,trim);
+   nc_stroke(g,b.x-2,b.y,b.x+2,b.y,mix(trim,PAPER,2));
+   for(int j=2;a->fit!=CA_FLARES&&j<length-1;j+=2)
+    nc_cast_dot(g,sl+(j/2&1),b.y-j,mix(a->leg,trim,3));
+  }
+ }
  Pt l={-wide+bias,sy},r={wide+bias,sy},le={-wide-2+bias,sy+5},re={wide+2+bias,sy+5};
  Pt la={-wide-1+bias,hipY+2},ra={wide+1+bias,hipY+1};
  if(dance){
@@ -152,31 +164,65 @@ static void nc_cast_actor(int x,int y,int scale,const NcCast*a,int pose,float t,
  Pt lb={-wide+1+bias,hipY+2},rb={wide-1+bias,hipY+2};
  nc_shape(g,l,r,rb,lb,a->cloth);
  nc_stroke(g,l.x,l.y,lb.x,lb.y,low);nc_stroke(g,r.x,r.y,rb.x,rb.y,edge);
+ if(stage&&a->fit==CA_STAR){
+  int k=3+wave;
+  nc_shape(g,(Pt){l.x,sy+1},(Pt){r.x,sy+1},(Pt){rb.x+8+k,hipY+9},(Pt){lb.x+2+k,hipY+3},mix(low,trim,3));
+  for(int j=0;j<5;j++)nc_stroke(g,r.x-j*2,sy+2,rb.x+8+k-j*3,hipY+9-j, j%2?low:trim);
+ }
+ if(stage){
+  /* These sparkles are embroidery on opaque stage costumes, not bare skin.
+     Left-to-right sheen changes with the existing choreography clock. */
+  int u=bias+((int)(sn(t*.61f)*1.7f));
+  nc_shape(g,(Pt){l.x+1,sy+2},(Pt){r.x-1,sy+2},(Pt){bias+2,hipY},(Pt){bias-2,hipY},hi);
+  nc_stroke(g,l.x+1,sy+3,bias-2,hipY-1,trim);
+  nc_stroke(g,r.x-1,sy+3,bias+2,hipY-1,trim);
+  for(int j=0;j<5;j++){
+   int xx=u+(j%3-1)*2,yy=sy+4+(j*3)%6;
+   nc_cast_dot(g,xx,yy,(j+(int)(t*3.f))%6==0?PAPER:mix(trim,hi,(j%3)+1));
+  }
+  nc_stroke(g,bias-3,hipY-1,bias+3,hipY-1,ncGold);
+  nc_cast_disc(g,bias,sy+2,1,mix(trim,PAPER,4));
+  nc_cast_dot(g,la.x+1,la.y+1,trim);nc_cast_dot(g,ra.x-1,ra.y+1,trim);
+ }
  switch(a->fit){
  case CA_FRINGE:{
   nc_shape(g,(Pt){-3+bias,hipY-2},(Pt){3+bias,hipY-2},(Pt){7+bias,hipY+6},(Pt){-7+bias,hipY+6},low);
   nc_stroke(g,-wide+1+bias,sy+1,wide-1+bias,hipY-1,trim);
-  for(int i=-6;i<=6;i+=2)nc_stroke(g,i/2+bias,hipY,i+bias,hipY+4+((s+i)&2),i&2?trim:hi);
+  for(int i=-8;i<=8;i+=2){
+   int yy=hipY+5+((s+i)&2);
+   nc_stroke(g,i/2+bias,hipY,i+bias,yy,i&2?trim:hi);
+   if(stage)nc_cast_dot(g,i+bias,yy,mix(trim,PAPER,2));
+  }
   nc_cast_dot(g,bias,hipY-2,trim);break;}
  case CA_FLARES:
   nc_shape(g,(Pt){l.x-2,sy},(Pt){r.x+2,sy},(Pt){r.x-1,sy+4},(Pt){l.x+1,sy+4},hi);
   nc_stroke(g,-3,sy+2,2,hipY,trim);nc_stroke(g,2,sy+2,2,hipY,ncGold);
-  nc_patch(g,-3,hipY,7,2,edge);break;
+  nc_patch(g,-3,hipY,7,2,edge);
+  if(stage)for(int j=0;j<3;j++){nc_cast_dot(g,-2+j*2,hipY,mix(trim,PAPER,2));nc_stroke(g,l.x-2,sy+j,r.x+2,sy+j,hi);}
+  break;
  case CA_FEATHER:
   nc_stroke(g,l.x+1,sy+1,1,hipY+1,trim);
   if(dance)for(int i=0;i<5;i++){
-   nc_stroke(g,la.x,la.y,la.x-2-i,la.y-3-(i&1),mix(a->cloth,trim,i+2));
-   nc_cast_dot(g,la.x-2-i,la.y-3-(i&1),trim);
+   nc_stroke(g,la.x,la.y,la.x-3-i*2,la.y-6+(i&1),mix(a->cloth,trim,i+2));
+   nc_cast_disc(g,la.x-3-i*2,la.y-6+(i&1),1,trim);
+   nc_cast_dot(g,la.x-2-i*2,la.y-5+(i&1),mix(trim,PAPER,2));
   }
   nc_patch(g,-3,hipY-1,7,2,ncGold);break;
  case CA_STAR:case CA_DUSTER:
   nc_shape(g,(Pt){l.x,sy+3},(Pt){r.x,sy+3},(Pt){rb.x+2,hipY+8},(Pt){lb.x-2,hipY+7},low);
   nc_stroke(g,l.x+1,sy+3,lb.x,hipY+6,hi);nc_stroke(g,r.x-2,sy+2,rb.x,hipY+5,trim);
-  if(a->fit==CA_STAR){nc_stroke(g,-3,sy+4,3,sy+4,trim);nc_stroke(g,0,sy+1,0,sy+8,trim);nc_cast_dot(g,0,sy+4,PAPER);}
+  if(a->fit==CA_STAR){
+   nc_stroke(g,-3,sy+4,3,sy+4,trim);nc_stroke(g,0,sy+1,0,sy+8,trim);nc_cast_dot(g,0,sy+4,PAPER);
+   if(stage)for(int j=-3;j<=3;j+=2)nc_stroke(g,r.x-1,sy+2,rb.x+3+j,hipY+8+((j&2)!=0),j&2?trim:hi);
+  }
   break;
  case CA_RIBBON:
   nc_stroke(g,l.x,sy+1,rb.x,hipY,trim);nc_stroke(g,l.x,sy+3,rb.x,hipY+2,hi);
-  if(dance){nc_stroke(g,ra.x,ra.y,ra.x+3,ra.y-2,trim);nc_stroke(g,ra.x+3,ra.y-2,ra.x+7,ra.y+1,hi);}
+  if(dance){
+   nc_stroke(g,ra.x,ra.y,ra.x+3,ra.y-2,trim);nc_stroke(g,ra.x+3,ra.y-2,ra.x+9,ra.y+1,hi);
+   nc_stroke(g,ra.x+9,ra.y+1,ra.x+12,ra.y+4+(wave&1),trim);
+   nc_stroke(g,la.x,la.y,la.x-3,la.y+4,hi);
+  }
   break;
  case CA_DJ:
   nc_stroke(g,-3,sy+3,3,sy+3,trim);nc_stroke(g,-3,sy+6,4,sy+6,low);
@@ -210,11 +256,12 @@ static void nc_cast_actor(int x,int y,int scale,const NcCast*a,int pose,float t,
  nc_costume_head(g,a,bias,hy,a->style);
  if(dance&&a->fit<=CA_RIBBON&&wave>1){
   nc_cast_dot(g,ra.x-1,ra.y-2,trim);nc_cast_dot(g,la.x+1,la.y-2,trim);
+  nc_cast_dot(g,bias-2,hy-6,mix(trim,PAPER,3));
  }
 }
 static void nc_stage_actor(int x,int y,int index,float time){
  float phase=time*(3.35f+nc_music()*.45f)+index*1.73f;
- nc_cast_actor(x+(int)(sn(phase*.62f)*5),y,142,&ncStageCast[index],CA_SWAY,phase,1);
+ nc_cast_actor(x+(int)(sn(phase*.62f)*5),y,154,&ncStageCast[index],CA_SWAY,phase,1);
 }
 static void nc_guest_actor(int x,int y,int guest,int pose,float time,int face,int scale){
  const NcCast*a=&ncGuestCast[guest%LEN(ncGuestCast)];

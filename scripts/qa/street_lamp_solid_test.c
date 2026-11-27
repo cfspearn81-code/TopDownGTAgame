@@ -48,7 +48,13 @@ static void civilian_bend(StreetLamp s){
  assert(took&&q->x>s.x+30&&absf(q->y-s.y)<5.f);
 }
 int main(void){
- init_city();assert(streetLampFootCount==107);
+ init_city();
+ int north=0;StreetLamp s;
+ for(int i=OUT_NP_PASS;i<LEN(outerNodes);i++)if(street_lamp_outer(i,&s)){
+  assert(street_lamp_clear(&s));
+  north++;
+ }
+ assert(north==4&&streetLampFootCount-north==107);
  for(int i=1;i<=streetLampFootCount;i++){
   StreetLampFoot f=streetLampFoot[i];
   assert(solid(f.x,f.y,0)&&street_lamp_foot(f.x+1.f,f.y,0));
@@ -64,5 +70,5 @@ int main(void){
  sv.x=primary.x;sv.y=primary.y;unsigned old=savehash();spawnPlayer();
  assert(d2(p.x-sv.x,p.y-sv.y)<20.f*20.f&&street_foot_clear(p.x,p.y,-1)&&old==savehash()&&p.hp==100);
  foot_contact(primary,0);foot_contact(primary,1);driven_hit(primary,0);driven_hit(primary,1);civilian_bend(secondary);
- puts("PASS: all 107 fixture bases, small-foot contact (overhead/C), rotated car sweep and one damage event per impact, civilian bypass, old-save rescue and unblocked chase boom.");
+ printf("PASS: all %d fixture bases (%d new Northpoint), small-foot contact (overhead/C), rotated car sweep and one damage event per impact, civilian bypass, old-save rescue and unblocked chase boom.\n",streetLampFootCount,north);
 }

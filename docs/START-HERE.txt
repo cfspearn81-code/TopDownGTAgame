@@ -1,16 +1,24 @@
 DEAD CHANNEL / PORT VANTA
-Street Contact Update for Windows 11 x64 and Linux x86-64
+Open City: Street Contact for Windows 11 x64 and Linux x86-64
 
 1. Windows: extract the ZIP to a normal folder and open DeadChannel.exe.
    Linux: extract the .tar.gz into a normal folder and run ./DeadChannel
    from the extracted Dead-Channel directory. If your extractor did not
    preserve execute permission, run chmod +x DeadChannel first.
-   Look for "Dead Channel | Street Contact Update" in the window title.
+   Look for "Dead Channel | Open City: Street Contact" in the window title.
 2. Select an existing Career File and choose Load / Resume. Or choose
    New Career, make a character, and select Start Career.
 3. New characters start in Apartment 4 with $0, fists and no car. Walk
    to the teal door and press E. Mara's first job at Mercury Dispatch
    introduces the city and pays for your next move.
+
+OPEN CITY
+Open the atlas with M, then F8. Northpoint is northeast of Glass Bluff.
+Press E at signed doors. Use C for a walkable room in either view.
+Pick Wardrobe from Pause to edit your current outfit; a New Career also
+has the expanded editor. Tab opens Style Lab. In Signal Settings, pin
+Shade Supply's side door, then press Enter at its Glass Mile marquee.
+See OPEN-CITY.md for the district, look, club and boat controls.
 
 CROSSROADS STREET LIFE
 See STABILITY-UPDATE.md for the latest repair notes and graded shelf migration.
